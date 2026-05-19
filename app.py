@@ -406,33 +406,67 @@ def merge_authors(authors_list: List[Dict]) -> List[Dict]:
 def find_duplicate_references(references: List[str], threshold: float = 0.85) -> List[Dict]:
     """Поиск дубликатов в списке литературы"""
     duplicates = []
+    seen_dois = {}  # Для отслеживания полных DOI
+    seen_texts = {}  # Для отслеживания текстов
+    
     for i, ref1 in enumerate(references):
+        # Извлекаем ПОЛНЫЙ DOI
         doi1 = extract_doi_from_text(ref1)
+        
+        # Проверка по полному DOI
+        if doi1:
+            if doi1 in seen_dois:
+                # Найден дубликат по полному DOI
+                j = seen_dois[doi1]
+                duplicates.append({
+                    'index1': j,
+                    'index2': i,
+                    'ref1': references[j][:200],
+                    'ref2': ref1[:200],
+                    'reason': f'Полное совпадение DOI: {doi1}'
+                })
+                continue
+            else:
+                seen_dois[doi1] = i
+        
+        # Очищаем строку для сравнения текста
         clean1 = re.sub(r'\s+', ' ', ref1).lower()
         clean1 = re.sub(r'[^\w\s]', '', clean1)
         
+        # Проверка по тексту (только если нет DOI или DOI не совпал)
         for j, ref2 in enumerate(references[i+1:], i+1):
+            # Извлекаем полный DOI второй ссылки
             doi2 = extract_doi_from_text(ref2)
             
+            # Если DOI совпадают полностью - уже обработано выше
             if doi1 and doi2 and doi1 == doi2:
-                duplicates.append({
-                    'index1': i, 'index2': j,
-                    'ref1': ref1[:200], 'ref2': ref2[:200],
-                    'reason': f'Одинаковый DOI: {doi1}'
-                })
                 continue
             
+            # Сравнение текста
             clean2 = re.sub(r'\s+', ' ', ref2).lower()
             clean2 = re.sub(r'[^\w\s]', '', clean2)
+            
             similarity = difflib.SequenceMatcher(None, clean1, clean2).ratio()
             
             if similarity > threshold:
                 duplicates.append({
-                    'index1': i, 'index2': j,
-                    'ref1': ref1[:200], 'ref2': ref2[:200],
-                    'reason': f'Схожесть текста: {similarity:.1%}'
+                    'index1': i,
+                    'index2': j,
+                    'ref1': ref1[:200],
+                    'ref2': ref2[:200],
+                    'reason': f'Высокая схожесть текста: {similarity:.1%}'
                 })
-    return duplicates
+    
+    # Удаляем дубликаты, которые могли быть добавлены дважды
+    unique_duplicates = []
+    seen_pairs = set()
+    for dup in duplicates:
+        pair = tuple(sorted([dup['index1'], dup['index2']]))
+        if pair not in seen_pairs:
+            seen_pairs.add(pair)
+            unique_duplicates.append(dup)
+    
+    return unique_duplicates
 
 # ======================== НОВЫЕ ФУНКЦИИ АНАЛИЗА ========================
 
