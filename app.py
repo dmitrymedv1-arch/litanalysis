@@ -269,30 +269,36 @@ def extract_doi_from_text(text: str) -> Optional[str]:
     return None
 
 # ======================== API ЗАПРОСЫ ========================
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=0.5, min=1, max=5))
 def fetch_crossref(doi: str) -> Optional[Dict]:
-    """Запрос к Crossref API"""
+    """Запрос к Crossref API с повторными попытками"""
     try:
         url = f"https://api.crossref.org/works/{doi}"
         headers = {'User-Agent': 'LiteratureAnalyzer/2.0 (mailto:analyzer@example.com)'}
-        response = requests.get(url, headers=headers, timeout=15)
+        response = requests.get(url, headers=headers, timeout=10)
         if response.status_code == 200:
             return response.json()['message']
-        return None
-    except:
+        elif response.status_code == 404:
+            return None
+        else:
+            return None
+    except Exception as e:
         return None
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=0.5, min=1, max=5))
 def fetch_openalex(doi: str) -> Optional[Dict]:
-    """Запрос к OpenAlex API"""
+    """Запрос к OpenAlex API с повторными попытками"""
     try:
         encoded_doi = requests.utils.quote(doi)
         url = f"https://api.openalex.org/works/doi/{encoded_doi}"
-        response = requests.get(url, timeout=15)
+        response = requests.get(url, timeout=10)
         if response.status_code == 200:
             return response.json()
-        return None
-    except:
+        elif response.status_code == 404:
+            return None
+        else:
+            return None
+    except Exception as e:
         return None
 
 def fetch_openalex_concepts(work_id: str) -> List[Dict]:
@@ -852,158 +858,209 @@ def parse_reference_list(references_text: str) -> List[str]:
     
     return references
 
+def process_single_reference(ref: str, paper_authors: Set[str] = None) -> Dict:
+    """Обработка одной ссылки (для параллельного выполнения)"""
+    doi = extract_doi_from_text(ref)
+    
+    result = {
+        'original_text': ref,
+        'doi': doi,
+        'crossref_data': None,
+        'openalex_data': None,
+        'crossref_status': False,
+        'openalex_status': False,
+        'authors': [],
+        'authors_display': [],
+        'journal': None,
+        'year': None,
+        'type': None,
+        'publisher': None,
+        'crossmark_issues': [],
+        'is_preprint': False,
+        'has_erratum': False,
+        'is_retracted': False,
+        'is_self_citation': False,
+        'issn': None,
+        'license': None,
+        'references_count': 0,
+        'citations_count': 0
+    }
+    
+    if doi:
+        # Параллельные запросы к API
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            crossref_future = executor.submit(fetch_crossref, doi)
+            openalex_future = executor.submit(fetch_openalex, doi)
+            crossref_data = crossref_future.result()
+            openalex_data = openalex_future.result()
+        
+        if crossref_data:
+            result['crossref_data'] = crossref_data
+            result['crossref_status'] = True
+            
+            authors_data = extract_authors_from_crossref(crossref_data)
+            result['authors'].extend(authors_data)
+            
+            for auth in authors_data:
+                result['authors_display'].append(auth['display_name'])
+            
+            if 'container-title' in crossref_data and crossref_data['container-title']:
+                result['journal'] = crossref_data['container-title'][0]
+            
+            if 'ISSN' in crossref_data and crossref_data['ISSN']:
+                result['issn'] = crossref_data['ISSN'][0]
+            
+            if 'issued' in crossref_data and 'date-parts' in crossref_data['issued']:
+                date_parts = crossref_data['issued']['date-parts']
+                if date_parts and date_parts[0] and len(date_parts[0]) > 0:
+                    result['year'] = date_parts[0][0]
+            
+            if 'type' in crossref_data:
+                result['type'] = crossref_data['type']
+            
+            if 'publisher' in crossref_data:
+                result['publisher'] = crossref_data['publisher']
+            
+            if 'license' in crossref_data:
+                result['license'] = crossref_data['license'][0].get('URL', '') if crossref_data['license'] else None
+            
+            if 'is-referenced-by-count' in crossref_data:
+                result['citations_count'] = crossref_data['is-referenced-by-count']
+            
+            if 'crossmark' in crossref_data:
+                for cm in crossref_data.get('crossmark', []):
+                    if 'type' in cm:
+                        result['crossmark_issues'].append(cm['type'])
+        
+        if openalex_data:
+            result['openalex_data'] = openalex_data
+            result['openalex_status'] = True
+            
+            authors_data = extract_authors_from_openalex(openalex_data)
+            existing_compare = {a['compare_name'] for a in result['authors']}
+            for auth in authors_data:
+                if auth['compare_name'] not in existing_compare:
+                    result['authors'].append(auth)
+                    result['authors_display'].append(auth['display_name'])
+                    existing_compare.add(auth['compare_name'])
+            
+            if openalex_data.get('type') == 'posted_content':
+                result['is_preprint'] = True
+            
+            if openalex_data.get('is_retracted'):
+                result['is_retracted'] = True
+            
+            if not result['year'] and 'publication_year' in openalex_data:
+                result['year'] = openalex_data['publication_year']
+            
+            if not result['journal'] and 'host_venue' in openalex_data and openalex_data['host_venue']:
+                result['journal'] = openalex_data['host_venue'].get('display_name', '')
+            
+            if not result['type'] and 'type' in openalex_data:
+                result['type'] = openalex_data['type']
+            
+            if 'referenced_works_count' in openalex_data:
+                result['references_count'] = openalex_data['referenced_works_count']
+            
+            if 'cited_by_count' in openalex_data:
+                result['citations_count'] = max(result['citations_count'], openalex_data['cited_by_count'])
+    
+    # Проверка на самоцитирование
+    if paper_authors and result['authors']:
+        for author in result['authors']:
+            for paper_author in paper_authors:
+                paper_norm, _ = normalize_author_name(paper_author)
+                if author['compare_name'] == paper_norm:
+                    result['is_self_citation'] = True
+                    break
+    
+    # Объединяем авторов
+    if result['authors']:
+        result['authors'] = merge_authors(result['authors'])
+        result['authors_display'] = [a['display_name'] for a in result['authors']]
+    
+    return result
+
 def analyze_reference_batch(references: List[str], progress_bar, progress_start: int, progress_end: int, paper_authors: Set[str] = None) -> List[Dict]:
-    """Анализ батча ссылок (расширенная версия)"""
+    """Анализ батча ссылок с параллельной обработкой"""
     results = []
     batch_size = len(references)
     
-    for idx, ref in enumerate(references):
-        doi = extract_doi_from_text(ref)
+    # Параллельная обработка всех ссылок в батче
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        # Запускаем все задачи параллельно
+        future_to_ref = {executor.submit(process_single_reference, ref, paper_authors): i for i, ref in enumerate(references)}
         
-        result = {
-            'original_text': ref,
-            'doi': doi,
-            'crossref_data': None,
-            'openalex_data': None,
-            'crossref_status': False,
-            'openalex_status': False,
-            'authors': [],
-            'authors_display': [],
-            'journal': None,
-            'year': None,
-            'type': None,
-            'publisher': None,
-            'crossmark_issues': [],
-            'is_preprint': False,
-            'has_erratum': False,
-            'is_retracted': False,
-            'is_self_citation': False,
-            'issn': None,
-            'license': None,
-            'references_count': 0,
-            'citations_count': 0
-        }
-        
-        if doi:
-            with ThreadPoolExecutor(max_workers=2) as executor:
-                crossref_future = executor.submit(fetch_crossref, doi)
-                openalex_future = executor.submit(fetch_openalex, doi)
-                crossref_data = crossref_future.result()
-                openalex_data = openalex_future.result()
+        # Собираем результаты по мере выполнения
+        for i, future in enumerate(as_completed(future_to_ref)):
+            try:
+                result = future.result()
+                results.append(result)
+            except Exception as e:
+                # В случае ошибки возвращаем базовый результат
+                idx = future_to_ref[future]
+                results.append({
+                    'original_text': references[idx],
+                    'doi': None,
+                    'crossref_data': None,
+                    'openalex_data': None,
+                    'crossref_status': False,
+                    'openalex_status': False,
+                    'authors': [],
+                    'authors_display': [],
+                    'journal': None,
+                    'year': None,
+                    'type': None,
+                    'publisher': None,
+                    'crossmark_issues': [],
+                    'is_preprint': False,
+                    'has_erratum': False,
+                    'is_retracted': False,
+                    'is_self_citation': False,
+                    'issn': None,
+                    'license': None,
+                    'references_count': 0,
+                    'citations_count': 0
+                })
             
-            if crossref_data:
-                result['crossref_data'] = crossref_data
-                result['crossref_status'] = True
-                
-                authors_data = extract_authors_from_crossref(crossref_data)
-                result['authors'].extend(authors_data)
-                
-                for auth in authors_data:
-                    result['authors_display'].append(auth['display_name'])
-                
-                if 'container-title' in crossref_data and crossref_data['container-title']:
-                    result['journal'] = crossref_data['container-title'][0]
-                
-                if 'ISSN' in crossref_data and crossref_data['ISSN']:
-                    result['issn'] = crossref_data['ISSN'][0]
-                
-                if 'issued' in crossref_data and 'date-parts' in crossref_data['issued']:
-                    date_parts = crossref_data['issued']['date-parts']
-                    if date_parts and date_parts[0] and len(date_parts[0]) > 0:
-                        result['year'] = date_parts[0][0]
-                
-                if 'type' in crossref_data:
-                    result['type'] = crossref_data['type']
-                
-                if 'publisher' in crossref_data:
-                    result['publisher'] = crossref_data['publisher']
-                
-                if 'license' in crossref_data:
-                    result['license'] = crossref_data['license'][0].get('URL', '') if crossref_data['license'] else None
-                
-                if 'is-referenced-by-count' in crossref_data:
-                    result['citations_count'] = crossref_data['is-referenced-by-count']
-                
-                if 'crossmark' in crossref_data:
-                    for cm in crossref_data.get('crossmark', []):
-                        if 'type' in cm:
-                            result['crossmark_issues'].append(cm['type'])
-            
-            if openalex_data:
-                result['openalex_data'] = openalex_data
-                result['openalex_status'] = True
-                
-                authors_data = extract_authors_from_openalex(openalex_data)
-                existing_compare = {a['compare_name'] for a in result['authors']}
-                for auth in authors_data:
-                    if auth['compare_name'] not in existing_compare:
-                        result['authors'].append(auth)
-                        result['authors_display'].append(auth['display_name'])
-                        existing_compare.add(auth['compare_name'])
-                
-                if openalex_data.get('type') == 'posted_content':
-                    result['is_preprint'] = True
-                
-                if openalex_data.get('is_retracted'):
-                    result['is_retracted'] = True
-                
-                if not result['year'] and 'publication_year' in openalex_data:
-                    result['year'] = openalex_data['publication_year']
-                
-                if not result['journal'] and 'host_venue' in openalex_data and openalex_data['host_venue']:
-                    result['journal'] = openalex_data['host_venue'].get('display_name', '')
-                
-                if not result['type'] and 'type' in openalex_data:
-                    result['type'] = openalex_data['type']
-                
-                if 'referenced_works_count' in openalex_data:
-                    result['references_count'] = openalex_data['referenced_works_count']
-                
-                if 'cited_by_count' in openalex_data:
-                    result['citations_count'] = max(result['citations_count'], openalex_data['cited_by_count'])
-        
-        if paper_authors and result['authors']:
-            for author in result['authors']:
-                for paper_author in paper_authors:
-                    paper_norm, _ = normalize_author_name(paper_author)
-                    if author['compare_name'] == paper_norm:
-                        result['is_self_citation'] = True
-                        break
-        
-        if result['authors']:
-            result['authors'] = merge_authors(result['authors'])
-            result['authors_display'] = [a['display_name'] for a in result['authors']]
-        
-        results.append(result)
-        
-        progress = progress_start + int((idx + 1) / batch_size * (progress_end - progress_start))
-        progress_bar.progress(progress / 100)
+            # Обновляем прогресс
+            progress = progress_start + int((i + 1) / batch_size * (progress_end - progress_start))
+            progress_bar.progress(progress / 100)
+    
+    # Сортируем результаты по исходному порядку
+    results.sort(key=lambda x: references.index(x['original_text']) if x['original_text'] in references else 0)
     
     return results
 
 def analyze_all_references(references: List[str], batch_size: int = 50, paper_authors: Set[str] = None) -> List[Dict]:
-    """Анализ всех ссылок с батчированием"""
+    """Анализ всех ссылок с батчированием и параллельной обработкой"""
     all_results = []
     total_batches = (len(references) + batch_size - 1) // batch_size
     
     progress_bar = st.progress(0)
     status_text = st.empty()
+    batch_info = st.empty()
     
     for batch_num in range(total_batches):
         start_idx = batch_num * batch_size
         end_idx = min(start_idx + batch_size, len(references))
         batch = references[start_idx:end_idx]
         
-        status_text.text(f"📊 Анализ батча {batch_num + 1} из {total_batches} (ссылки {start_idx + 1}-{end_idx} из {len(references)})")
+        batch_info.info(f"📊 Обработка батча {batch_num + 1} из {total_batches} (ссылки {start_idx + 1}-{end_idx} из {len(references)})")
         
         progress_start = (batch_num * 100) // total_batches
         progress_end = ((batch_num + 1) * 100) // total_batches
         
+        # Обрабатываем батч параллельно
         batch_results = analyze_reference_batch(batch, progress_bar, progress_start, progress_end, paper_authors)
         all_results.extend(batch_results)
+        
+        # Небольшая задержка между батчами для избежания rate limiting
+        time.sleep(0.5)
     
     status_text.text("✅ Анализ завершен!")
     progress_bar.progress(100)
+    batch_info.empty()
     
     return all_results
 
