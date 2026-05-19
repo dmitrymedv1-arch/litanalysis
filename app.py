@@ -10,6 +10,7 @@ from typing import Dict, List, Tuple, Optional, Set
 import hashlib
 from tenacity import retry, stop_after_attempt, wait_exponential
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 # Настройка страницы
 st.set_page_config(
@@ -227,8 +228,8 @@ def parse_reference_list(references_text: str) -> List[str]:
     
     return references
 
-async def analyze_reference_batch(references: List[str], session, progress_bar, progress_start: int, progress_end: int) -> List[Dict]:
-    """Асинхронный анализ батча ссылок"""
+def analyze_reference_batch(references: List[str], progress_bar, progress_start: int, progress_end: int) -> List[Dict]:
+    """Анализ батча ссылок"""
     results = []
     batch_size = len(references)
     
@@ -255,12 +256,12 @@ async def analyze_reference_batch(references: List[str], session, progress_bar, 
         }
         
         if doi:
-            # Параллельные запросы к Crossref и OpenAlex
-            crossref_task = asyncio.create_task(asyncio.to_thread(fetch_crossref, doi))
-            openalex_task = asyncio.create_task(asyncio.to_thread(fetch_openalex, doi))
-            
-            crossref_data = await crossref_task
-            openalex_data = await openalex_task
+            # Параллельные синхронные запросы
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                crossref_future = executor.submit(fetch_crossref, doi)
+                openalex_future = executor.submit(fetch_openalex, doi)
+                crossref_data = crossref_future.result()
+                openalex_data = openalex_future.result()
             
             if crossref_data:
                 result['crossref_data'] = crossref_data
@@ -302,11 +303,6 @@ async def analyze_reference_batch(references: List[str], session, progress_bar, 
                 
                 if openalex_data.get('is_retracted'):
                     result['is_retracted'] = True
-                
-                # Проверка на erratum через отношения
-                if 'related_works' in openalex_data:
-                    # Упрощенная проверка
-                    pass
         
         results.append(result)
         
@@ -316,7 +312,7 @@ async def analyze_reference_batch(references: List[str], session, progress_bar, 
     
     return results
 
-async def analyze_all_references(references: List[str], batch_size: int = 50) -> List[Dict]:
+def analyze_all_references(references: List[str], batch_size: int = 50) -> List[Dict]:
     """Анализ всех ссылок с батчированием"""
     all_results = []
     total_batches = (len(references) + batch_size - 1) // batch_size
@@ -324,19 +320,18 @@ async def analyze_all_references(references: List[str], batch_size: int = 50) ->
     progress_bar = st.progress(0)
     status_text = st.empty()
     
-    async with aiohttp.ClientSession() as session:
-        for batch_num in range(total_batches):
-            start_idx = batch_num * batch_size
-            end_idx = min(start_idx + batch_size, len(references))
-            batch = references[start_idx:end_idx]
-            
-            status_text.text(f"Анализ батча {batch_num + 1} из {total_batches} (ссылки {start_idx + 1}-{end_idx} из {len(references)})")
-            
-            progress_start = (batch_num * 100) // total_batches
-            progress_end = ((batch_num + 1) * 100) // total_batches
-            
-            batch_results = await analyze_reference_batch(batch, session, progress_bar, progress_start, progress_end)
-            all_results.extend(batch_results)
+    for batch_num in range(total_batches):
+        start_idx = batch_num * batch_size
+        end_idx = min(start_idx + batch_size, len(references))
+        batch = references[start_idx:end_idx]
+        
+        status_text.text(f"Анализ батча {batch_num + 1} из {total_batches} (ссылки {start_idx + 1}-{end_idx} из {len(references)})")
+        
+        progress_start = (batch_num * 100) // total_batches
+        progress_end = ((batch_num + 1) * 100) // total_batches
+        
+        batch_results = analyze_reference_batch(batch, progress_bar, progress_start, progress_end)
+        all_results.extend(batch_results)
     
     status_text.text("Анализ завершен!")
     progress_bar.progress(100)
@@ -544,7 +539,7 @@ def main():
                     
                     # Запускаем анализ
                     with st.spinner("Анализ ссылок..."):
-                        results = asyncio.run(analyze_all_references(references, batch_size))
+                        results = analyze_all_references(references, batch_size)
                         st.session_state['results'] = results
                         st.session_state['analysis_complete'] = True
                     
