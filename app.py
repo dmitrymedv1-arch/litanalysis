@@ -1592,7 +1592,7 @@ def main():
             with col2:
                 st.markdown(f"""
                 <div class="metric-card">
-                    <div class="metric-number">{stats['total_with_doi']} ({stats['total_with_doi']/stats['total_references']*100:.0f}%)</div>
+                    <div class="metric-number">{stats['total_with_doi']} ({stats['total_with_doi']/stats['total_references']*100 if stats['total_references'] > 0 else 0:.0f}%)</div>
                     <div class="metric-label">🔗 Найдено DOI</div>
                 </div>
                 """, unsafe_allow_html=True)
