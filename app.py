@@ -563,7 +563,7 @@ def analyze_temporal_citations(results: List[Dict]) -> Dict:
                     })
     
     return {
-        'yearly_distribution': dict(sorted_yearly_citations),
+        'yearly_distribution': dict(sorted(yearly_citations.items())),
         'cumulative_citations': cumulative,
         'median_age': median_age,
         'sleeping_beauties': sleeping_beauties[:5],
