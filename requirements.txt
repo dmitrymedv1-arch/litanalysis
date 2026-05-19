@@ -1,12 +1,7 @@
 streamlit
-numpy
 pandas
-plotly
-scipy
-kaleido
-pymc
-arviz
-openpyxl
-xlrd
-statsmodels
-matplotlib
+requests
+aiohttp
+asyncio
+python-dotenv
+tenacity
