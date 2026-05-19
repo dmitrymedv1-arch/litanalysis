@@ -14,7 +14,7 @@ import difflib
 import math
 from collections import defaultdict
 from itertools import combinations
-
+ 
 # Попробуем импортировать дополнительные библиотеки для новых функций
 try:
     from langdetect import detect, DetectorFactory
