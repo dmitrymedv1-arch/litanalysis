@@ -235,25 +235,37 @@ def cache_issn_lookup(issn: str) -> Optional[Dict]:
 
 # ======================== ИЗВЛЕЧЕНИЕ DOI ========================
 def extract_doi_from_text(text: str) -> Optional[str]:
-    """Извлечение DOI из строки с учетом различных форматов"""
+    """Извлечение DOI из строки с учетом всех возможных форматов"""
+    # Очищаем текст
     text = text.replace('\n', ' ').replace('\r', ' ')
     
+    # Паттерны для DOI в разных форматах (от более специфичных к общим)
     patterns = [
-        r'https?://doi\.org/(10\.\d{4,9}/[^\s]+)',
-        r'https?://dx\.doi\.org/(10\.\d{4,9}/[^\s]+)',
-        r'doi[:]\s*(10\.\d{4,9}/[^\s]+)',
-        r'DOI[:]\s*(10\.\d{4,9}/[^\s]+)',
-        r'(10\.\d{4,9}/[^\s]+)'
+        # https://doi.org/10.xxxx/xxxx
+        r'https?://doi\.org/(10\.\d{4,9}/[^\s<>"\'()]+)',
+        # https://dx.doi.org/10.xxxx/xxxx
+        r'https?://dx\.doi\.org/(10\.\d{4,9}/[^\s<>"\'()]+)',
+        # doi:10.xxxx/xxxx (с двоеточием)
+        r'doi[:]\s*(10\.\d{4,9}/[^\s<>"\'()]+)',
+        # DOI:10.xxxx/xxxx (с двоеточием и заглавными)
+        r'DOI[:]\s*(10\.\d{4,9}/[^\s<>"\'()]+)',
+        # doi = 10.xxxx/xxxx
+        r'doi\s*=\s*(10\.\d{4,9}/[^\s<>"\'()]+)',
+        # Просто 10.xxxx/xxxx в конце строки или перед пробелом/пунктуацией
+        r'(10\.\d{4,9}/[^\s<>"\'()]+)'
     ]
     
     for pattern in patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            doi_raw = match.group(1) if match.lastindex else match.group(0)
-            doi_raw = re.sub(r'[.,;:)]+$', '', doi_raw)
-            doi_raw = doi_raw.strip()
-            if re.match(r'10\.\d{4,9}/', doi_raw):
-                return doi_raw
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        if matches:
+            for match in matches:
+                # Очищаем от trailing punctuation
+                doi_raw = re.sub(r'[.,;:)]+$', '', match)
+                doi_raw = doi_raw.strip()
+                # Валидируем формат DOI
+                if re.match(r'10\.\d{4,9}/', doi_raw):
+                    return doi_raw
+    
     return None
 
 # ======================== API ЗАПРОСЫ ========================
@@ -755,24 +767,52 @@ def identify_citation_classics(results: List[Dict]) -> List[Dict]:
 
 # ======================== ОСНОВНАЯ ЛОГИКА АНАЛИЗА ========================
 def parse_reference_list(references_text: str) -> List[str]:
-    """Разбиение списка литературы на отдельные ссылки"""
+    """Разбиение списка литературы на отдельные ссылки (поддержка множества форматов)"""
     lines = references_text.strip().split('\n')
     references = []
     current_ref = []
+    
+    # Паттерны для определения начала новой ссылки
+    patterns = [
+        r'^\d+\.',      # 1.
+        r'^\[\d+\]',    # [1]
+        r'^\(\d+\)',    # (1)
+        r'^\d+\)',      # 1)
+        r'^\d+\s+[A-Z]' # 1 Y. Zheng (без точки)
+    ]
     
     for line in lines:
         line = line.strip()
         if not line:
             continue
         
-        if re.match(r'^\d+\.', line):
+        # Проверяем, начинается ли строка с маркера ссылки
+        is_new_ref = False
+        for pattern in patterns:
+            if re.match(pattern, line):
+                is_new_ref = True
+                break
+        
+        if is_new_ref:
+            # Сохраняем предыдущую ссылку
             if current_ref:
                 references.append(' '.join(current_ref))
-            current_ref = [line]
+            
+            # Очищаем маркер из начала строки
+            cleaned_line = line
+            for pattern in patterns:
+                cleaned_line = re.sub(pattern, '', cleaned_line, count=1)
+            cleaned_line = cleaned_line.strip()
+            current_ref = [cleaned_line]
         else:
+            # Продолжаем текущую ссылку
             if current_ref:
                 current_ref.append(line)
+            else:
+                # Если нет текущей ссылки, начинаем новую
+                current_ref = [line]
     
+    # Добавляем последнюю ссылку
     if current_ref:
         references.append(' '.join(current_ref))
     
