@@ -1913,7 +1913,7 @@ def main():
 
 === ОСНОВНАЯ СТАТИСТИКА ===
 Всего ссылок: {stats['total_references']}
-Найдено DOI: {stats['total_with_doi']} ({stats['total_with_doi']/stats['total_references']*100:.1f}%)
+Найдено DOI: {stats['total_with_doi']} ({stats['total_with_doi']/stats['total_references']*100 if stats['total_references'] > 0 else 0:.1f}%)
 Ссылки за 5 лет: {stats['years_last_5']}
 Самоцитирования: {stats['self_citations_count']} ({stats['self_citations_percent']:.1f}%)
 Суммарная цитируемость: {stats.get('total_citations_sum', 0)}
