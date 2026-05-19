@@ -580,7 +580,12 @@ def analyze_publisher_diversity(results: List[Dict]) -> Dict:
     
     total_pubs = sum(publisher_counter.values())
     if total_pubs == 0:
-        return {'hhi': 0, 'diversity': 'N/A', 'top_publishers': []}
+        return {
+            'hhi': 0, 
+            'diversity': 'N/A', 
+            'top_publishers': [],
+            'unique_publishers': 0  # ← ДОБАВИТЬ ЭТУ СТРОКУ
+        }
     
     # Индекс Херфиндаля-Хиршмана
     hhi = sum((count / total_pubs * 100) ** 2 for count in publisher_counter.values())
@@ -596,7 +601,7 @@ def analyze_publisher_diversity(results: List[Dict]) -> Dict:
     return {
         'hhi': round(hhi, 2),
         'diversity': diversity,
-        'unique_publishers': len(publisher_counter),
+        'unique_publishers': len(publisher_counter),  # ← ДОБАВИТЬ ЭТУ СТРОКУ
         'top_publishers': publisher_counter.most_common(10)
     }
 
@@ -1638,7 +1643,7 @@ def main():
             with col8:
                 st.markdown(f"""
                 <div class="metric-card">
-                    <div class="metric-number">{stats['publisher_diversity']['unique_publishers']}</div>
+                    <div class="metric-number">{stats['publisher_diversity'].get('unique_publishers', 0)}</div>
                     <div class="metric-label">🏢 Уникальных издателей</div>
                 </div>
                 """, unsafe_allow_html=True)
