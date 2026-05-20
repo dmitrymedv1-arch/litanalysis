@@ -824,58 +824,235 @@ def analyze_journal_frequency_all(results: List[Dict]) -> Dict:
     }
 
 def analyze_author_frequency_all(results: List[Dict]) -> Dict:
-    """Analyze author frequency with improved merging logic"""
-    author_counter = Counter()
-    author_details = {}
+    """Analyze author frequency with enhanced cross-reference merging using ORCID-name mapping"""
+    # Step 1: First pass - collect all author records and build ORCID to name mapping
+    all_author_records = []
+    orcid_to_names = defaultdict(set)  # Maps ORCID to all compare_names
+    name_to_orcid = {}  # Maps compare_name to ORCID (if any record has ORCID)
     
     for result in results:
         for author in result.get('authors', []):
             key = get_author_disambiguation_key(author)
-            display_name = author.get('display_name', 'Unknown')
+            compare_name = author.get('compare_name', '')
             orcid = author.get('orcid')
+            display_name = author.get('display_name', 'Unknown')
             institution = author.get('institution', '')
             country = author.get('country', '')
             
-            if key:
-                author_counter[key] += 1
-                if key not in author_details:
-                    author_details[key] = {
-                        'display_name': display_name,
-                        'orcid': orcid,
-                        'institution': institution,
-                        'country': country,
-                        'count': 0
-                    }
-                author_details[key]['count'] = author_counter[key]
-                
-                # Update with best available data
-                if orcid and not author_details[key]['orcid']:
-                    author_details[key]['orcid'] = orcid
-                if institution and not author_details[key]['institution']:
-                    author_details[key]['institution'] = institution
-                if country and not author_details[key]['country']:
-                    author_details[key]['country'] = country
+            # Store all records for later processing
+            all_author_records.append({
+                'key': key,
+                'compare_name': compare_name,
+                'orcid': orcid,
+                'display_name': display_name,
+                'institution': institution,
+                'country': country
+            })
+            
+            # Build mapping: if we have ORCID, record all names associated with it
+            if orcid:
+                orcid_to_names[orcid].add(compare_name)
+            
+            # If we have a compare_name and it has ORCID in at least one record, remember that
+            if compare_name and orcid:
+                # This name is definitively linked to this ORCID
+                name_to_orcid[compare_name] = orcid
     
-    # Convert to list and sort by count
+    # Step 2: Propagate ORCID links through name relationships
+    # If two different names are linked to the same ORCID, they represent the same person
+    name_clusters = defaultdict(set)  # Maps root name to all names in cluster
+    
+    # First, group by ORCID
+    for orcid, names in orcid_to_names.items():
+        # For each ORCID, all associated names belong together
+        root_name = min(names) if names else ''  # Use smallest name as cluster key
+        for name in names:
+            name_clusters[root_name].add(name)
+            # Also record that this name maps to this ORCID for reverse lookup
+            name_to_orcid[name] = orcid
+    
+    # Step 3: Second pass - merge records using ORCID as primary key, fallback to name clusters
+    merged_authors = {}  # Key: final_identifier, Value: author details
+    
+    for record in all_author_records:
+        original_key = record['key']
+        compare_name = record['compare_name']
+        orcid = record['orcid']
+        display_name = record['display_name']
+        institution = record['institution']
+        country = record['country']
+        
+        # Determine the canonical identifier for this author
+        canonical_id = None
+        
+        # Priority 1: Use ORCID if available (most reliable)
+        if orcid:
+            canonical_id = f"orcid:{orcid}"
+        else:
+            # Priority 2: Check if this compare_name is linked to an ORCID via name_to_orcid
+            if compare_name in name_to_orcid:
+                linked_orcid = name_to_orcid[compare_name]
+                canonical_id = f"orcid:{linked_orcid}"
+            else:
+                # Priority 3: Check if this name belongs to a cluster with other names
+                found_cluster = False
+                for root_name, cluster_names in name_clusters.items():
+                    if compare_name in cluster_names:
+                        # Use the root of the cluster as canonical identifier
+                        canonical_id = f"cluster:{root_name}"
+                        found_cluster = True
+                        break
+                
+                # Priority 4: Use original key as last resort
+                if not found_cluster:
+                    canonical_id = original_key
+        
+        # Now merge using the canonical identifier
+        if canonical_id not in merged_authors:
+            merged_authors[canonical_id] = {
+                'display_name': display_name,
+                'orcid': orcid if orcid else (name_to_orcid.get(compare_name) if compare_name in name_to_orcid else None),
+                'institution': institution,
+                'country': country,
+                'count': 0,
+                'all_names': set(),
+                'all_institutions': set(),
+                'all_countries': set()
+            }
+        
+        # Aggregate data
+        merged_authors[canonical_id]['count'] += 1
+        merged_authors[canonical_id]['all_names'].add(display_name)
+        
+        if institution:
+            merged_authors[canonical_id]['all_institutions'].add(institution)
+        if country:
+            merged_authors[canonical_id]['all_countries'].add(country)
+        
+        # Update to best available display name (prefer longer, more complete names)
+        current_display = merged_authors[canonical_id]['display_name']
+        if len(display_name) > len(current_display):
+            merged_authors[canonical_id]['display_name'] = display_name
+        
+        # Update ORCID if we have it and it's missing
+        if orcid and not merged_authors[canonical_id]['orcid']:
+            merged_authors[canonical_id]['orcid'] = orcid
+        elif compare_name in name_to_orcid and not merged_authors[canonical_id]['orcid']:
+            merged_authors[canonical_id]['orcid'] = name_to_orcid[compare_name]
+    
+    # Step 4: Build final author list with best available information
     author_list = []
-    for key, details in author_details.items():
+    for canonical_id, details in merged_authors.items():
+        # Determine the best institution (prefer non-empty, then most common if multiple)
+        best_institution = ''
+        if details['all_institutions']:
+            # Count frequency of institutions
+            inst_counter = Counter()
+            for inst in details['all_institutions']:
+                if inst:
+                    inst_counter[inst] += 1
+            if inst_counter:
+                best_institution = inst_counter.most_common(1)[0][0]
+        
+        # Determine the best country
+        best_country = ''
+        if details['all_countries']:
+            country_counter = Counter()
+            for ctry in details['all_countries']:
+                if ctry:
+                    country_counter[ctry] += 1
+            if country_counter:
+                best_country = country_counter.most_common(1)[0][0]
+        
         author_list.append({
             'display_name': details['display_name'],
             'orcid': details['orcid'],
-            'institution': details['institution'],
-            'country': details['country'],
+            'institution': best_institution,
+            'country': best_country,
             'count': details['count']
         })
     
+    # Sort by citation count descending
     author_list.sort(key=lambda x: x['count'], reverse=True)
     
-    # Calculate total unique authors
-    total_unique_authors = len(author_list)
+    # Step 5: Post-process to merge any remaining duplicates by name similarity
+    # (handle cases where ORCID is missing everywhere but names are very similar)
+    final_author_list = []
+    used_indices = set()
+    
+    for i, author in enumerate(author_list):
+        if i in used_indices:
+            continue
+        
+        # Extract base name without ORCID for comparison
+        base_name = author['display_name'].lower()
+        # Extract just the last name + first initial for comparison
+        name_parts = base_name.split()
+        if len(name_parts) >= 2:
+            last_name = name_parts[0]
+            first_initial = name_parts[1][0] if len(name_parts[1]) > 0 else ''
+            comparison_key = f"{last_name} {first_initial}"
+        else:
+            comparison_key = base_name
+        
+        # Find all authors with the same comparison_key
+        merged_count = author['count']
+        merged_orcid = author['orcid']
+        merged_institution = author['institution']
+        merged_country = author['country']
+        merged_names = [author['display_name']]
+        
+        for j, other in enumerate(author_list[i+1:], i+1):
+            if j in used_indices:
+                continue
+            
+            other_base = other['display_name'].lower()
+            other_parts = other_base.split()
+            if len(other_parts) >= 2:
+                other_last = other_parts[0]
+                other_initial = other_parts[1][0] if len(other_parts[1]) > 0 else ''
+                other_key = f"{other_last} {other_initial}"
+            else:
+                other_key = other_base
+            
+            if other_key == comparison_key:
+                # Same person!
+                used_indices.add(j)
+                merged_count += other['count']
+                merged_names.append(other['display_name'])
+                
+                # Prefer any available ORCID
+                if other['orcid'] and not merged_orcid:
+                    merged_orcid = other['orcid']
+                
+                # Prefer institution if current is empty
+                if other['institution'] and not merged_institution:
+                    merged_institution = other['institution']
+                elif other['institution'] and merged_institution and len(other['institution']) > len(merged_institution):
+                    merged_institution = other['institution']
+                
+                # Prefer country if current is empty
+                if other['country'] and not merged_country:
+                    merged_country = other['country']
+        
+        # Choose best display name (longest, most complete)
+        best_name = max(merged_names, key=len)
+        
+        final_author_list.append({
+            'display_name': best_name,
+            'orcid': merged_orcid,
+            'institution': merged_institution,
+            'country': merged_country,
+            'count': merged_count
+        })
+    
+    # Final sort by count
+    final_author_list.sort(key=lambda x: x['count'], reverse=True)
     
     return {
-        'all_authors': author_list,
-        'unique_authors': total_unique_authors,
-        'top_20': author_list[:20]
+        'all_authors': final_author_list,
+        'unique_authors': len(final_author_list),
+        'top_20': final_author_list[:20]
     }
 
 def analyze_orcid_coverage(results: List[Dict]) -> Dict:
