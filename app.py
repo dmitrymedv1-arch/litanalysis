@@ -446,6 +446,163 @@ if 'language' not in st.session_state:
 if 'bad_dois' not in st.session_state:
     st.session_state.bad_dois = set()
 
+# ======================== COLORED PROGRESS BAR ========================
+def update_colored_progress(progress_percent: float, success_rate: float = None, data_density: float = None):
+    """
+    Update progress bar with color based on:
+    - progress_percent: 0-100 completion percentage
+    - success_rate: 0-1 ratio of successful API responses (optional)
+    - data_density: 0-1 ratio of found DOIs to total references (optional)
+    """
+    
+    # Determine color based on multiple factors
+    if success_rate is not None:
+        # Color by API success rate (better metric)
+        if success_rate >= 0.8:
+            color = "#00CC96"  # Rich green - excellent
+        elif success_rate >= 0.6:
+            color = "#FFA042"  # Orange - good
+        elif success_rate >= 0.4:
+            color = "#FF6B6B"  # Coral - moderate
+        elif success_rate >= 0.2:
+            color = "#FF4444"  # Red - poor
+        else:
+            color = "#CC0000"  # Dark red - critical
+    elif data_density is not None:
+        # Color by data density (how many DOIs found)
+        if data_density >= 0.9:
+            color = "#00CC96"  # Green - dense data
+        elif data_density >= 0.7:
+            color = "#00B5F1"  # Blue - good data
+        elif data_density >= 0.5:
+            color = "#FFA042"  # Orange - moderate
+        elif data_density >= 0.3:
+            color = "#FF6B6B"  # Coral - sparse
+        else:
+            color = "#FF4444"  # Red - very sparse
+    else:
+        # Default: gradient from green to red based on progress
+        if progress_percent < 30:
+            # Green to yellow-green
+            r = int(0 + (255 * progress_percent / 30))
+            g = 255
+            b = int(100 - (100 * progress_percent / 30))
+        elif progress_percent < 70:
+            # Yellow to orange
+            r = 255
+            g = int(255 - (255 * (progress_percent - 30) / 40))
+            b = 0
+        else:
+            # Orange to red
+            r = 255
+            g = int(100 - (100 * (progress_percent - 70) / 30))
+            b = 0
+        color = f"rgb({r}, {g}, {b})"
+    
+    # Create custom HTML/CSS for colored progress bar
+    progress_html = f"""
+    <style>
+    @keyframes shimmer {{
+        0% {{ background-position: -1000px 0; }}
+        100% {{ background-position: 1000px 0; }}
+    }}
+    
+    .colored-progress-container {{
+        width: 100%;
+        background-color: #f0f0f0;
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+        margin: 10px 0;
+    }}
+    
+    .colored-progress-bar {{
+        width: {progress_percent}%;
+        height: 28px;
+        background: linear-gradient(90deg, 
+            {color} 0%, 
+            {color}CC 50%,
+            {color} 100%);
+        background-size: 200% 100%;
+        animation: shimmer 2s infinite linear;
+        border-radius: 20px;
+        transition: width 0.5s ease-in-out;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 12px;
+        text-shadow: 0 0 2px rgba(0,0,0,0.5);
+    }}
+    
+    .colored-progress-bar::after {{
+        content: "{progress_percent:.1f}%";
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        white-space: nowrap;
+    }}
+    
+    .progress-stats {{
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+    }}
+    
+    .progress-badge {{
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+    }}
+    
+    .badge-green {{ background: #d4edda; color: #155724; }}
+    .badge-blue {{ background: #d1ecf1; color: #0c5460; }}
+    .badge-orange {{ background: #fff3cd; color: #856404; }}
+    .badge-red {{ background: #f8d7da; color: #721c24; }}
+    </style>
+    
+    <div class="colored-progress-container">
+        <div class="colored-progress-bar"></div>
+    </div>
+    """
+    
+    return progress_html
+
+def get_progress_color_by_metrics(doi_found_count: int, total_refs: int, api_success_count: int = None) -> Tuple[str, str]:
+    """
+    Determine color and badge text based on actual data metrics
+    Returns: (color_hex, badge_text, badge_class)
+    """
+    data_density = doi_found_count / total_refs if total_refs > 0 else 0
+    
+    if api_success_count is not None:
+        api_success_rate = api_success_count / total_refs if total_refs > 0 else 0
+        if api_success_rate >= 0.8 and data_density >= 0.8:
+            return "#00CC96", "🚀 Excellent data quality", "badge-green"
+        elif api_success_rate >= 0.6:
+            return "#00B5F1", "📊 Good API response rate", "badge-blue"
+        elif api_success_rate >= 0.4:
+            return "#FFA042", "⚠️ Moderate data quality", "badge-orange"
+        else:
+            return "#FF4444", "❌ Low API success rate", "badge-red"
+    else:
+        if data_density >= 0.8:
+            return "#00CC96", "✅ High DOI coverage", "badge-green"
+        elif data_density >= 0.6:
+            return "#00B5F1", "📈 Good DOI coverage", "badge-blue"
+        elif data_density >= 0.4:
+            return "#FFA042", "⚠️ Moderate DOI coverage", "badge-orange"
+        elif data_density >= 0.2:
+            return "#FF6B6B", "⚠️ Low DOI coverage", "badge-red"
+        else:
+            return "#CC0000", "❌ Very low DOI coverage", "badge-red"
+
 # ======================== ENHANCED CSS DESIGN ========================
 st.markdown("""
 <style>
@@ -968,23 +1125,49 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
     return results
 
 def analyze_all_references_optimized(references: List[str], batch_size: int = 50, paper_authors: Set[str] = None) -> List[Dict]:
-    """Analyze all references with optimized batching and progress updates"""
+    """Analyze all references with optimized batching and COLORED progress updates"""
     all_results = []
     total_batches = (len(references) + batch_size - 1) // batch_size
     
-    # OPTIMIZATION 3: Use st.status for better progress indication with less frequent updates
-    status_container = st.status(f"📊 Analyzing {len(references)} references...", expanded=True)
+    # Calculate expected DOI count for color coding
+    expected_doi_count = 0
+    for ref in references:
+        if extract_doi_from_text(ref):
+            expected_doi_count += 1
+    data_density_estimate = expected_doi_count / len(references) if references else 0
+    
+    # Create colored progress container
+    progress_placeholder = st.empty()
+    metrics_placeholder = st.empty()
+    status_placeholder = st.empty()
+    
+    # Initial progress bar with estimate-based color
+    initial_color, initial_badge, badge_class = get_progress_color_by_metrics(expected_doi_count, len(references))
+    initial_html = f"""
+    <div class="colored-progress-container">
+        <div class="colored-progress-bar" style="width: 0%; background: linear-gradient(90deg, {initial_color} 0%, {initial_color}CC 50%, {initial_color} 100%);"></div>
+    </div>
+    <div class="progress-stats">
+        <span>📊 Estimated DOI coverage: {data_density_estimate:.1%}</span>
+        <span class="progress-badge {badge_class}">{initial_badge}</span>
+    </div>
+    """
+    progress_placeholder.markdown(initial_html, unsafe_allow_html=True)
+    
+    # Track metrics for dynamic color updates
+    total_dois_found = 0
+    total_api_success = 0
+    processed_refs = 0
     
     def update_progress(batch_num, ref_idx, batch_len, total_batches):
-        """Update progress - called less frequently now"""
-        overall_progress = (batch_num * batch_len + ref_idx) / len(references)
-        status_container.update(
-            label=f"📊 Analyzing: Batch {batch_num + 1}/{total_batches} | Reference {batch_num * batch_len + ref_idx + 1}/{len(references)}",
-            state="running"
-        )
-        # Update main progress bar less frequently
-        if ref_idx % 20 == 0:  # Update progress bar only every 20 references
-            st.progress(overall_progress)
+        """Update progress with dynamic coloring based on actual metrics"""
+        nonlocal total_dois_found, total_api_success, processed_refs
+        
+        # This is called from inside the batch, need to update counts carefully
+        # We'll use a simpler approach: update after each batch completion
+        pass
+    
+    status_container = st.status(f"📊 Analyzing {len(references)} references...", expanded=True)
     
     for batch_num in range(total_batches):
         start_idx = batch_num * batch_size
@@ -1000,15 +1183,195 @@ def analyze_all_references_optimized(references: List[str], batch_size: int = 50
         # Process batch with optimized function
         batch_results = analyze_reference_batch_optimized(
             batch, 
-            progress_callback=update_progress,
+            progress_callback=None,  # Disable internal callback, we'll update manually
             paper_authors=paper_authors,
             batch_num=batch_num,
             total_batches=total_batches
         )
+        
+        # Update metrics after batch completion
+        for result in batch_results:
+            processed_refs += 1
+            if result.get('doi'):
+                total_dois_found += 1
+            if result.get('crossref_status') or result.get('openalex_status'):
+                total_api_success += 1
+        
         all_results.extend(batch_results)
+        
+        # Calculate current progress and metrics
+        progress_percent = (processed_refs / len(references)) * 100
+        current_data_density = total_dois_found / processed_refs if processed_refs > 0 else 0
+        api_success_rate = total_api_success / processed_refs if processed_refs > 0 else 0
+        
+        # Get dynamic color based on actual metrics
+        color, badge_text, badge_class = get_progress_color_by_metrics(
+            total_dois_found, 
+            processed_refs,
+            total_api_success
+        )
+        
+        # Create animated shimmer effect based on progress speed
+        shimmer_speed = "2s" if progress_percent < 50 else "1s"
+        
+        # Update colored progress bar with metrics
+        progress_html = f"""
+        <style>
+        @keyframes shimmer{{
+            0% {{ background-position: -1000px 0; }}
+            100% {{ background-position: 1000px 0; }}
+        }}
+        
+        .colored-progress-container {{
+            width: 100%;
+            background-color: #f0f0f0;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+            margin: 10px 0;
+        }}
+        
+        .colored-progress-bar {{
+            width: {progress_percent:.1f}%;
+            height: 32px;
+            background: linear-gradient(90deg, 
+                {color} 0%, 
+                {color}DD 25%,
+                {color} 50%,
+                {color}DD 75%,
+                {color} 100%);
+            background-size: 200% 100%;
+            animation: shimmer {shimmer_speed} infinite linear;
+            border-radius: 20px;
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 13px;
+            text-shadow: 0 0 2px rgba(0,0,0,0.5);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }}
+        
+        .colored-progress-bar::after {{
+            content: "{progress_percent:.1f}%";
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+        }}
+        
+        .progress-stats {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 8px;
+            font-size: 12px;
+        }}
+        
+        .stat-item {{
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }}
+        
+        .progress-badge {{
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            background: {color}20;
+            color: {color};
+            border: 1px solid {color}40;
+        }}
+        
+        .badge-green {{ background: #d4edda; color: #155724; border-color: #15572440; }}
+        .badge-blue {{ background: #d1ecf1; color: #0c5460; border-color: #0c546040; }}
+        .badge-orange {{ background: #fff3cd; color: #856404; border-color: #85640440; }}
+        .badge-red {{ background: #f8d7da; color: #721c24; border-color: #721c2440; }}
+        
+        .data-metric {{
+            font-family: monospace;
+            font-size: 11px;
+            background: #f8f9fa;
+            padding: 2px 8px;
+            border-radius: 12px;
+        }}
+        
+        .progress-legend {{
+            display: flex;
+            gap: 15px;
+            margin-top: 5px;
+            font-size: 10px;
+            color: #666;
+        }}
+        
+        .legend-dot {{
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 4px;
+        }}
+        </style>
+        
+        <div class="colored-progress-container">
+            <div class="colored-progress-bar"></div>
+        </div>
+        <div class="progress-stats">
+            <div class="stat-item">
+                <span>📊</span>
+                <span><strong>{processed_refs}/{len(references)}</strong> references</span>
+            </div>
+            <div class="stat-item">
+                <span>🔗</span>
+                <span><strong>{total_dois_found}</strong> DOIs found</span>
+                <span class="data-metric">({current_data_density:.1%})</span>
+            </div>
+            <div class="stat-item">
+                <span>✅</span>
+                <span><strong>{total_api_success}</strong> API successes</span>
+                <span class="data-metric">({api_success_rate:.1%})</span>
+            </div>
+            <span class="progress-badge {badge_class}">{badge_text}</span>
+        </div>
+        <div class="progress-legend">
+            <span><span class="legend-dot" style="background: #00CC96;"></span> Excellent (80%+)</span>
+            <span><span class="legend-dot" style="background: #00B5F1;"></span> Good (60-80%)</span>
+            <span><span class="legend-dot" style="background: #FFA042;"></span> Moderate (40-60%)</span>
+            <span><span class="legend-dot" style="background: #FF6B6B;"></span> Low (20-40%)</span>
+            <span><span class="legend-dot" style="background: #CC0000;"></span> Critical (<20%)</span>
+        </div>
+        """
+        
+        progress_placeholder.markdown(progress_html, unsafe_allow_html=True)
+        
+        # Also update the main Streamlit progress bar for compatibility
+        st.progress(progress_percent / 100)
     
     status_container.update(label="✅ Analysis completed!", state="complete")
-    st.progress(100)
+    
+    # Final progress bar with completion status
+    final_color, final_badge, _ = get_progress_color_by_metrics(total_dois_found, len(references), total_api_success)
+    final_html = f"""
+    <div class="colored-progress-container">
+        <div class="colored-progress-bar" style="width: 100%; background: linear-gradient(90deg, {final_color} 0%, {final_color}CC 50%, {final_color} 100%);"></div>
+    </div>
+    <div class="progress-stats">
+        <span>✅ Analysis complete!</span>
+        <span class="progress-badge {badge_class}">{final_badge}</span>
+    </div>
+    <div class="progress-stats" style="margin-top: 10px;">
+        <span>📊 Final stats: {total_dois_found}/{len(references)} DOIs ({total_dois_found/len(references)*100:.1f}%)</span>
+        <span>🔗 API success rate: {total_api_success/len(references)*100:.1f}%</span>
+    </div>
+    """
+    progress_placeholder.markdown(final_html, unsafe_allow_html=True)
     
     return all_results
 
