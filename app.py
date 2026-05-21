@@ -512,8 +512,10 @@ def find_duplicate_references(references: List[str], threshold: float = 0.85) ->
         doi1 = extract_doi_from_text(ref1)
         
         if doi1:
+            # Check if DOI already seen (exact match including suffix)
             if doi1 in seen_dois:
                 j = seen_dois[doi1]
+                # Only consider duplicate if DOIs are EXACTLY the same (including suffix)
                 duplicates.append({
                     'index1': j,
                     'index2': i,
@@ -531,9 +533,11 @@ def find_duplicate_references(references: List[str], threshold: float = 0.85) ->
         for j, ref2 in enumerate(references[i+1:], i+1):
             doi2 = extract_doi_from_text(ref2)
             
+            # Skip if both have DOI and they are exactly the same (already handled above)
             if doi1 and doi2 and doi1 == doi2:
                 continue
             
+            # Only perform text similarity for references without exact DOI match
             clean2 = re.sub(r'\s+', ' ', ref2).lower()
             clean2 = re.sub(r'[^\w\s]', '', clean2)
             
