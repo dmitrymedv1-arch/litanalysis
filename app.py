@@ -14,6 +14,8 @@ import difflib
 import math
 from collections import defaultdict
 from itertools import combinations
+import asyncio
+import aiohttp
  
 # Try to import additional libraries for new features
 try:
@@ -826,7 +828,7 @@ def fetch_crossref(doi: str) -> Optional[Dict]:
     try:
         url = f"https://api.crossref.org/works/{doi}"
         headers = {'User-Agent': 'LiteratureAnalyzer/2.0 (mailto:analyzer@example.com)'}
-        response = requests.get(url, headers=headers, timeout=15)
+        response = requests.get(url, headers=headers, timeout=8)
         if response.status_code == 200:
             return response.json()['message']
         return None
@@ -839,7 +841,7 @@ def fetch_openalex(doi: str) -> Optional[Dict]:
     try:
         encoded_doi = requests.utils.quote(doi)
         url = f"https://api.openalex.org/works/doi/{encoded_doi}"
-        response = requests.get(url, timeout=15)
+        response = requests.get(url, timeout=8)
         if response.status_code == 200:
             return response.json()
         return None
@@ -1814,7 +1816,7 @@ def analyze_reference_batch(references: List[str], progress_bar, progress_start:
         }
         
         if doi:
-            with ThreadPoolExecutor(max_workers=2) as executor:
+            with ThreadPoolExecutor(max_workers=3) as executor:
                 crossref_future = executor.submit(fetch_crossref, doi)
                 openalex_future = executor.submit(fetch_openalex, doi)
                 crossref_data = crossref_future.result()
