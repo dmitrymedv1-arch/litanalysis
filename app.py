@@ -23,6 +23,411 @@ try:
 except ImportError:
     LANG_DETECT_AVAILABLE = False
 
+# ======================== LOCALIZATION DICTIONARY ========================
+TEXTS = {
+    'en': {
+        # General UI
+        'app_title': "Literature Reference Analyzer for Scientific Editorial Offices",
+        'app_subtitle': "Enhanced version with Crossref + OpenAlex analytics",
+        'settings': "⚙️ Settings",
+        'batch_size': "Batch size",
+        'batch_size_help': "Number of references processed at once",
+        'paper_authors': "👥 Paper authors (optional)",
+        'paper_authors_help': "For self-citation analysis",
+        'format_hint': "**Format:** `FirstInitial LastName` (e.g., `N. Fukatsu`, `N Fukatsu`, `Z. Wei`)",
+        'separator_hint': "**Separators:** comma, tab, or new line",
+        'authors_placeholder': "N. Fukatsu\nZ. Wei\nJ. Smith\nor\nN. Fukatsu, Z. Wei, J. Smith",
+        'authors_added': "✅ Added {} authors",
+        'authors_warning': "⚠️ No valid authors added. Please use format: N. Fukatsu or N Fukatsu",
+        'language': "🌐 Language",
+        'language_english': "English",
+        'language_russian': "Russian",
+        
+        # Tabs
+        'tab_upload': "📥 Data Upload",
+        'tab_analytics': "📊 Enhanced Analytics",
+        'tab_report': "📄 HTML Report",
+        
+        # Upload tab
+        'upload_header': "Literature Reference Upload",
+        'input_method': "Select input method",
+        'text_paste': "Text paste",
+        'file_upload': "File upload (.txt)",
+        'paste_placeholder': "1. Jung HS, Kim BG, Kwon JH, Bae JW. Thermocatalytic technologies...\n2. Liew WM, Ainirazali N. Cutting-edge innovations...",
+        'upload_success': "✅ File uploaded, size: {} characters",
+        'start_analysis': "🚀 Start Enhanced Analysis",
+        'parsing': "📖 Parsing reference list...",
+        'found_refs': "📄 Found {} references",
+        'preview': "🔍 Preview first 3 references",
+        'searching_duplicates': "🔍 Searching for duplicates...",
+        'found_duplicates': "⚠️ Found {} potential duplicates",
+        'view_duplicates': "View duplicates",
+        'reason': "Reason",
+        'analysis_started': "🔄 Enhanced reference analysis (this may take several minutes)...",
+        'analysis_complete': "✅ Analysis complete! Found DOI: {} out of {} references",
+        'go_to_analytics': "👈 Go to 'Enhanced Analytics' tab for detailed results",
+        'enter_reference_list': "⚠️ Please enter a reference list",
+        'limit_exceeded': "❌ Limit of 2000 references exceeded. Found {} references.",
+        
+        # Analytics tab - metrics
+        'total_references': "📄 Total references",
+        'doi_found': "🔗 DOI found",
+        'last_5_years': "📅 References (last 5 years)",
+        'self_citations': "🔄 Self-citations",
+        'total_citations': "📊 Total citations",
+        'avg_citations': "⭐ Average citations",
+        'orcid_coverage': "🎯 ORCID coverage",
+        'unique_publishers': "🏢 Unique publishers",
+        
+        # Analytics tab - sections
+        'analysis_sections': "📑 Analysis Sections",
+        'doi_status': "🔍 DOI Status",
+        'citation_metrics': "📊 Citation Metrics",
+        'identifier_coverage': "🔍 Identifier Coverage Analysis",
+        'top_authors': "👨‍🎓 Top Authors (with intelligent merging)",
+        'all_journals': "📖 All Journals (sorted by frequency)",
+        'all_publishers': "🏢 All Publishers (sorted by frequency)",
+        'yearly_stats': "📅 Yearly Statistics",
+        'recent_years_summary': "Recent years summary",
+        'distribution_by_year': "Distribution by year",
+        'detailed_yearly_data': "Detailed yearly data",
+        'key_concepts': "🧠 Key Scientific Concepts",
+        'geographic_distribution': "🌍 Geographic Distribution",
+        'collaboration_networks': "🤝 Collaboration Networks",
+        'top_author_pairs': "Top author pairs",
+        'core_authors': "Core authors",
+        'diversity_analysis': "🔄 Diversity Analysis",
+        'citation_classics': "⭐ Citation Classics",
+        'crossref_only': "⚠️ References with Only Crossref (OpenAlex missing)",
+        'openalex_only': "⚠️ References with Only OpenAlex (Crossref missing)",
+        'suspicious_dois': "🔍 Suspicious DOIs (Not found in any database)",
+        'suspicious_dois_hint': "These DOIs were extracted from references but returned no data from Crossref or OpenAlex. May be invalid, typo, or AI-generated.",
+        'non_doi_sources': "📄 Non-DOI Sources (Books, Theses, Conference Papers, etc.)",
+        'url_sources': "🔗 URL Sources (Web links without DOI)",
+        'problematic_refs': "⚠️ Problematic References",
+        'predatory_journals': "🚨 Potentially Predatory Journals",
+        'full_reference_list': "📋 Full Reference List with Filters",
+        'showing': "Showing {} of {} references",
+        'showing_first': "Showing first {} of {} references",
+        
+        # Filters
+        'only_with_doi': "Only with DOI",
+        'only_non_doi': "Only non-DOI",
+        'url_links': "URL-links",
+        'only_crossref': "Only Crossref",
+        'only_openalex': "Only OpenAlex",
+        'problematic_only': "⚠️ Problematic only",
+        'self_cited_only': "🔄 Self-cited only",
+        'search_in_text': "Search in text",
+        'search_placeholder': "Enter keyword...",
+        
+        # Reference display
+        'not_found': "Not found",
+        'status': "Status",
+        'journal': "Journal",
+        'year': "Year",
+        'authors': "Authors",
+        'citations': "Citations",
+        'issues': "Issues",
+        'full_text': "Full text",
+        'retracted': "Retracted",
+        'preprint': "Preprint",
+        'self_citation': "Self-citation",
+        'suspicious_doi_badge': "⚠️ Suspicious DOI",
+        
+        # Statistics strings
+        'status_both': "Crossref + OpenAlex",
+        'status_crossref_only': "Only Crossref",
+        'status_openalex_only': "Only OpenAlex",
+        'status_none': "No data",
+        'references_with_known_year': "References with known year",
+        'references_with_unknown_year': "References with unknown year",
+        'last_3_years': "Last 3 years",
+        'last_5_years_metric': "Last 5 years",
+        'last_10_years': "Last 10 years",
+        'unique_authors': "Unique authors",
+        'unique_journals': "Unique journals",
+        'unique_publishers_metric': "Unique publishers",
+        'shannon_authors': "Authors Shannon index",
+        'shannon_journals': "Journals Shannon index",
+        'shannon_publishers': "Publishers Shannon index",
+        'total_countries': "Total countries",
+        'international_collaboration': "International collaboration",
+        'no_citation_classics': "No citation classics detected",
+        'no_crossref_only': "✅ No references with only Crossref data",
+        'no_openalex_only': "✅ No references with only OpenAlex data",
+        'no_suspicious_dois': "✅ No suspicious DOIs detected",
+        'all_have_doi': "✅ All references have DOI identifiers",
+        'no_url_only': "✅ No URL-only references found",
+        'no_problematic': "✅ No problematic references detected",
+        'none_detected': "None detected",
+        
+        # Export
+        'export_report': "📄 Export Enhanced Report",
+        'download_html': "💾 Download HTML Report (Expert Edition)",
+        'text_export': "📋 Text Export",
+        'copy_to_clipboard': "📋 Copy to clipboard",
+        'copied': "✅ Data copied! (use Ctrl+C)",
+        'run_analysis_first': "👈 Please run analysis in 'Data Upload' tab first",
+        'upload_first': "👈 Please upload a reference list in the 'Data Upload' tab and click 'Start Enhanced Analysis'",
+        
+        # HTML Report
+        'html_overview': "📈 Overview",
+        'html_identifier_coverage': "🔍 Identifier Coverage",
+        'html_authors': "👨‍🎓 Authors",
+        'html_journals': "📖 Journals",
+        'html_publishers': "🏢 Publishers",
+        'html_yearly': "📅 Yearly Statistics",
+        'html_concepts': "🧠 Concepts",
+        'html_geography': "🌍 Geography",
+        'html_collaborations': "🤝 Collaborations",
+        'html_diversity': "🔄 Diversity",
+        'html_classics': "⭐ Citation Classics",
+        'html_self_citations': "📝 Self-Citations",
+        'html_crossref_only': "⚠️ Only Crossref",
+        'html_openalex_only': "⚠️ Only OpenAlex",
+        'html_suspicious_doi': "🔍 Suspicious DOIs",
+        'html_non_doi': "📄 Non-DOI Sources",
+        'html_url_sources': "🔗 URL Sources",
+        'html_problems': "⚠️ Problems",
+        'html_generated': "Generated",
+        'html_footer': "Report automatically generated using Crossref and OpenAlex APIs.",
+        'html_copyright': "© Literature Reference Analyzer | Expert Edition",
+        'html_rank': "Rank",
+        'html_count': "Count",
+        'html_percentage': "Percentage",
+        'html_citations_count': "citations",
+        'html_frequency': "Frequency",
+        'html_authors_count': "authors",
+        'html_connections': "connections",
+        'html_joint_works': "joint works",
+        'html_citations_label': "citations",
+        'html_total_self_citations': "Total self-citations",
+        'html_attention': "⚠️ Attention: invalid/suspicious DOI",
+        'html_not_found': "Not found",
+        'html_works': "works",
+        
+        # Additional UI
+        'authors_warning_text': "Author name format not recognized: '{}'. Expected format: 'N. Fukatsu' or 'N Fukatsu'",
+        'with_orcid': "With ORCID",
+        'unique_concepts': "Unique concepts",
+        'median_age': "Median age",
+        'average_age': "Average age",
+        'core_authors_label': "Core authors",
+        'orcid_label': "ORCID",
+        'institution_label': "Institution",
+        'country_label': "Country",
+        'yearly_distribution': "Distribution by year (from newest to oldest):",
+        'cumulative_percentage': "Cumulative percentage:",
+        'references_count': "references",
+        'percent_sign': "%",
+        'cumulative': "cumulative",
+    },
+    'ru': {
+        # General UI
+        'app_title': "Анализатор литературных ссылок для научных редакций",
+        'app_subtitle': "Расширенная версия с аналитикой Crossref + OpenAlex",
+        'settings': "⚙️ Настройки",
+        'batch_size': "Размер пакета",
+        'batch_size_help': "Количество ссылок, обрабатываемых за раз",
+        'paper_authors': "👥 Авторы статьи (опционально)",
+        'paper_authors_help': "Для анализа самоцитирования",
+        'format_hint': "**Формат:** `Инициал Фамилия` (например, `Н. Фукацу`, `Н Фукацу`, `З. Вэй`)",
+        'separator_hint': "**Разделители:** запятая, табуляция или новая строка",
+        'authors_placeholder': "Н. Фукацу\nЗ. Вэй\nД. Смит\nили\nН. Фукацу, З. Вэй, Д. Смит",
+        'authors_added': "✅ Добавлено {} авторов",
+        'authors_warning': "⚠️ Не добавлено ни одного корректного автора. Используйте формат: Н. Фукацу или Н Фукацу",
+        'language': "🌐 Язык",
+        'language_english': "Английский",
+        'language_russian': "Русский",
+        
+        # Tabs
+        'tab_upload': "📥 Загрузка данных",
+        'tab_analytics': "📊 Расширенная аналитика",
+        'tab_report': "📄 HTML отчет",
+        
+        # Upload tab
+        'upload_header': "Загрузка списка литературы",
+        'input_method': "Выберите способ ввода",
+        'text_paste': "Вставка текста",
+        'file_upload': "Загрузка файла (.txt)",
+        'paste_placeholder': "1. Иванов ИИ, Петров ПП. Новые технологии...\n2. Сидоров АБ. Инновации в науке...",
+        'upload_success': "✅ Файл загружен, размер: {} символов",
+        'start_analysis': "🚀 Запустить расширенный анализ",
+        'parsing': "📖 Разбор списка литературы...",
+        'found_refs': "📄 Найдено {} ссылок",
+        'preview': "🔍 Предпросмотр первых 3 ссылок",
+        'searching_duplicates': "🔍 Поиск дубликатов...",
+        'found_duplicates': "⚠️ Найдено {} потенциальных дубликатов",
+        'view_duplicates': "Показать дубликаты",
+        'reason': "Причина",
+        'analysis_started': "🔄 Выполняется расширенный анализ ссылок (это может занять несколько минут)...",
+        'analysis_complete': "✅ Анализ завершен! Найдено DOI: {} из {} ссылок",
+        'go_to_analytics': "👈 Перейдите на вкладку 'Расширенная аналитика' для просмотра результатов",
+        'enter_reference_list': "⚠️ Пожалуйста, введите список литературы",
+        'limit_exceeded': "❌ Превышен лимит в 2000 ссылок. Найдено {} ссылок.",
+        
+        # Analytics tab - metrics
+        'total_references': "📄 Всего ссылок",
+        'doi_found': "🔗 Найдено DOI",
+        'last_5_years': "📅 Ссылок (последние 5 лет)",
+        'self_citations': "🔄 Самоцитирований",
+        'total_citations': "📊 Всего цитирований",
+        'avg_citations': "⭐ Среднее цитирований",
+        'orcid_coverage': "🎯 Покрытие ORCID",
+        'unique_publishers': "🏢 Уникальных издательств",
+        
+        # Analytics tab - sections
+        'analysis_sections': "📑 Разделы анализа",
+        'doi_status': "🔍 Статус DOI",
+        'citation_metrics': "📊 Метрики цитирований",
+        'identifier_coverage': "🔍 Анализ покрытия идентификаторами",
+        'top_authors': "👨‍🎓 Топ авторов (с интеллектуальным объединением)",
+        'all_journals': "📖 Все журналы (по частоте)",
+        'all_publishers': "🏢 Все издательства (по частоте)",
+        'yearly_stats': "📅 Годовая статистика",
+        'recent_years_summary': "Сводка за последние годы",
+        'distribution_by_year': "Распределение по годам",
+        'detailed_yearly_data': "Детальные данные по годам",
+        'key_concepts': "🧠 Ключевые концепции",
+        'geographic_distribution': "🌍 Географическое распределение",
+        'collaboration_networks': "🤝 Сети сотрудничества",
+        'top_author_pairs': "Топ пар авторов",
+        'core_authors': "Ядерные авторы",
+        'diversity_analysis': "🔄 Анализ разнообразия",
+        'citation_classics': "⭐ Классики цитирования",
+        'crossref_only': "⚠️ Ссылки только с Crossref (нет в OpenAlex)",
+        'openalex_only': "⚠️ Ссылки только с OpenAlex (нет в Crossref)",
+        'suspicious_dois': "🔍 Подозрительные DOI (не найдены ни в одной базе)",
+        'suspicious_dois_hint': "Эти DOI были извлечены из ссылок, но не вернули данных из Crossref или OpenAlex. Возможно, недействительны, содержат опечатку или сгенерированы ИИ.",
+        'non_doi_sources': "📄 Источники без DOI (книги, диссертации, материалы конференций и т.д.)",
+        'url_sources': "🔗 Источники с URL (веб-ссылки без DOI)",
+        'problematic_refs': "⚠️ Проблемные ссылки",
+        'predatory_journals': "🚨 Потенциально хищнические журналы",
+        'full_reference_list': "📋 Полный список литературы с фильтрами",
+        'showing': "Показано {} из {} ссылок",
+        'showing_first': "Показаны первые {} из {} ссылок",
+        
+        # Filters
+        'only_with_doi': "Только с DOI",
+        'only_non_doi': "Только без DOI",
+        'url_links': "Только URL-ссылки",
+        'only_crossref': "Только Crossref",
+        'only_openalex': "Только OpenAlex",
+        'problematic_only': "⚠️ Только проблемные",
+        'self_cited_only': "🔄 Только самоцитирования",
+        'search_in_text': "Поиск в тексте",
+        'search_placeholder': "Введите ключевое слово...",
+        
+        # Reference display
+        'not_found': "Не найдено",
+        'status': "Статус",
+        'journal': "Журнал",
+        'year': "Год",
+        'authors': "Авторы",
+        'citations': "Цитирований",
+        'issues': "Проблемы",
+        'full_text': "Полный текст",
+        'retracted': "Отозвана",
+        'preprint': "Препринт",
+        'self_citation': "Самоцитирование",
+        'suspicious_doi_badge': "⚠️ Подозрительный DOI",
+        
+        # Statistics strings
+        'status_both': "Crossref + OpenAlex",
+        'status_crossref_only': "Только Crossref",
+        'status_openalex_only': "Только OpenAlex",
+        'status_none': "Нет данных",
+        'references_with_known_year': "Ссылок с известным годом",
+        'references_with_unknown_year': "Ссылок с неизвестным годом",
+        'last_3_years': "Последние 3 года",
+        'last_5_years_metric': "Последние 5 лет",
+        'last_10_years': "Последние 10 лет",
+        'unique_authors': "Уникальных авторов",
+        'unique_journals': "Уникальных журналов",
+        'unique_publishers_metric': "Уникальных издательств",
+        'shannon_authors': "Индекс Шеннона (авторы)",
+        'shannon_journals': "Индекс Шеннона (журналы)",
+        'shannon_publishers': "Индекс Шеннона (издательства)",
+        'total_countries': "Всего стран",
+        'international_collaboration': "Международное сотрудничество",
+        'no_citation_classics': "Классики цитирования не обнаружены",
+        'no_crossref_only': "✅ Нет ссылок только с Crossref",
+        'no_openalex_only': "✅ Нет ссылок только с OpenAlex",
+        'no_suspicious_dois': "✅ Подозрительных DOI не обнаружено",
+        'all_have_doi': "✅ Все ссылки имеют DOI",
+        'no_url_only': "✅ Ссылок только с URL не найдено",
+        'no_problematic': "✅ Проблемных ссылок не обнаружено",
+        'none_detected': "Не обнаружено",
+        
+        # Export
+        'export_report': "📄 Экспорт расширенного отчета",
+        'download_html': "💾 Скачать HTML отчет (Expert Edition)",
+        'text_export': "📋 Текстовый экспорт",
+        'copy_to_clipboard': "📋 Копировать в буфер",
+        'copied': "✅ Данные скопированы! (используйте Ctrl+C)",
+        'run_analysis_first': "👈 Сначала запустите анализ на вкладке 'Загрузка данных'",
+        'upload_first': "👈 Загрузите список литературы на вкладке 'Загрузка данных' и нажмите 'Запустить расширенный анализ'",
+        
+        # HTML Report
+        'html_overview': "📈 Обзор",
+        'html_identifier_coverage': "🔍 Покрытие идентификаторами",
+        'html_authors': "👨‍🎓 Авторы",
+        'html_journals': "📖 Журналы",
+        'html_publishers': "🏢 Издательства",
+        'html_yearly': "📅 Годовая статистика",
+        'html_concepts': "🧠 Концепции",
+        'html_geography': "🌍 География",
+        'html_collaborations': "🤝 Сотрудничество",
+        'html_diversity': "🔄 Разнообразие",
+        'html_classics': "⭐ Классики цитирования",
+        'html_self_citations': "📝 Самоцитирования",
+        'html_crossref_only': "⚠️ Только Crossref",
+        'html_openalex_only': "⚠️ Только OpenAlex",
+        'html_suspicious_doi': "🔍 Подозрительные DOI",
+        'html_non_doi': "📄 Источники без DOI",
+        'html_url_sources': "🔗 URL-источники",
+        'html_problems': "⚠️ Проблемы",
+        'html_generated': "Сгенерирован",
+        'html_footer': "Отчет автоматически сгенерирован с использованием API Crossref и OpenAlex.",
+        'html_copyright': "© Анализатор литературных ссылок | Экспертная версия",
+        'html_rank': "Ранг",
+        'html_count': "Количество",
+        'html_percentage': "Процент",
+        'html_citations_count': "цитирований",
+        'html_frequency': "Частота",
+        'html_authors_count': "авторов",
+        'html_connections': "связей",
+        'html_joint_works': "совместных работ",
+        'html_citations_label': "цитирований",
+        'html_total_self_citations': "Всего самоцитирований",
+        'html_attention': "⚠️ Внимание: недействительный/подозрительный DOI",
+        'html_not_found': "Не найден",
+        'html_works': "работ",
+        
+        # Additional UI
+        'authors_warning_text': "Формат имени автора не распознан: '{}'. Ожидаемый формат: 'Н. Фукацу' или 'Н Фукацу'",
+        'with_orcid': "С ORCID",
+        'unique_concepts': "Уникальных концепций",
+        'median_age': "Медианный возраст",
+        'average_age': "Средний возраст",
+        'core_authors_label': "Ядерные авторы",
+        'orcid_label': "ORCID",
+        'institution_label': "Учреждение",
+        'country_label': "Страна",
+        'yearly_distribution': "Распределение по годам (от новых к старым):",
+        'cumulative_percentage': "Накопленный процент:",
+        'references_count': "ссылок",
+        'percent_sign': "%",
+        'cumulative': "накоплено",
+    }
+}
+
+def get_text(key: str) -> str:
+    """Get localized text by key"""
+    lang = st.session_state.get('language', 'en')
+    return TEXTS[lang].get(key, TEXTS['en'].get(key, key))
+
 # Page configuration
 st.set_page_config(
     page_title="Literature Reference Analyzer | Expert Edition",
@@ -30,6 +435,10 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Initialize language in session state
+if 'language' not in st.session_state:
+    st.session_state.language = 'en'
 
 # ======================== ENHANCED CSS DESIGN ========================
 st.markdown("""
@@ -1568,7 +1977,7 @@ def parse_paper_authors(authors_input: str) -> Set[str]:
                 if len(parts_reverse[0]) == 1 or (len(parts_reverse[0]) == 2 and parts_reverse[0][1] == '.'):
                     authors.add(part)
                     continue
-            st.warning(f"Author name format not recognized: '{part}'. Expected format: 'N. Fukatsu' or 'N Fukatsu'")
+            st.warning(get_text('authors_warning_text').format(part))
     
     return authors
 
@@ -1629,16 +2038,16 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         has_problem = False
         problems = []
         if result['is_retracted']:
-            problems.append('Retracted')
+            problems.append(get_text('retracted'))
             has_problem = True
         if result['is_preprint']:
-            problems.append('Preprint')
+            problems.append(get_text('preprint'))
             has_problem = True
         if result['crossmark_issues']:
             problems.extend(result['crossmark_issues'])
             has_problem = True
         if result.get('is_suspicious_doi'):
-            problems.append('⚠️ Suspicious DOI (not found in any database)')
+            problems.append('⚠️ ' + get_text('suspicious_doi_badge'))
             has_problem = True
         
         if has_problem:
@@ -1666,7 +2075,7 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         orcid_str = f" 🔗 ORCID: {author['orcid']}" if author.get('orcid') else ""
         inst_str = f" 🏛 {author['institution'][:30]}" if author.get('institution') else ""
         display = ' '.join([part.capitalize() for part in author['display_name'].split()])
-        top_authors_formatted.append(f"{display}{orcid_str}{inst_str} — {author['count']} citations")
+        top_authors_formatted.append(f"{display}{orcid_str}{inst_str} — {author['count']} {get_text('html_citations_label')}")
     
     total_refs_with_journal = sum(journal_counter.values())
     citation_stacking = []
@@ -1750,13 +2159,13 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
     }
 
 # ======================== HTML REPORT (ENGLISH, UPDATED) ========================
-def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_authors: Set[str] = None) -> str:
+def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_authors: Set[str] = None, lang: str = 'en') -> str:
     """Generate enhanced HTML report in English with clickable links"""
     
     def make_clickable_doi(doi):
         if doi:
             return f'<a href="https://doi.org/{doi}" target="_blank" class="clickable-link">{doi}</a>'
-        return 'Not found'
+        return get_text('html_not_found')
     
     def make_clickable_orcid(orcid):
         if orcid:
@@ -1769,7 +2178,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         return ''
     
     html = f"""<!DOCTYPE html>
-<html lang="en">
+<html lang="{lang}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1997,93 +2406,93 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
 </head>
 <body>
     <div class="sidebar">
-        <h3>📊 Navigation</h3>
-        <a href="#overview">📈 Overview</a>
-        <a href="#identifiers">🔍 Identifier Coverage</a>
-        <a href="#authors">👨‍🎓 Authors</a>
-        <a href="#journals">📖 Journals</a>
-        <a href="#publishers">🏢 Publishers</a>
-        <a href="#yearly">📅 Yearly Statistics</a>
-        <a href="#concepts">🧠 Concepts</a>
-        <a href="#geography">🌍 Geography</a>
-        <a href="#collaboration">🤝 Collaborations</a>
-        <a href="#diversity">🔄 Diversity</a>
-        <a href="#classics">⭐ Citation Classics</a>
-        <a href="#selfcitations">📝 Self-Citations</a>
-        <a href="#crossref_only">⚠️ Only Crossref</a>
-        <a href="#openalex_only">⚠️ Only OpenAlex</a>
-        <a href="#suspicious_doi">🔍 Suspicious DOIs</a>
-        <a href="#non_doi">📄 Non-DOI Sources</a>
-        <a href="#url_sources">🔗 URL Sources</a>
-        <a href="#problems">⚠️ Problems</a>
+        <h3>📊 {get_text('html_overview')}</h3>
+        <a href="#overview">{get_text('html_overview')}</a>
+        <a href="#identifiers">{get_text('html_identifier_coverage')}</a>
+        <a href="#authors">{get_text('html_authors')}</a>
+        <a href="#journals">{get_text('html_journals')}</a>
+        <a href="#publishers">{get_text('html_publishers')}</a>
+        <a href="#yearly">{get_text('html_yearly')}</a>
+        <a href="#concepts">{get_text('html_concepts')}</a>
+        <a href="#geography">{get_text('html_geography')}</a>
+        <a href="#collaboration">{get_text('html_collaborations')}</a>
+        <a href="#diversity">{get_text('html_diversity')}</a>
+        <a href="#classics">{get_text('html_classics')}</a>
+        <a href="#selfcitations">{get_text('html_self_citations')}</a>
+        <a href="#crossref_only">{get_text('html_crossref_only')}</a>
+        <a href="#openalex_only">{get_text('html_openalex_only')}</a>
+        <a href="#suspicious_doi">{get_text('html_suspicious_doi')}</a>
+        <a href="#non_doi">{get_text('html_non_doi')}</a>
+        <a href="#url_sources">{get_text('html_url_sources')}</a>
+        <a href="#problems">{get_text('html_problems')}</a>
     </div>
     
     <div class="main-content">
         <div class="header">
-            <h1>📚 Enhanced Literature Reference Analysis</h1>
-            <div class="date">Generated: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}</div>
+            <h1>📚 {get_text('app_title')}</h1>
+            <div class="date">{get_text('html_generated')}: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}</div>
             <div style="margin-top: 15px;">
                 <span class="badge badge-success">✅ Crossref + OpenAlex</span>
-                <span class="badge badge-info">📊 {stats['total_references']} references</span>
+                <span class="badge badge-info">📊 {stats['total_references']} {get_text('total_references')}</span>
             </div>
         </div>
         
         <div id="overview" class="section">
-            <div class="section-title">📈 Overview Statistics</div>
+            <div class="section-title">{get_text('html_overview')}</div>
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-number">{stats['total_references']}</div>
-                    <div class="stat-label">Total References</div>
+                    <div class="stat-label">{get_text('total_references')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['total_with_doi']}</div>
-                    <div class="stat-label">With DOI</div>
+                    <div class="stat-label">{get_text('doi_found')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['yearly_stats']['last_5_years']}</div>
-                    <div class="stat-label">References (last 5 years)</div>
+                    <div class="stat-label">{get_text('last_5_years')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['self_citations_count']}</div>
-                    <div class="stat-label">Self-citations</div>
+                    <div class="stat-label">{get_text('self_citations')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats.get('total_citations_sum', 0)}</div>
-                    <div class="stat-label">Total citations</div>
+                    <div class="stat-label">{get_text('total_citations')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats.get('avg_citations', 0):.1f}</div>
-                    <div class="stat-label">Average citations</div>
+                    <div class="stat-label">{get_text('avg_citations')}</div>
                 </div>
             </div>
         </div>
         
         <div id="identifiers" class="section">
-            <div class="section-title">🔍 Identifier Coverage</div>
+            <div class="section-title">{get_text('html_identifier_coverage')}</div>
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-number">{stats['identifier_coverage']['stats']['has_doi']}</div>
-                    <div class="stat-label">With DOI</div>
+                    <div class="stat-label">{get_text('doi_found')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['identifier_coverage']['stats']['has_url']}</div>
-                    <div class="stat-label">With URL</div>
+                    <div class="stat-label">URL</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['identifier_coverage']['stats']['has_arxiv']}</div>
-                    <div class="stat-label">With arXiv</div>
+                    <div class="stat-label">arXiv</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['identifier_coverage']['stats']['has_pmid']}</div>
-                    <div class="stat-label">With PMID</div>
+                    <div class="stat-label">PMID</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['identifier_coverage']['stats']['has_isbn']}</div>
-                    <div class="stat-label">With ISBN</div>
+                    <div class="stat-label">ISBN</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['identifier_coverage']['stats']['has_none']}</div>
-                    <div class="stat-label">No identifier</div>
+                    <div class="stat-label">{get_text('no_identifier')}</div>
                 </div>
             </div>
             <div class="stats-grid">
@@ -2093,193 +2502,193 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['doi_status']['crossref_only']}</div>
-                    <div class="stat-label">⚠️ Only Crossref</div>
+                    <div class="stat-label">⚠️ {get_text('only_crossref')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['doi_status']['openalex_only']}</div>
-                    <div class="stat-label">⚠️ Only OpenAlex</div>
+                    <div class="stat-label">⚠️ {get_text('only_openalex')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['doi_status']['none']}</div>
-                    <div class="stat-label">❌ No data</div>
+                    <div class="stat-label">❌ {get_text('status_none')}</div>
                 </div>
             </div>
         </div>
         
         <div id="authors" class="section">
-            <div class="section-title">👨‍🎓 Author Analysis (Enhanced Merging)</div>
+            <div class="section-title">{get_text('html_authors')}</div>
             <div>
-                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{author["display_name"]}</span><span class="rank-count">{author["count"]} citations</span>' + (f'<div style="font-size: 11px; color: #667eea;">🔗 ORCID: {make_clickable_orcid(author["orcid"])}</div>' if author.get("orcid") else '') + (f'<div style="font-size: 11px; color: #666;">🏛 {author["institution"][:50]}</div>' if author.get("institution") else '') + '<div class="progress-bar"><div class="progress-fill" style="width: ' + str(min(100, author["count"] / stats["author_frequency_all"]["all_authors"][0]["count"] * 100 if stats["author_frequency_all"]["all_authors"] else 0)) + '%;"></div></div></div>' for i, author in enumerate(stats["author_frequency_all"]["all_authors"][:30])])}
+                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{author["display_name"]}</span><span class="rank-count">{author["count"]} {get_text("html_citations_label")}</span>' + (f'<div style="font-size: 11px; color: #667eea;">🔗 ORCID: {make_clickable_orcid(author["orcid"])}</div>' if author.get("orcid") else '') + (f'<div style="font-size: 11px; color: #666;">🏛 {author["institution"][:50]}</div>' if author.get("institution") else '') + '<div class="progress-bar"><div class="progress-fill" style="width: ' + str(min(100, author["count"] / stats["author_frequency_all"]["all_authors"][0]["count"] * 100 if stats["author_frequency_all"]["all_authors"] else 0)) + '%;"></div></div></div>' for i, author in enumerate(stats["author_frequency_all"]["all_authors"][:30])])}
             </div>
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">Unique authors: {stats['author_frequency_all']['unique_authors']}</span>
-                <span class="badge badge-info">Shannon index: {stats['shannon_index']['authors']}</span>
-                <span class="badge badge-info">ORCID coverage: {stats['orcid_coverage']['with_orcid']} ({stats['orcid_coverage']['coverage_percent']:.1f}%)</span>
+                <span class="badge badge-info">{get_text('unique_authors')}: {stats['author_frequency_all']['unique_authors']}</span>
+                <span class="badge badge-info">{get_text('shannon_authors')}: {stats['shannon_index']['authors']}</span>
+                <span class="badge badge-info">{get_text('orcid_coverage')}: {stats['orcid_coverage']['with_orcid']} ({stats['orcid_coverage']['coverage_percent']:.1f}%)</span>
             </div>
         </div>
         
         <div id="journals" class="section">
-            <div class="section-title">📖 Journal Frequency (All Journals)</div>
+            <div class="section-title">{get_text('html_journals')}</div>
             <table>
                 <thead>
-                    <tr><th>Rank</th><th>Journal</th><th>Count</th><th>Percentage</th></tr>
+                    <tr><th>{get_text('html_rank')}</th><th>{get_text('journal')}</th><th>{get_text('html_count')}</th><th>{get_text('html_percentage')}</th></tr>
                 </thead>
                 <tbody>
                     {''.join([f'<tr><td>{i+1}</td><td>{journal["journal"]}</td><td>{journal["count"]}</td><td>{journal["percentage"]:.1f}%</td></tr>' for i, journal in enumerate(stats["journal_frequency_all"]["all_journals"])])}
                 </tbody>
-            </table>
+             </table>
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">Unique journals: {stats['journal_frequency_all']['unique_journals']}</span>
-                <span class="badge badge-info">Shannon index: {stats['shannon_index']['journals']}</span>
+                <span class="badge badge-info">{get_text('unique_journals')}: {stats['journal_frequency_all']['unique_journals']}</span>
+                <span class="badge badge-info">{get_text('shannon_journals')}: {stats['shannon_index']['journals']}</span>
             </div>
         </div>
         
         <div id="publishers" class="section">
-            <div class="section-title">🏢 Publisher Frequency (All Publishers)</div>
+            <div class="section-title">{get_text('html_publishers')}</div>
             <table>
                 <thead>
-                    <tr><th>Rank</th><th>Publisher</th><th>Count</th><th>Percentage</th></tr>
+                    <tr><th>{get_text('html_rank')}</th><th>{get_text('publisher')}</th><th>{get_text('html_count')}</th><th>{get_text('html_percentage')}</th></tr>
                 </thead>
                 <tbody>
                     {''.join([f'<tr><td>{i+1}</td><td>{publisher["publisher"]}</td><td>{publisher["count"]}</td><td>{publisher["percentage"]:.1f}%</td></tr>' for i, publisher in enumerate(stats["publisher_frequency"]["all_publishers"])])}
                 </tbody>
-            </table>
+             </table>
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">Unique publishers: {stats['publisher_frequency']['unique_publishers']}</span>
-                <span class="badge badge-info">Shannon index: {stats['shannon_index']['publishers']}</span>
+                <span class="badge badge-info">{get_text('unique_publishers_metric')}: {stats['publisher_frequency']['unique_publishers']}</span>
+                <span class="badge badge-info">{get_text('shannon_publishers')}: {stats['shannon_index']['publishers']}</span>
             </div>
         </div>
         
         <div id="yearly" class="section">
-            <div class="section-title">📅 Yearly Statistics (Descending from Current Year)</div>
+            <div class="section-title">{get_text('html_yearly')}</div>
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-number">{stats['yearly_stats']['last_3_years']} ({stats['yearly_stats']['last_3_years_percent']:.1f}%)</div>
-                    <div class="stat-label">Last 3 years</div>
+                    <div class="stat-label">{get_text('last_3_years')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['yearly_stats']['last_5_years']} ({stats['yearly_stats']['last_5_years_percent']:.1f}%)</div>
-                    <div class="stat-label">Last 5 years</div>
+                    <div class="stat-label">{get_text('last_5_years_metric')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['yearly_stats']['last_10_years']} ({stats['yearly_stats']['last_10_years_percent']:.1f}%)</div>
-                    <div class="stat-label">Last 10 years</div>
+                    <div class="stat-label">{get_text('last_10_years')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['yearly_stats']['unknown_year']}</div>
-                    <div class="stat-label">Unknown year</div>
+                    <div class="stat-label">{get_text('references_with_unknown_year')}</div>
                 </div>
             </div>
             <div>
-                <h4>Distribution by year (from newest to oldest):</h4>
-                {''.join([f'<div class="rank-item"><span class="rank-name">{year}</span><span class="rank-count">{stats["yearly_stats"]["yearly_counts"][year]} references ({stats["yearly_stats"]["yearly_percentages"][year]:.1f}%)</span><div class="progress-bar"><div class="progress-fill" style="width: {stats["yearly_stats"]["yearly_percentages"][year]}%;"></div></div></div>' for year in sorted(stats["yearly_stats"]["yearly_counts"].keys(), reverse=True)])}
+                <h4>{get_text('yearly_distribution')}</h4>
+                {''.join([f'<div class="rank-item"><span class="rank-name">{year}</span><span class="rank-count">{stats["yearly_stats"]["yearly_counts"][year]} {get_text("references_count")} ({stats["yearly_stats"]["yearly_percentages"][year]:.1f}%)</span><div class="progress-bar"><div class="progress-fill" style="width: {stats["yearly_stats"]["yearly_percentages"][year]}%;"></div></div></div>' for year in sorted(stats["yearly_stats"]["yearly_counts"].keys(), reverse=True)])}
             </div>
             <div style="margin-top: 15px;">
-                <h4>Cumulative percentage:</h4>
-                {''.join([f'<div class="rank-item"><span class="rank-name">{year}</span><span class="rank-count">{stats["yearly_stats"]["cumulative_percentages"][year]:.1f}% cumulative</span><div class="progress-bar"><div class="progress-fill" style="width: {stats["yearly_stats"]["cumulative_percentages"][year]}%;"></div></div></div>' for year in sorted(stats["yearly_stats"]["yearly_counts"].keys(), reverse=True)])}
+                <h4>{get_text('cumulative_percentage')}</h4>
+                {''.join([f'<div class="rank-item"><span class="rank-name">{year}</span><span class="rank-count">{stats["yearly_stats"]["cumulative_percentages"][year]:.1f}% {get_text("cumulative")}</span><div class="progress-bar"><div class="progress-fill" style="width: {stats["yearly_stats"]["cumulative_percentages"][year]}%;"></div></div></div>' for year in sorted(stats["yearly_stats"]["yearly_counts"].keys(), reverse=True)])}
             </div>
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">Median age: {stats['temporal']['median_age']} years</span>
-                <span class="badge badge-info">Average age: {stats['temporal']['average_age']:.1f} years</span>
+                <span class="badge badge-info">{get_text('median_age')}: {stats['temporal']['median_age']} {get_text('years')}</span>
+                <span class="badge badge-info">{get_text('average_age')}: {stats['temporal']['average_age']:.1f} {get_text('years')}</span>
             </div>
         </div>
         
         <div id="concepts" class="section">
-            <div class="section-title">🧠 Key Concepts (OpenAlex)</div>
+            <div class="section-title">{get_text('html_concepts')}</div>
             <div class="concepts-grid">
-                {''.join([f'<div class="concept-card"><div class="concept-name">{concept[0]}</div><div class="concept-score">Frequency: {concept[1]}</div></div>' for concept in stats['concepts']['concepts'][:12]])}
+                {''.join([f'<div class="concept-card"><div class="concept-name">{concept[0]}</div><div class="concept-score">{get_text("html_frequency")}: {concept[1]}</div></div>' for concept in stats['concepts']['concepts'][:12]])}
             </div>
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">Unique concepts: {stats['concepts']['unique_concepts']}</span>
+                <span class="badge badge-info">{get_text('unique_concepts')}: {stats['concepts']['unique_concepts']}</span>
             </div>
         </div>
         
         <div id="geography" class="section">
-            <div class="section-title">🌍 Geographic Distribution</div>
+            <div class="section-title">{get_text('html_geography')}</div>
             <div>
-                {''.join([f'<div class="rank-item"><span class="rank-name">{country}</span><span class="rank-count">{count} authors</span><div class="progress-bar"><div class="progress-fill" style="width: {count / max(stats["geography"]["countries"].values()) * 100 if stats["geography"]["countries"] else 0}%;"></div></div></div>' for country, count in list(stats['geography']['countries'].items())[:10]])}
+                {''.join([f'<div class="rank-item"><span class="rank-name">{country}</span><span class="rank-count">{count} {get_text("html_authors_count")}</span><div class="progress-bar"><div class="progress-fill" style="width: {count / max(stats["geography"]["countries"].values()) * 100 if stats["geography"]["countries"] else 0}%;"></div></div></div>' for country, count in list(stats['geography']['countries'].items())[:10]])}
             </div>
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">Countries represented: {stats['geography']['total_countries']}</span>
-                <span class="badge badge-info">International collaboration: {stats['geography']['international_percent']:.1f}%</span>
+                <span class="badge badge-info">{get_text('total_countries')}: {stats['geography']['total_countries']}</span>
+                <span class="badge badge-info">{get_text('international_collaboration')}: {stats['geography']['international_percent']:.1f}%</span>
             </div>
         </div>
         
         <div id="collaboration" class="section">
-            <div class="section-title">🤝 Top Collaborations</div>
+            <div class="section-title">{get_text('html_collaborations')}</div>
             <div>
-                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{collab["author1"]} + {collab["author2"]}</span><span class="rank-count">{collab["count"]} works</span></div>' for i, collab in enumerate(stats['collaboration']['top_collaborations'][:8])])}
+                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{collab["author1"]} + {collab["author2"]}</span><span class="rank-count">{collab["count"]} {get_text("html_works")}</span></div>' for i, collab in enumerate(stats['collaboration']['top_collaborations'][:8]])])
             </div>
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">Core authors: {', '.join([f"{author[0]} ({author[1]} connections)" for author in stats['collaboration']['core_authors'][:5]])}</span>
+                <span class="badge badge-info">{get_text('core_authors_label')}: {', '.join([f"{author[0]} ({author[1]} {get_text('html_connections')})" for author in stats['collaboration']['core_authors'][:5]])}</span>
             </div>
         </div>
         
         <div id="diversity" class="section">
-            <div class="section-title">🔄 Diversity Analysis</div>
+            <div class="section-title">{get_text('html_diversity')}</div>
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-number">{stats['shannon_index']['authors']}</div>
-                    <div class="stat-label">Shannon index (authors)</div>
+                    <div class="stat-label">{get_text('shannon_authors')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['shannon_index']['journals']}</div>
-                    <div class="stat-label">Shannon index (journals)</div>
+                    <div class="stat-label">{get_text('shannon_journals')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['shannon_index']['publishers']}</div>
-                    <div class="stat-label">Shannon index (publishers)</div>
+                    <div class="stat-label">{get_text('shannon_publishers')}</div>
                 </div>
             </div>
         </div>
         
         <div id="classics" class="section">
-            <div class="section-title">⭐ Citation Classics (abnormally high citations)</div>
-            {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{classic["title"][:80]}...</span><span class="rank-count">📊 {classic["citations"]} citations</span><div style="font-size: 12px; color: #666; margin-top: 5px;">{classic["journal"]} ({classic["year"]})</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(classic["doi"])}</div>' if classic.get("doi") else '') + '</div>' for i, classic in enumerate(stats['citation_classics'][:8])]) if stats['citation_classics'] else '<p>None detected</p>'}
+            <div class="section-title">{get_text('html_classics')}</div>
+            {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{classic["title"][:80]}...</span><span class="rank-count">📊 {classic["citations"]} {get_text("html_citations_label")}</span><div style="font-size: 12px; color: #666; margin-top: 5px;">{classic["journal"]} ({classic["year"]})</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(classic["doi"])}</div>' if classic.get("doi") else '') + '</div>' for i, classic in enumerate(stats['citation_classics'][:8])]) if stats['citation_classics'] else f'<p>{get_text("no_citation_classics")}</p>'}
         </div>
         
         <div id="selfcitations" class="section">
-            <div class="section-title">📝 Self-Citations by the Author(s)</div>
-            {''.join([f'<div class="rank-item"><div><strong>📄 {ref["original_text"][:200]}...</strong></div>' + (f'<div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div>' if ref.get("doi") else '') + (f'<div style="font-size: 11px; margin-top: 5px;">📖 Journal: {ref["journal"]}</div>' if ref.get("journal") else '') + (f'<div style="font-size: 11px; margin-top: 5px;">📅 Year: {ref["year"]}</div>' if ref.get("year") else '') + '<div style="font-size: 11px; margin-top: 5px;">👨‍🎓 Authors: ' + ', '.join(ref["authors_display"][:3]) + ('...' if len(ref["authors_display"]) > 3 else '') + '</div></div>' for ref in stats.get('self_citation_refs', [])[:30]]) if stats.get('self_citation_refs') else '<p>✅ No self-citations detected</p>'}
+            <div class="section-title">{get_text('html_self_citations')}</div>
+            {''.join([f'<div class="rank-item"><div><strong>📄 {ref["original_text"][:200]}...</strong></div>' + (f'<div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div>' if ref.get("doi") else '') + (f'<div style="font-size: 11px; margin-top: 5px;">📖 {get_text("journal")}: {ref["journal"]}</div>' if ref.get("journal") else '') + (f'<div style="font-size: 11px; margin-top: 5px;">📅 {get_text("year")}: {ref["year"]}</div>' if ref.get("year") else '') + '<div style="font-size: 11px; margin-top: 5px;">👨‍🎓 ' + get_text("authors") + ': ' + ', '.join(ref["authors_display"][:3]) + ('...' if len(ref["authors_display"]) > 3 else '') + '</div></div>' for ref in stats.get('self_citation_refs', [])[:30]]) if stats.get('self_citation_refs') else f'<p>✅ {get_text("no_problematic")}</p>'}
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">Total self-citations: {stats['self_citations_count']} ({stats['self_citations_percent']:.1f}%)</span>
+                <span class="badge badge-info">{get_text('html_total_self_citations')}: {stats['self_citations_count']} ({stats['self_citations_percent']:.1f}%)</span>
             </div>
         </div>
         
         <div id="crossref_only" class="section">
-            <div class="section-title">⚠️ References with Only Crossref (OpenAlex missing)</div>
-            {''.join([f'<div class="rank-item"><div>📄 {ref["text"]}</div><div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('crossref_only_refs', [])[:20]]) if stats.get('crossref_only_refs') else '<p>✅ No references found</p>'}
+            <div class="section-title">{get_text('html_crossref_only')}</div>
+            {''.join([f'<div class="rank-item"><div>📄 {ref["text"]}</div><div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('crossref_only_refs', [])[:20]]) if stats.get('crossref_only_refs') else f'<p>{get_text("no_crossref_only")}</p>'}
         </div>
         
         <div id="openalex_only" class="section">
-            <div class="section-title">⚠️ References with Only OpenAlex (Crossref missing)</div>
-            {''.join([f'<div class="rank-item"><div>📄 {ref["text"]}</div><div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('openalex_only_refs', [])[:20]]) if stats.get('openalex_only_refs') else '<p>✅ No references found</p>'}
+            <div class="section-title">{get_text('html_openalex_only')}</div>
+            {''.join([f'<div class="rank-item"><div>📄 {ref["text"]}</div><div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('openalex_only_refs', [])[:20]]) if stats.get('openalex_only_refs') else f'<p>{get_text("no_openalex_only")}</p>'}
         </div>
         
         <div id="suspicious_doi" class="section">
-            <div class="section-title">🔍 Suspicious DOIs (Not found in Crossref or OpenAlex)</div>
-            {''.join([f'<div class="rank-item"><div class="badge badge-danger">⚠️ Attention: invalid/suspicious DOI</div><div>📄 {ref["text"]}</div><div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('suspicious_doi_refs', [])[:20]]) if stats.get('suspicious_doi_refs') else '<p>✅ No suspicious DOIs found</p>'}
+            <div class="section-title">{get_text('html_suspicious_doi')}</div>
+            {''.join([f'<div class="rank-item"><div class="badge badge-danger">{get_text("html_attention")}</div><div>📄 {ref["text"]}</div><div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('suspicious_doi_refs', [])[:20]]) if stats.get('suspicious_doi_refs') else f'<p>{get_text("no_suspicious_dois")}</p>'}
         </div>
         
         <div id="non_doi" class="section">
-            <div class="section-title">📄 Non-DOI Sources (Books, Theses, etc.)</div>
-            {''.join([f'<div class="rank-item">📄 {ref}...</div>' for ref in stats['identifier_coverage']['references_without_doi'][:20]]) if stats['identifier_coverage']['references_without_doi'] else '<p>✅ All references have DOI</p>'}
+            <div class="section-title">{get_text('html_non_doi')}</div>
+            {''.join([f'<div class="rank-item">📄 {ref}...</div>' for ref in stats['identifier_coverage']['references_without_doi'][:20]]) if stats['identifier_coverage']['references_without_doi'] else f'<p>{get_text("all_have_doi")}</p>'}
         </div>
         
         <div id="url_sources" class="section">
-            <div class="section-title">🔗 URL Sources (Web links without DOI)</div>
-            {''.join([f'<div class="rank-item">🔗 {ref}...</div>' for ref in stats['identifier_coverage']['references_with_only_url'][:20]]) if stats['identifier_coverage']['references_with_only_url'] else '<p>✅ No URL-only references</p>'}
+            <div class="section-title">{get_text('html_url_sources')}</div>
+            {''.join([f'<div class="rank-item">🔗 {ref}...</div>' for ref in stats['identifier_coverage']['references_with_only_url'][:20]]) if stats['identifier_coverage']['references_with_only_url'] else f'<p>{get_text("no_url_only")}</p>'}
         </div>
         
         <div id="problems" class="section">
-            <div class="section-title">⚠️ Problematic References</div>
-            {''.join([f'<div class="rank-item"><span class="badge badge-danger">⚠️ {ref["problems"]}</span><div style="margin-top: 8px;">{ref["text"]}...</div></div>' for ref in stats['problematic_refs'][:10]]) if stats['problematic_refs'] else '<p>✅ None detected</p>'}
-            {f'<div style="margin-top: 15px;"><h4>🚨 Potentially predatory journals:</h4>{"".join([f"<div class=rank-item>📕 {pred['journal']}<br><span style=font-size:12px;color:#666;>{', '.join(pred['signs'])}</span></div>" for pred in stats['predatory_journals'][:5]])}</div>' if stats['predatory_journals'] else ''}
+            <div class="section-title">{get_text('html_problems')}</div>
+            {''.join([f'<div class="rank-item"><span class="badge badge-danger">⚠️ {ref["problems"]}</span><div style="margin-top: 8px;">{ref["text"]}...</div></div>' for ref in stats['problematic_refs'][:10]]) if stats['problematic_refs'] else f'<p>{get_text("no_problematic")}</p>'}
+            {f'<div style="margin-top: 15px;"><h4>{get_text("predatory_journals")}:</h4>{"".join([f"<div class=rank-item>📕 {pred['journal']}<br><span style=font-size:12px;color:#666;>{', '.join(pred['signs'])}</span></div>" for pred in stats['predatory_journals'][:5]])}</div>' if stats['predatory_journals'] else ''}
         </div>
         
         <div class="footer">
-            Report automatically generated using Crossref and OpenAlex APIs.
-            <br>© Literature Reference Analyzer | Expert Edition
+            {get_text('html_footer')}
+            <br>{get_text('html_copyright')}
         </div>
     </div>
 </body>
@@ -2289,79 +2698,93 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
 
 # ======================== UI INTERFACE (ENGLISH, UPDATED) ========================
 def main():
-    st.title("📚 Literature Reference Analyzer for Scientific Editorial Offices")
-    st.markdown("### Enhanced version with Crossref + OpenAlex analytics")
+    # Language selector in sidebar (before anything else)
+    with st.sidebar:
+        st.markdown(f"## {get_text('language')}")
+        lang_option = st.selectbox(
+            "",
+            options=['en', 'ru'],
+            format_func=lambda x: get_text('language_english') if x == 'en' else get_text('language_russian'),
+            index=0 if st.session_state.language == 'en' else 1
+        )
+        if lang_option != st.session_state.language:
+            st.session_state.language = lang_option
+            st.rerun()
+        st.markdown("---")
+    
+    st.title(get_text('app_title'))
+    st.markdown(f"### {get_text('app_subtitle')}")
     st.markdown("---")
     
     with st.sidebar:
-        st.markdown("## ⚙️ Settings")
-        batch_size = st.slider("Batch size", 10, 100, 50, help="Number of references processed at once")
+        st.markdown(f"## {get_text('settings')}")
+        batch_size = st.slider(get_text('batch_size'), 10, 100, 50, help=get_text('batch_size_help'))
         
         st.markdown("---")
-        st.markdown("## 👥 Paper authors (optional)")
-        st.markdown("*For self-citation analysis*")
-        st.markdown("**Format:** `FirstInitial LastName` (e.g., `N. Fukatsu`, `N Fukatsu`, `Z. Wei`)")
-        st.markdown("**Separators:** comma, tab, or new line")
+        st.markdown(f"## {get_text('paper_authors')}")
+        st.markdown(f"*{get_text('paper_authors_help')}*")
+        st.markdown(get_text('format_hint'))
+        st.markdown(get_text('separator_hint'))
         
         authors_input = st.text_area(
-            "Authors (one per line or comma-separated)",
-            placeholder="N. Fukatsu\nZ. Wei\nJ. Smith\nor\nN. Fukatsu, Z. Wei, J. Smith",
-            help="Enter authors in format: FirstInitial LastName"
+            get_text('paper_authors'),
+            placeholder=get_text('authors_placeholder'),
+            help=get_text('paper_authors_help')
         )
         
         paper_authors = set()
         if authors_input:
             paper_authors = parse_paper_authors(authors_input)
             if paper_authors:
-                st.success(f"✅ Added {len(paper_authors)} authors")
+                st.success(get_text('authors_added').format(len(paper_authors)))
             else:
-                st.warning("⚠️ No valid authors added. Please use format: N. Fukatsu or N Fukatsu")
+                st.warning(get_text('authors_warning'))
         
         st.markdown("---")
     
-    tab1, tab2, tab3 = st.tabs(["📥 Data Upload", "📊 Enhanced Analytics", "📄 HTML Report"])
+    tab1, tab2, tab3 = st.tabs([get_text('tab_upload'), get_text('tab_analytics'), get_text('tab_report')])
     
     with tab1:
         st.markdown('<div class="custom-tab fade-in">', unsafe_allow_html=True)
-        st.header("Literature Reference Upload")
+        st.header(get_text('upload_header'))
         
-        input_method = st.radio("Select input method", ["Text paste", "File upload (.txt)"])
+        input_method = st.radio(get_text('input_method'), [get_text('text_paste'), get_text('file_upload')])
         
         references_text = ""
         
-        if input_method == "Text paste":
+        if input_method == get_text('text_paste'):
             references_text = st.text_area(
-                "Paste your reference list",
+                get_text('text_paste'),
                 height=400,
-                placeholder="1. Jung HS, Kim BG, Kwon JH, Bae JW. Thermocatalytic technologies...\n2. Liew WM, Ainirazali N. Cutting-edge innovations..."
+                placeholder=get_text('paste_placeholder')
             )
         else:
-            uploaded_file = st.file_uploader("Upload .txt file", type=['txt'])
+            uploaded_file = st.file_uploader(get_text('file_upload'), type=['txt'])
             if uploaded_file:
                 references_text = uploaded_file.read().decode('utf-8')
-                st.success(f"✅ File uploaded, size: {len(references_text)} characters")
+                st.success(get_text('upload_success').format(len(references_text)))
         
-        if st.button("🚀 Start Enhanced Analysis", type="primary", disabled=not references_text.strip()):
+        if st.button(get_text('start_analysis'), type="primary", disabled=not references_text.strip()):
             if references_text.strip():
-                with st.spinner("📖 Parsing reference list..."):
+                with st.spinner(get_text('parsing')):
                     references = parse_reference_list(references_text)
-                    st.info(f"📄 Found {len(references)} references")
+                    st.info(get_text('found_refs').format(len(references)))
                     
-                    with st.expander("🔍 Preview first 3 references"):
+                    with st.expander(get_text('preview')):
                         for i, ref in enumerate(references[:3]):
                             st.text(f"{i+1}. {ref[:200]}...")
                 
                 if len(references) > 2000:
-                    st.error(f"❌ Limit of 2000 references exceeded. Found {len(references)} references.")
+                    st.error(get_text('limit_exceeded').format(len(references)))
                 else:
-                    with st.spinner("🔍 Searching for duplicates..."):
+                    with st.spinner(get_text('searching_duplicates')):
                         duplicates = find_duplicate_references(references)
                         if duplicates:
-                            st.warning(f"⚠️ Found {len(duplicates)} potential duplicates")
-                            with st.expander("View duplicates"):
+                            st.warning(get_text('found_duplicates').format(len(duplicates)))
+                            with st.expander(get_text('view_duplicates')):
                                 for dup in duplicates[:10]:
                                     st.text(f"Reference {dup['index1']+1} and {dup['index2']+1}")
-                                    st.text(f"Reason: {dup['reason']}")
+                                    st.text(f"{get_text('reason')}: {dup['reason']}")
                                     st.markdown("---")
                     
                     st.session_state['references'] = references
@@ -2369,16 +2792,16 @@ def main():
                     st.session_state['batch_size'] = batch_size
                     st.session_state['analysis_started'] = True
                     
-                    with st.spinner("🔄 Enhanced reference analysis (this may take several minutes)..."):
+                    with st.spinner(get_text('analysis_started')):
                         results = analyze_all_references(references, batch_size, paper_authors if paper_authors else None)
                         st.session_state['results'] = results
                         st.session_state['analysis_complete'] = True
                     
-                    st.success(f"✅ Analysis complete! Found DOI: {len([r for r in results if r['doi']])} out of {len(results)} references")
+                    st.success(get_text('analysis_complete').format(len([r for r in results if r['doi']]), len(results)))
                     st.balloons()
-                    st.info("👈 Go to 'Enhanced Analytics' tab for detailed results")
+                    st.info(get_text('go_to_analytics'))
             else:
-                st.warning("⚠️ Please enter a reference list")
+                st.warning(get_text('enter_reference_list'))
         
         st.markdown('</div>', unsafe_allow_html=True)
     
@@ -2387,7 +2810,7 @@ def main():
             results = st.session_state['results']
             paper_authors = st.session_state.get('paper_authors', set())
             
-            with st.spinner("📊 Generating enhanced statistics..."):
+            with st.spinner(get_text('analysis_started')):
                 stats = generate_advanced_statistics(results)
             
             st.markdown('<div class="stats-grid">', unsafe_allow_html=True)
@@ -2396,28 +2819,28 @@ def main():
                 st.markdown(f"""
                 <div class="metric-card">
                     <div class="metric-number">{stats['total_references']}</div>
-                    <div class="metric-label">📄 Total references</div>
+                    <div class="metric-label">{get_text('total_references')}</div>
                 </div>
                 """, unsafe_allow_html=True)
             with col2:
                 st.markdown(f"""
                 <div class="metric-card">
                     <div class="metric-number">{stats['total_with_doi']} ({stats['total_with_doi']/stats['total_references']*100 if stats['total_references'] > 0 else 0:.0f}%)</div>
-                    <div class="metric-label">🔗 DOI found</div>
+                    <div class="metric-label">{get_text('doi_found')}</div>
                 </div>
                 """, unsafe_allow_html=True)
             with col3:
                 st.markdown(f"""
                 <div class="metric-card">
                     <div class="metric-number">{stats['yearly_stats']['last_5_years']}</div>
-                    <div class="metric-label">📅 References (last 5 years)</div>
+                    <div class="metric-label">{get_text('last_5_years')}</div>
                 </div>
                 """, unsafe_allow_html=True)
             with col4:
                 st.markdown(f"""
                 <div class="metric-card">
                     <div class="metric-number">{stats['self_citations_count']} ({stats['self_citations_percent']:.1f}%)</div>
-                    <div class="metric-label">🔄 Self-citations</div>
+                    <div class="metric-label">{get_text('self_citations')}</div>
                 </div>
                 """, unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
@@ -2427,35 +2850,35 @@ def main():
                 st.markdown(f"""
                 <div class="metric-card">
                     <div class="metric-number">{stats.get('total_citations_sum', 0)}</div>
-                    <div class="metric-label">📊 Total citations</div>
+                    <div class="metric-label">{get_text('total_citations')}</div>
                 </div>
                 """, unsafe_allow_html=True)
             with col6:
                 st.markdown(f"""
                 <div class="metric-card">
                     <div class="metric-number">{stats.get('avg_citations', 0):.1f}</div>
-                    <div class="metric-label">⭐ Average citations</div>
+                    <div class="metric-label">{get_text('avg_citations')}</div>
                 </div>
                 """, unsafe_allow_html=True)
             with col7:
                 st.markdown(f"""
                 <div class="metric-card">
                     <div class="metric-number">{stats['orcid_coverage']['coverage_percent']:.1f}%</div>
-                    <div class="metric-label">🎯 ORCID coverage</div>
+                    <div class="metric-label">{get_text('orcid_coverage')}</div>
                 </div>
                 """, unsafe_allow_html=True)
             with col8:
                 st.markdown(f"""
                 <div class="metric-card">
                     <div class="metric-number">{stats['publisher_frequency']['unique_publishers']}</div>
-                    <div class="metric-label">🏢 Unique publishers</div>
+                    <div class="metric-label">{get_text('unique_publishers')}</div>
                 </div>
                 """, unsafe_allow_html=True)
             
             st.markdown("---")
             
             # Custom tabs implementation with buttons
-            st.markdown("### 📑 Analysis Sections")
+            st.markdown(f"### {get_text('analysis_sections')}")
             
             # Initialize session state for active tab if not exists
             if 'active_tab' not in st.session_state:
@@ -2463,23 +2886,23 @@ def main():
             
             # Define tabs configuration
             tabs_config = [
-                {"id": "metrics", "icon": "📊", "title": "Metrics", "subtitle": "Overview stats"},
-                {"id": "identifiers", "icon": "🔍", "title": "Identifiers", "subtitle": "Coverage analysis"},
-                {"id": "authors", "icon": "👨‍🎓", "title": "Authors", "subtitle": "Frequency & ORCID"},
-                {"id": "journals", "icon": "📖", "title": "Journals", "subtitle": "All journals"},
-                {"id": "publishers", "icon": "🏢", "title": "Publishers", "subtitle": "All publishers"},
-                {"id": "yearly", "icon": "📅", "title": "Yearly", "subtitle": "Temporal stats"},
-                {"id": "concepts", "icon": "🧠", "title": "Concepts", "subtitle": "Key topics"},
-                {"id": "geography", "icon": "🌍", "title": "Geography", "subtitle": "Distribution"},
-                {"id": "collaboration", "icon": "🤝", "title": "Collaborations", "subtitle": "Networks"},
-                {"id": "diversity", "icon": "🔄", "title": "Diversity", "subtitle": "Shannon index"},
-                {"id": "classics", "icon": "⭐", "title": "Classics", "subtitle": "High citations"},
-                {"id": "crossref_only", "icon": "⚠️", "title": "Only Crossref", "subtitle": "Missing OpenAlex"},
-                {"id": "openalex_only", "icon": "⚠️", "title": "Only OpenAlex", "subtitle": "Missing Crossref"},
-                {"id": "suspicious", "icon": "🔍", "title": "Suspicious DOI", "subtitle": "Invalid DOIs"},
-                {"id": "non_doi", "icon": "📄", "title": "Non-DOI", "subtitle": "Books, theses"},
-                {"id": "url_sources", "icon": "🔗", "title": "URL Sources", "subtitle": "Web links"},
-                {"id": "problems", "icon": "⚠️", "title": "Problems", "subtitle": "Issues detected"}
+                {"id": "metrics", "icon": "📊", "title": get_text('total_references'), "subtitle": get_text('html_overview')},
+                {"id": "identifiers", "icon": "🔍", "title": get_text('identifier_coverage'), "subtitle": get_text('html_identifier_coverage')},
+                {"id": "authors", "icon": "👨‍🎓", "title": get_text('authors'), "subtitle": get_text('html_authors')},
+                {"id": "journals", "icon": "📖", "title": get_text('journal'), "subtitle": get_text('html_journals')},
+                {"id": "publishers", "icon": "🏢", "title": get_text('publisher'), "subtitle": get_text('html_publishers')},
+                {"id": "yearly", "icon": "📅", "title": get_text('yearly_stats'), "subtitle": get_text('html_yearly')},
+                {"id": "concepts", "icon": "🧠", "title": get_text('key_concepts'), "subtitle": get_text('html_concepts')},
+                {"id": "geography", "icon": "🌍", "title": get_text('geographic_distribution'), "subtitle": get_text('html_geography')},
+                {"id": "collaboration", "icon": "🤝", "title": get_text('collaboration_networks'), "subtitle": get_text('html_collaborations')},
+                {"id": "diversity", "icon": "🔄", "title": get_text('diversity_analysis'), "subtitle": get_text('html_diversity')},
+                {"id": "classics", "icon": "⭐", "title": get_text('citation_classics'), "subtitle": get_text('html_classics')},
+                {"id": "crossref_only", "icon": "⚠️", "title": get_text('crossref_only'), "subtitle": get_text('html_crossref_only')},
+                {"id": "openalex_only", "icon": "⚠️", "title": get_text('openalex_only'), "subtitle": get_text('html_openalex_only')},
+                {"id": "suspicious", "icon": "🔍", "title": get_text('suspicious_dois'), "subtitle": get_text('html_suspicious_doi')},
+                {"id": "non_doi", "icon": "📄", "title": get_text('non_doi_sources'), "subtitle": get_text('html_non_doi')},
+                {"id": "url_sources", "icon": "🔗", "title": get_text('url_sources'), "subtitle": get_text('html_url_sources')},
+                {"id": "problems", "icon": "⚠️", "title": get_text('problematic_refs'), "subtitle": get_text('html_problems')}
             ]
             
             # Create buttons in rows of 6
@@ -2489,7 +2912,6 @@ def main():
                 for j, col in enumerate(cols):
                     if i + j < len(tabs_config):
                         tab = tabs_config[i + j]
-                        button_style = "active" if st.session_state.active_tab == tab["id"] else ""
                         if col.button(
                             f"{tab['icon']}\n{tab['title']}\n{tab['subtitle']}",
                             key=f"tab_{tab['id']}",
@@ -2506,23 +2928,23 @@ def main():
             if active_tab == "metrics":
                 col1, col2 = st.columns(2)
                 with col1:
-                    st.markdown("### 🔍 DOI Status")
+                    st.markdown(f"### {get_text('doi_status')}")
                     doi_data = pd.DataFrame([
-                        {"Status": "Crossref + OpenAlex", "Count": stats['doi_status']['both']},
-                        {"Status": "Only Crossref", "Count": stats['doi_status']['crossref_only']},
-                        {"Status": "Only OpenAlex", "Count": stats['doi_status']['openalex_only']},
-                        {"Status": "No data", "Count": stats['doi_status']['none']}
+                        {"Status": get_text('status_both'), "Count": stats['doi_status']['both']},
+                        {"Status": get_text('status_crossref_only'), "Count": stats['doi_status']['crossref_only']},
+                        {"Status": get_text('status_openalex_only'), "Count": stats['doi_status']['openalex_only']},
+                        {"Status": get_text('status_none'), "Count": stats['doi_status']['none']}
                     ])
                     st.dataframe(doi_data, use_container_width=True)
                 
                 with col2:
-                    st.markdown("### 📊 Citation Metrics")
-                    st.metric("Total citations sum", stats.get('total_citations_sum', 0))
-                    st.metric("Average citations", f"{stats.get('avg_citations', 0):.1f}")
-                    st.metric("Self-citations", f"{stats['self_citations_count']} ({stats['self_citations_percent']:.1f}%)")
+                    st.markdown(f"### {get_text('citation_metrics')}")
+                    st.metric(get_text('total_citations'), stats.get('total_citations_sum', 0))
+                    st.metric(get_text('avg_citations'), f"{stats.get('avg_citations', 0):.1f}")
+                    st.metric(get_text('self_citations'), f"{stats['self_citations_count']} ({stats['self_citations_percent']:.1f}%)")
             
             elif active_tab == "identifiers":
-                st.markdown("### 🔍 Identifier Coverage Analysis")
+                st.markdown(f"### {get_text('identifier_coverage')}")
                 id_df = pd.DataFrame([
                     {"Identifier type": "DOI", "Count": stats['identifier_coverage']['stats']['has_doi'], "Percentage": f"{stats['identifier_coverage']['stats']['has_doi']/stats['total_references']*100:.1f}%"},
                     {"Identifier type": "URL", "Count": stats['identifier_coverage']['stats']['has_url'], "Percentage": f"{stats['identifier_coverage']['stats']['has_url']/stats['total_references']*100:.1f}%"},
@@ -2535,12 +2957,12 @@ def main():
                 st.dataframe(id_df, use_container_width=True)
                 
                 if stats['identifier_coverage']['references_without_any']:
-                    st.markdown("### 📄 References without any identifier")
+                    st.markdown(f"### {get_text('references_without_any')}")
                     for ref in stats['identifier_coverage']['references_without_any'][:10]:
                         st.text(ref)
             
             elif active_tab == "authors":
-                st.markdown("### 👨‍🎓 Top Authors (with intelligent merging)")
+                st.markdown(f"### {get_text('top_authors')}")
                 for i, author in enumerate(stats['author_frequency_all']['all_authors'][:30], 1):
                     orcid_text = f" 🔗 ORCID: {author['orcid']}" if author.get('orcid') else ""
                     inst_text = f" 🏛 {author['institution'][:50]}" if author.get('institution') else ""
@@ -2548,46 +2970,46 @@ def main():
                     <div class="rank-item">
                         <span class="rank-number">{i}.</span>
                         <span class="rank-name">{author['display_name']}{orcid_text}{inst_text}</span>
-                        <span class="rank-count">{author['count']} citations</span>
+                        <span class="rank-count">{author['count']} {get_text('html_citations_label')}</span>
                         <div class="progress-bar-custom">
                             <div class="progress-fill" style="width: {author['count'] / stats['author_frequency_all']['all_authors'][0]['count'] * 100 if stats['author_frequency_all']['all_authors'] else 0}%;"></div>
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
-                st.markdown(f"**Unique authors:** {stats['author_frequency_all']['unique_authors']}")
+                st.markdown(f"**{get_text('unique_authors')}:** {stats['author_frequency_all']['unique_authors']}")
             
             elif active_tab == "journals":
-                st.markdown("### 📖 All Journals (sorted by frequency)")
+                st.markdown(f"### {get_text('all_journals')}")
                 journals_df = pd.DataFrame(stats['journal_frequency_all']['all_journals'])
                 st.dataframe(journals_df, use_container_width=True)
-                st.markdown(f"**Unique journals:** {stats['journal_frequency_all']['unique_journals']}")
+                st.markdown(f"**{get_text('unique_journals')}:** {stats['journal_frequency_all']['unique_journals']}")
             
             elif active_tab == "publishers":
-                st.markdown("### 🏢 All Publishers (sorted by frequency)")
+                st.markdown(f"### {get_text('all_publishers')}")
                 publishers_df = pd.DataFrame(stats['publisher_frequency']['all_publishers'])
                 st.dataframe(publishers_df, use_container_width=True)
-                st.markdown(f"**Unique publishers:** {stats['publisher_frequency']['unique_publishers']}")
+                st.markdown(f"**{get_text('unique_publishers_metric')}:** {stats['publisher_frequency']['unique_publishers']}")
             
             elif active_tab == "yearly":
-                st.markdown("### 📅 Yearly Statistics")
-                st.markdown(f"**References with known year:** {stats['yearly_stats']['total_with_year']}")
-                st.markdown(f"**References with unknown year:** {stats['yearly_stats']['unknown_year']}")
+                st.markdown(f"### {get_text('yearly_stats')}")
+                st.markdown(f"**{get_text('references_with_known_year')}:** {stats['yearly_stats']['total_with_year']}")
+                st.markdown(f"**{get_text('references_with_unknown_year')}:** {stats['yearly_stats']['unknown_year']}")
                 
-                st.markdown("#### Recent years summary")
+                st.markdown(f"#### {get_text('recent_years_summary')}")
                 col1, col2, col3 = st.columns(3)
                 with col1:
-                    st.metric("Last 3 years", f"{stats['yearly_stats']['last_3_years']} ({stats['yearly_stats']['last_3_years_percent']:.1f}%)")
+                    st.metric(get_text('last_3_years'), f"{stats['yearly_stats']['last_3_years']} ({stats['yearly_stats']['last_3_years_percent']:.1f}%)")
                 with col2:
-                    st.metric("Last 5 years", f"{stats['yearly_stats']['last_5_years']} ({stats['yearly_stats']['last_5_years_percent']:.1f}%)")
+                    st.metric(get_text('last_5_years_metric'), f"{stats['yearly_stats']['last_5_years']} ({stats['yearly_stats']['last_5_years_percent']:.1f}%)")
                 with col3:
-                    st.metric("Last 10 years", f"{stats['yearly_stats']['last_10_years']} ({stats['yearly_stats']['last_10_years_percent']:.1f}%)")
+                    st.metric(get_text('last_10_years'), f"{stats['yearly_stats']['last_10_years']} ({stats['yearly_stats']['last_10_years_percent']:.1f}%)")
                 
-                st.markdown("#### Distribution by year")
+                st.markdown(f"#### {get_text('distribution_by_year')}")
                 years_df = pd.DataFrame(list(stats['yearly_stats']['yearly_counts'].items()), columns=["Year", "Count"])
                 years_df = years_df.sort_values("Year", ascending=False)
                 st.bar_chart(years_df.set_index("Year"))
                 
-                st.markdown("#### Detailed yearly data")
+                st.markdown(f"#### {get_text('detailed_yearly_data')}")
                 yearly_data = []
                 for year in sorted(stats['yearly_stats']['yearly_counts'].keys(), reverse=True):
                     yearly_data.append({
@@ -2599,110 +3021,110 @@ def main():
                 st.dataframe(pd.DataFrame(yearly_data), use_container_width=True)
             
             elif active_tab == "concepts":
-                st.markdown("### 🧠 Key Scientific Concepts")
+                st.markdown(f"### {get_text('key_concepts')}")
                 concepts_df = pd.DataFrame(stats['concepts']['concepts'][:15], columns=["Concept", "Frequency"])
                 st.dataframe(concepts_df, use_container_width=True)
             
             elif active_tab == "geography":
-                st.markdown("### 🌍 Geographic Distribution")
+                st.markdown(f"### {get_text('geographic_distribution')}")
                 if stats['geography']['countries']:
                     geo_df = pd.DataFrame(list(stats['geography']['countries'].items()), columns=["Country", "Author count"])
                     st.dataframe(geo_df, use_container_width=True)
-                    st.markdown(f"**Total countries:** {stats['geography']['total_countries']}")
-                    st.markdown(f"**International collaboration:** {stats['geography']['international_percent']:.1f}%")
+                    st.markdown(f"**{get_text('total_countries')}:** {stats['geography']['total_countries']}")
+                    st.markdown(f"**{get_text('international_collaboration')}:** {stats['geography']['international_percent']:.1f}%")
             
             elif active_tab == "collaboration":
-                st.markdown("### 🤝 Collaboration Networks")
+                st.markdown(f"### {get_text('collaboration_networks')}")
                 if stats['collaboration']['top_collaborations']:
-                    st.markdown("#### Top author pairs")
+                    st.markdown(f"#### {get_text('top_author_pairs')}")
                     for i, collab in enumerate(stats['collaboration']['top_collaborations'][:10], 1):
-                        st.markdown(f"{i}. **{collab['author1']}** + **{collab['author2']}** — {collab['count']} joint works")
+                        st.markdown(f"{i}. **{collab['author1']}** + **{collab['author2']}** — {collab['count']} {get_text('html_joint_works')}")
                     
-                    st.markdown("#### Core authors")
+                    st.markdown(f"#### {get_text('core_authors')}")
                     for author, connections in stats['collaboration']['core_authors'][:10]:
-                        st.markdown(f"• **{author}** — {connections} connections")
+                        st.markdown(f"• **{author}** — {connections} {get_text('html_connections')}")
             
             elif active_tab == "diversity":
-                st.markdown("### 🔄 Diversity Analysis")
+                st.markdown(f"### {get_text('diversity_analysis')}")
                 col1, col2, col3 = st.columns(3)
                 with col1:
-                    st.metric("Authors Shannon index", stats['shannon_index']['authors'])
+                    st.metric(get_text('shannon_authors'), stats['shannon_index']['authors'])
                 with col2:
-                    st.metric("Journals Shannon index", stats['shannon_index']['journals'])
+                    st.metric(get_text('shannon_journals'), stats['shannon_index']['journals'])
                 with col3:
-                    st.metric("Publishers Shannon index", stats['shannon_index']['publishers'])
+                    st.metric(get_text('shannon_publishers'), stats['shannon_index']['publishers'])
             
             elif active_tab == "classics":
-                st.markdown("### ⭐ Citation Classics")
+                st.markdown(f"### {get_text('citation_classics')}")
                 if stats['citation_classics']:
                     for classic in stats['citation_classics'][:10]:
                         with st.expander(f"{classic['title'][:100]}..."):
-                            st.markdown(f"**Citations:** {classic['citations']}")
-                            st.markdown(f"**Journal:** {classic['journal']}")
-                            st.markdown(f"**Year:** {classic['year']}")
+                            st.markdown(f"**{get_text('citations')}:** {classic['citations']}")
+                            st.markdown(f"**{get_text('journal')}:** {classic['journal']}")
+                            st.markdown(f"**{get_text('year')}:** {classic['year']}")
                             if classic.get('doi'):
                                 st.markdown(f"**DOI:** [{classic['doi']}](https://doi.org/{classic['doi']})")
                 else:
-                    st.info("No citation classics detected")
+                    st.info(get_text('no_citation_classics'))
             
             elif active_tab == "crossref_only":
-                st.markdown("### ⚠️ References with Only Crossref (OpenAlex missing)")
+                st.markdown(f"### {get_text('crossref_only')}")
                 if stats.get('crossref_only_refs'):
                     for ref in stats['crossref_only_refs'][:20]:
                         st.warning(f"📄 {ref['text']}...\n\nDOI: {ref['doi']}")
                 else:
-                    st.success("✅ No references with only Crossref data")
+                    st.success(get_text('no_crossref_only'))
             
             elif active_tab == "openalex_only":
-                st.markdown("### ⚠️ References with Only OpenAlex (Crossref missing)")
+                st.markdown(f"### {get_text('openalex_only')}")
                 if stats.get('openalex_only_refs'):
                     for ref in stats['openalex_only_refs'][:20]:
                         st.info(f"📄 {ref['text']}...\n\nDOI: {ref['doi']}")
                 else:
-                    st.success("✅ No references with only OpenAlex data")
+                    st.success(get_text('no_openalex_only'))
             
             elif active_tab == "suspicious":
-                st.markdown("### 🔍 Suspicious DOIs (Not found in any database)")
-                st.markdown("These DOIs were extracted from references but returned no data from Crossref or OpenAlex. May be invalid, typo, or AI-generated.")
+                st.markdown(f"### {get_text('suspicious_dois')}")
+                st.markdown(get_text('suspicious_dois_hint'))
                 if stats.get('suspicious_doi_refs'):
                     for ref in stats['suspicious_doi_refs'][:20]:
                         st.error(f"⚠️ {ref['text']}...\n\nDOI: {ref['doi']}")
                 else:
-                    st.success("✅ No suspicious DOIs detected")
+                    st.success(get_text('no_suspicious_dois'))
             
             elif active_tab == "non_doi":
-                st.markdown("### 📄 Non-DOI Sources (Books, Theses, Conference Papers, etc.)")
+                st.markdown(f"### {get_text('non_doi_sources')}")
                 if stats['identifier_coverage']['references_without_doi']:
                     for ref in stats['identifier_coverage']['references_without_doi'][:20]:
                         st.text(ref)
                 else:
-                    st.success("✅ All references have DOI identifiers")
+                    st.success(get_text('all_have_doi'))
             
             elif active_tab == "url_sources":
-                st.markdown("### 🔗 URL Sources (Web links without DOI)")
+                st.markdown(f"### {get_text('url_sources')}")
                 if stats['identifier_coverage']['references_with_only_url']:
                     for ref in stats['identifier_coverage']['references_with_only_url'][:20]:
                         st.text(ref)
                 else:
-                    st.success("✅ No URL-only references found")
+                    st.success(get_text('no_url_only'))
             
             elif active_tab == "problems":
-                st.markdown("### ⚠️ Problematic References")
+                st.markdown(f"### {get_text('problematic_refs')}")
                 if stats['problematic_refs']:
                     for ref in stats['problematic_refs'][:15]:
                         st.warning(f"**{ref['problems']}**\n\n{ref['text']}")
                 else:
-                    st.success("✅ No problematic references detected")
+                    st.success(get_text('no_problematic'))
                 
                 if stats['predatory_journals']:
-                    st.markdown("### 🚨 Potentially Predatory Journals")
+                    st.markdown(f"### {get_text('predatory_journals')}")
                     for pred in stats['predatory_journals'][:10]:
                         with st.expander(f"📕 {pred['journal']}"):
-                            st.markdown(f"**Signs:** {', '.join(pred['signs'])}")
-                            st.markdown(f"**Reference:** {pred['reference']}")
+                            st.markdown(f"**{get_text('issues')}:** {', '.join(pred['signs'])}")
+                            st.markdown(f"**{get_text('reference')}:** {pred['reference']}")
             
             st.markdown("---")
-            st.markdown("### 📋 Full Reference List with Filters")
+            st.markdown(f"### {get_text('full_reference_list')}")
             
             # Initialize filter states in session state if not exists
             if 'filter_states' not in st.session_state:
@@ -2729,28 +3151,28 @@ def main():
             col_filter1, col_filter2, col_filter3, col_filter4 = st.columns(4)
             with col_filter1:
                 doi_only = st.checkbox(
-                    "Only with DOI",
+                    get_text('only_with_doi'),
                     value=st.session_state.filter_states['doi_only'],
                     key="filter_doi_only",
                     on_change=lambda: toggle_filter('doi_only', st.session_state.filter_doi_only)
                 )
             with col_filter2:
                 non_doi_only = st.checkbox(
-                    "Only non-DOI",
+                    get_text('only_non_doi'),
                     value=st.session_state.filter_states['non_doi_only'],
                     key="filter_non_doi_only",
                     on_change=lambda: toggle_filter('non_doi_only', st.session_state.filter_non_doi_only)
                 )
             with col_filter3:
                 url_only = st.checkbox(
-                    "URL-links",
+                    get_text('url_links'),
                     value=st.session_state.filter_states['url_only'],
                     key="filter_url_only",
                     on_change=lambda: toggle_filter('url_only', st.session_state.filter_url_only)
                 )
             with col_filter4:
                 crossref_only = st.checkbox(
-                    "Only Crossref",
+                    get_text('only_crossref'),
                     value=st.session_state.filter_states['crossref_only'],
                     key="filter_crossref_only",
                     on_change=lambda: toggle_filter('crossref_only', st.session_state.filter_crossref_only)
@@ -2759,27 +3181,27 @@ def main():
             col_filter5, col_filter6, col_filter7, col_filter8 = st.columns(4)
             with col_filter5:
                 openalex_only = st.checkbox(
-                    "Only OpenAlex",
+                    get_text('only_openalex'),
                     value=st.session_state.filter_states['openalex_only'],
                     key="filter_openalex_only",
                     on_change=lambda: toggle_filter('openalex_only', st.session_state.filter_openalex_only)
                 )
             with col_filter6:
                 problematic_only = st.checkbox(
-                    "⚠️ Problematic only",
+                    get_text('problematic_only'),
                     value=st.session_state.filter_states['problematic_only'],
                     key="filter_problematic_only",
                     on_change=lambda: toggle_filter('problematic_only', st.session_state.filter_problematic_only)
                 )
             with col_filter7:
                 self_cited_only = st.checkbox(
-                    "🔄 Self-cited only",
+                    get_text('self_cited_only'),
                     value=st.session_state.filter_states['self_cited_only'],
                     key="filter_self_cited_only",
                     on_change=lambda: toggle_filter('self_cited_only', st.session_state.filter_self_cited_only)
                 )
             with col_filter8:
-                search_term = st.text_input("Search in text", placeholder="Enter keyword...")
+                search_term = st.text_input(get_text('search_in_text'), placeholder=get_text('search_placeholder'))
             
             filtered_results = results
             
@@ -2801,7 +3223,7 @@ def main():
             if search_term:
                 filtered_results = [r for r in filtered_results if search_term.lower() in r['original_text'].lower()]
             
-            st.markdown(f"**Showing {len(filtered_results)} of {len(results)} references**")
+            st.markdown(get_text('showing').format(len(filtered_results), len(results)))
             
             for i, result in enumerate(filtered_results[:50]):
                 if result.get('is_suspicious_doi'):
@@ -2813,42 +3235,42 @@ def main():
                 
                 problems_badges = []
                 if result['is_retracted']:
-                    problems_badges.append('<span class="badge-danger">Retracted</span>')
+                    problems_badges.append(f'<span class="badge-danger">{get_text("retracted")}</span>')
                 if result['is_preprint']:
-                    problems_badges.append('<span class="badge-warning">Preprint</span>')
+                    problems_badges.append(f'<span class="badge-warning">{get_text("preprint")}</span>')
                 if result['is_self_citation']:
-                    problems_badges.append('<span class="badge-info">Self-citation</span>')
+                    problems_badges.append(f'<span class="badge-info">{get_text("self_citation")}</span>')
                 if result.get('is_suspicious_doi'):
-                    problems_badges.append('<span class="badge-danger">⚠️ Suspicious DOI</span>')
+                    problems_badges.append(f'<span class="badge-danger">{get_text("suspicious_doi_badge")}</span>')
                 
                 badges_html = ' '.join(problems_badges)
                 
                 with st.expander(f"{status_icon} {result['original_text'][:150]}..."):
-                    st.markdown(f"**DOI:** {result['doi'] if result['doi'] else 'Not found'}")
+                    st.markdown(f"**DOI:** {result['doi'] if result['doi'] else get_text('not_found')}")
                     identifiers = result.get('identifiers', {})
                     if identifiers.get('url'):
                         st.markdown(f"**URL:** {identifiers['url']}")
                     if identifiers.get('arxiv'):
                         st.markdown(f"**arXiv:** {identifiers['arxiv']}")
-                    st.markdown(f"**Status:** Crossref: {'✅' if result['crossref_status'] else '❌'} | OpenAlex: {'✅' if result['openalex_status'] else '❌'}")
+                    st.markdown(f"**{get_text('status')}:** Crossref: {'✅' if result['crossref_status'] else '❌'} | OpenAlex: {'✅' if result['openalex_status'] else '❌'}")
                     if result['journal']:
-                        st.markdown(f"**Journal:** {result['journal']}")
+                        st.markdown(f"**{get_text('journal')}:** {result['journal']}")
                     if result['year']:
-                        st.markdown(f"**Year:** {result['year']}")
+                        st.markdown(f"**{get_text('year')}:** {result['year']}")
                     if result['authors_display']:
-                        st.markdown(f"**Authors:** {', '.join(result['authors_display'][:5])}")
+                        st.markdown(f"**{get_text('authors')}:** {', '.join(result['authors_display'][:5])}")
                     if result.get('citations_count', 0) > 0:
-                        st.markdown(f"**Citations:** {result['citations_count']}")
+                        st.markdown(f"**{get_text('citations')}:** {result['citations_count']}")
                     if badges_html:
-                        st.markdown(f"**Issues:** {badges_html}", unsafe_allow_html=True)
-                    st.markdown("**Full text:**")
+                        st.markdown(f"**{get_text('issues')}:** {badges_html}", unsafe_allow_html=True)
+                    st.markdown(f"**{get_text('full_text')}:**")
                     st.text(result['original_text'])
             
             if len(filtered_results) > 50:
-                st.info(f"Showing first 50 of {len(filtered_results)} references")
+                st.info(get_text('showing_first').format(50, len(filtered_results)))
             
         else:
-            st.info("👈 Please upload a reference list in the 'Data Upload' tab and click 'Start Enhanced Analysis'")
+            st.info(get_text('upload_first'))
     
     with tab3:
         if 'analysis_complete' in st.session_state and st.session_state['analysis_complete']:
@@ -2856,20 +3278,20 @@ def main():
             paper_authors = st.session_state.get('paper_authors', set())
             stats = generate_advanced_statistics(results)
             
-            st.markdown("### 📄 Export Enhanced Report")
-            st.markdown("Download HTML report with complete analytics")
+            st.markdown(f"### {get_text('export_report')}")
+            st.markdown(get_text('download_html'))
             
-            html_report = generate_html_report_advanced(results, stats, paper_authors)
+            html_report = generate_html_report_advanced(results, stats, paper_authors, st.session_state.language)
             
             st.download_button(
-                label="💾 Download HTML Report (Expert Edition)",
+                label=get_text('download_html'),
                 data=html_report.encode('utf-8'),
                 file_name=f"literature_analysis_expert_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
                 mime="text/html"
             )
             
             st.markdown("---")
-            st.markdown("### 📋 Text Export")
+            st.markdown(f"### {get_text('text_export')}")
             
             copy_text = f"""
 === ENHANCED LITERATURE REFERENCE ANALYSIS ===
@@ -2920,12 +3342,12 @@ Journals (Shannon): {stats['shannon_index']['journals']}
 Publishers (Shannon): {stats['shannon_index']['publishers']}
 """
             
-            st.text_area("Copy data:", copy_text, height=400)
+            st.text_area(get_text('text_export'), copy_text, height=400)
             
-            if st.button("📋 Copy to clipboard"):
-                st.write("✅ Data copied! (use Ctrl+C)")
+            if st.button(get_text('copy_to_clipboard')):
+                st.write(get_text('copied'))
         else:
-            st.info("👈 Please run analysis in 'Data Upload' tab first")
+            st.info(get_text('run_analysis_first'))
 
 if __name__ == "__main__":
     main()
