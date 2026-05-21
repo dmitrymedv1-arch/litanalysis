@@ -257,26 +257,63 @@ def extract_identifiers(text: str) -> Dict[str, Optional[str]]:
         'isbn': None
     }
     
-    # Extract DOI
+    # Extract DOI - IMPROVED: handle parentheses, brackets, and special characters
     doi_patterns = [
-        r'https?://doi\.org/(10\.\d{4,9}/[^\s<>"\'()]+)',
-        r'https?://dx\.doi\.org/(10\.\d{4,9}/[^\s<>"\'()]+)',
-        r'doi[:]\s*(10\.\d{4,9}/[^\s<>"\'()]+)',
-        r'DOI[:]\s*(10\.\d{4,9}/[^\s<>"\'()]+)',
-        r'doi\s*=\s*(10\.\d{4,9}/[^\s<>"\'()]+)',
-        r'(10\.\d{4,9}/[^\s<>"\'()]+)'
+        r'https?://doi\.org/(10\.\d{4,9}/[^\s<>"\'()\[\]{}]+(?:\([^)]*\))?(?:[^\s<>"\'()\[\]{}]*)?)',
+        r'https?://dx\.doi\.org/(10\.\d{4,9}/[^\s<>"\'()\[\]{}]+(?:\([^)]*\))?(?:[^\s<>"\'()\[\]{}]*)?)',
+        r'doi[:]\s*(10\.\d{4,9}/[^\s<>"\'()\[\]{}]+(?:\([^)]*\))?(?:[^\s<>"\'()\[\]{}]*)?)',
+        r'DOI[:]\s*(10\.\d{4,9}/[^\s<>"\'()\[\]{}]+(?:\([^)]*\))?(?:[^\s<>"\'()\[\]{}]*)?)',
+        r'doi\s*=\s*(10\.\d{4,9}/[^\s<>"\'()\[\]{}]+(?:\([^)]*\))?(?:[^\s<>"\'()\[\]{}]*)?)',
+        r'(10\.\d{4,9}/[^\s<>"\'()\[\]{}]+(?:\([^)]*\))?(?:[^\s<>"\'()\[\]{}]*)?)'
     ]
     
     for pattern in doi_patterns:
         matches = re.findall(pattern, text, re.IGNORECASE)
         if matches:
             for match in matches:
-                doi_raw = re.sub(r'[.,;:)]+$', '', match)
-                doi_raw = doi_raw.strip()
-                if re.match(r'10\.\d{4,9}/', doi_raw):
-                    result['doi'] = doi_raw
-                    break
+                doi_raw = match.strip()
+                # Remove trailing punctuation that might be part of sentence
+                doi_raw = re.sub(r'[.,;:!?)]+$', '', doi_raw)
+                # Ensure closing parenthesis is preserved if it's part of DOI
+                if '(' in doi_raw and doi_raw.count('(') > doi_raw.count(')'):
+                    # Try to find matching closing parenthesis
+                    open_count = doi_raw.count('(')
+                    close_needed = open_count - doi_raw.count(')')
+                    # Look ahead for more closing parentheses
+                    remaining_text = text[text.find(doi_raw) + len(doi_raw):]
+                    for _ in range(close_needed):
+                        match_close = re.search(r'\)', remaining_text)
+                        if match_close:
+                            doi_raw += ')'
+                            remaining_text = remaining_text[match_close.start() + 1:]
+                        else:
+                            break
+                
+                # Validate DOI format (must have prefix and suffix)
+                if re.match(r'10\.\d{4,9}/.+', doi_raw):
+                    # Additional validation: DOI should not end with invalid characters
+                    if not re.search(r'[.,;:!?]$', doi_raw):
+                        result['doi'] = doi_raw
+                        break
             if result['doi']:
+                break
+    
+    # If DOI still not found with complex pattern, try simpler but more robust pattern
+    if not result['doi']:
+        simple_pattern = r'(10\.\d{4,9}/[^\s]+)'
+        matches = re.findall(simple_pattern, text)
+        for match in matches:
+            # Clean up the match
+            doi_clean = re.sub(r'[.,;:!?)]+$', '', match)
+            # Ensure parentheses are properly matched
+            if '(' in doi_clean and ')' not in doi_clean:
+                # Try to find closing parenthesis
+                remaining = text[text.find(doi_clean) + len(doi_clean):]
+                close_match = re.search(r'\)', remaining)
+                if close_match:
+                    doi_clean += ')'
+            if re.match(r'10\.\d{4,9}/', doi_clean):
+                result['doi'] = doi_clean
                 break
     
     # Extract URL (general web links)
@@ -324,6 +361,7 @@ def extract_identifiers(text: str) -> Dict[str, Optional[str]]:
         result['isbn'] = matches[0].strip()
     
     return result
+
 
 def extract_doi_from_text(text: str) -> Optional[str]:
     """Extract DOI from string (legacy function, now uses extract_identifiers)"""
