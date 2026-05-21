@@ -2398,18 +2398,30 @@ def identify_citation_classics(results: List[Dict]) -> List[Dict]:
 
 # ======================== MAIN ANALYSIS LOGIC ========================
 def parse_reference_list(references_text: str) -> List[str]:
-    """Split reference list into individual references (support multiple formats)"""
+    """Split reference list into individual references (support multiple formats)
+    
+    Supports:
+    - Numbered references: "1. Reference text"
+    - Bracketed: "[1] Reference text"
+    - Parenthesized: "(1) Reference text"
+    - Plain DOI list: one DOI per line
+    - Mixed formats
+    """
     lines = references_text.strip().split('\n')
     references = []
     current_ref = []
     
+    # Pattern for numbered/bracketed references
     patterns = [
-        r'^\d+\.',
-        r'^\[\d+\]',
-        r'^\(\d+\)',
-        r'^\d+\)',
-        r'^\d+\s+[A-Z]'
+        r'^\d+\.',      # "1. Text"
+        r'^\[\d+\]',    # "[1] Text"
+        r'^\(\d+\)',    # "(1) Text"
+        r'^\d+\)',      # "1) Text"
+        r'^\d+\s+[A-Z]' # "1 Text" (if Text starts with capital letter)
     ]
+    
+    # Pattern for detecting if a line looks like a standalone DOI or URL
+    doi_url_pattern = r'^(https?://doi\.org/|https?://dx\.doi\.org/|10\.\d{4,9}/)'
     
     for line in lines:
         line = line.strip()
@@ -2417,15 +2429,34 @@ def parse_reference_list(references_text: str) -> List[str]:
             continue
         
         is_new_ref = False
+        
+        # Check if line starts with a reference marker
         for pattern in patterns:
             if re.match(pattern, line):
                 is_new_ref = True
                 break
         
+        # SPECIAL CASE: If line starts with DOI/URL pattern AND previous line
+        # was also a DOI/URL, treat as separate reference even without marker
+        if not is_new_ref and re.match(doi_url_pattern, line):
+            # Check if current_ref is not empty and contains a DOI/URL pattern
+            if current_ref:
+                # Join current_ref to see if it looks like it contains DOIs
+                current_text = ' '.join(current_ref)
+                # If current_text already has a DOI and this is another DOI on new line,
+                # it should be a separate reference
+                if re.search(doi_url_pattern, current_text):
+                    # Save current reference and start new one
+                    if current_ref:
+                        references.append(' '.join(current_ref))
+                        current_ref = []
+                    is_new_ref = True
+        
         if is_new_ref:
             if current_ref:
                 references.append(' '.join(current_ref))
             
+            # Clean the line from the marker
             cleaned_line = line
             for pattern in patterns:
                 cleaned_line = re.sub(pattern, '', cleaned_line, count=1)
@@ -2437,10 +2468,25 @@ def parse_reference_list(references_text: str) -> List[str]:
             else:
                 current_ref = [line]
     
+    # Don't forget the last reference
     if current_ref:
         references.append(' '.join(current_ref))
     
-    return references
+    # Post-processing: split any reference that contains multiple DOIs on the same line
+    final_references = []
+    for ref in references:
+        # Check if this reference contains multiple DOI patterns separated by spaces or newlines
+        # Find all DOIs/URLs in this reference
+        doi_matches = re.findall(r'(https?://doi\.org/10\.\d{4,9}/[^\s]+|10\.\d{4,9}/[^\s]+)', ref)
+        
+        if len(doi_matches) > 1:
+            # Split into separate references, one per DOI
+            for doi_match in doi_matches:
+                final_references.append(doi_match.strip())
+        else:
+            final_references.append(ref)
+    
+    return final_references
 
 # NOTE: The original analyze_reference_batch function has been replaced by 
 # analyze_reference_batch_optimized above. The original is kept for reference
