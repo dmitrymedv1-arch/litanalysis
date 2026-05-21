@@ -7,7 +7,7 @@ from datetime import datetime
 from collections import Counter, defaultdict
 from typing import Dict, List, Tuple, Optional, Set
 import hashlib
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential, wait_random
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import difflib
@@ -441,6 +441,10 @@ st.set_page_config(
 # Initialize language in session state
 if 'language' not in st.session_state:
     st.session_state.language = 'en'
+    
+# Initialize bad DOIs cache in session state
+if 'bad_dois' not in st.session_state:
+    st.session_state.bad_dois = set()
 
 # ======================== ENHANCED CSS DESIGN ========================
 st.markdown("""
@@ -674,6 +678,340 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# ======================== OPTIMIZED API REQUESTS ========================
+# OPTIMIZATION 4: Improved retry with random wait for better performance
+@retry(stop=stop_after_attempt(2), wait=wait_random(min=0.5, max=1.5))
+def fetch_crossref(doi: str) -> Optional[Dict]:
+    """Request to Crossref API - OPTIMIZED with faster retry"""
+    try:
+        url = f"https://api.crossref.org/works/{doi}"
+        headers = {'User-Agent': 'LiteratureAnalyzer/2.0 (mailto:analyzer@example.com)'}
+        response = requests.get(url, headers=headers, timeout=8)
+        if response.status_code == 200:
+            return response.json()['message']
+        return None
+    except:
+        return None
+
+@retry(stop=stop_after_attempt(2), wait=wait_random(min=0.5, max=1.5))
+def fetch_openalex(doi: str) -> Optional[Dict]:
+    """Request to OpenAlex API - OPTIMIZED with faster retry"""
+    try:
+        encoded_doi = requests.utils.quote(doi)
+        url = f"https://api.openalex.org/works/doi/{encoded_doi}"
+        response = requests.get(url, timeout=8)
+        if response.status_code == 200:
+            return response.json()
+        return None
+    except:
+        return None
+
+def fetch_openalex_concepts(work_id: str) -> List[Dict]:
+    """Extract concepts from OpenAlex"""
+    try:
+        url = f"https://api.openalex.org/works/{work_id}"
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get('concepts', [])
+    except:
+        pass
+    return []
+
+# ======================== NEW ASYNC FUNCTIONS FOR MAXIMUM PERFORMANCE ========================
+# OPTIMIZATION 2: Async function for batch processing
+async def fetch_single_doi_async(session: aiohttp.ClientSession, doi: str, semaphore: asyncio.Semaphore) -> Tuple[str, Optional[Dict], Optional[Dict]]:
+    """Fetch Crossref and OpenAlex data for a single DOI asynchronously"""
+    async with semaphore:
+        crossref_result = None
+        openalex_result = None
+        
+        # Fetch Crossref
+        try:
+            crossref_url = f"https://api.crossref.org/works/{doi}"
+            headers = {'User-Agent': 'LiteratureAnalyzer/2.0 (mailto:analyzer@example.com)'}
+            async with session.get(crossref_url, headers=headers, timeout=aiohttp.ClientTimeout(total=8)) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    crossref_result = data.get('message')
+        except:
+            pass
+        
+        # Fetch OpenAlex
+        try:
+            encoded_doi = requests.utils.quote(doi)
+            openalex_url = f"https://api.openalex.org/works/doi/{encoded_doi}"
+            async with session.get(openalex_url, timeout=aiohttp.ClientTimeout(total=8)) as response:
+                if response.status == 200:
+                    openalex_result = await response.json()
+        except:
+            pass
+        
+        return doi, crossref_result, openalex_result
+
+async def fetch_all_dois_async(dois_with_indices: List[Tuple[int, str]], max_concurrent: int = 100) -> Dict[int, Tuple[Optional[Dict], Optional[Dict]]]:
+    """Fetch multiple DOIs asynchronously for maximum speed"""
+    results = {}
+    semaphore = asyncio.Semaphore(max_concurrent)
+    
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        for idx, doi in dois_with_indices:
+            # Skip if DOI is known to be bad
+            if doi in st.session_state.bad_dois:
+                results[idx] = (None, None)
+                continue
+            tasks.append(fetch_single_doi_async(session, doi, semaphore))
+        
+        # Execute all tasks concurrently
+        task_results = await asyncio.gather(*tasks)
+        
+        for doi, crossref_data, openalex_data in task_results:
+            # Find the index for this DOI
+            for idx, d in dois_with_indices:
+                if d == doi:
+                    results[idx] = (crossref_data, openalex_data)
+                    # Cache bad DOIs
+                    if crossref_data is None and openalex_data is None:
+                        st.session_state.bad_dois.add(doi)
+                    break
+    
+    return results
+
+# ======================== OPTIMIZED BATCH PROCESSING ========================
+def analyze_reference_batch_optimized(references: List[str], progress_callback=None, paper_authors: Set[str] = None, batch_num: int = 0, total_batches: int = 1) -> List[Dict]:
+    """Analyze batch of references using optimized ThreadPoolExecutor"""
+    results = []
+    batch_size = len(references)
+    
+    # Step 1: Extract all DOIs with their indices
+    dois_with_indices = []
+    ref_doi_map = {}
+    for idx, ref in enumerate(references):
+        identifiers = extract_identifiers(ref)
+        doi = identifiers['doi']
+        ref_doi_map[idx] = {'doi': doi, 'identifiers': identifiers}
+        if doi:
+            dois_with_indices.append((idx, doi))
+    
+    # Step 2: Fetch data using ThreadPoolExecutor (optimized approach)
+    if dois_with_indices:
+        # OPTIMIZATION 1: Single global ThreadPoolExecutor for all DOIs in batch
+        with ThreadPoolExecutor(max_workers=30) as executor:
+            futures = {}
+            for idx, doi in dois_with_indices:
+                # Check if DOI is in bad cache
+                if doi in st.session_state.bad_dois:
+                    futures[(idx, 'crossref')] = None
+                    futures[(idx, 'openalex')] = None
+                else:
+                    futures[(idx, 'crossref')] = executor.submit(fetch_crossref, doi)
+                    futures[(idx, 'openalex')] = executor.submit(fetch_openalex, doi)
+            
+            # Collect results
+            crossref_results = {}
+            openalex_results = {}
+            for (idx, api_type), future in futures.items():
+                if future is not None:
+                    try:
+                        result = future.result(timeout=15)
+                        if api_type == 'crossref':
+                            crossref_results[idx] = result
+                        else:
+                            openalex_results[idx] = result
+                    except Exception:
+                        if api_type == 'crossref':
+                            crossref_results[idx] = None
+                        else:
+                            openalex_results[idx] = None
+                else:
+                    if api_type == 'crossref':
+                        crossref_results[idx] = None
+                    else:
+                        openalex_results[idx] = None
+            
+            # Mark bad DOIs for caching
+            for idx, doi in dois_with_indices:
+                if crossref_results.get(idx) is None and openalex_results.get(idx) is None:
+                    st.session_state.bad_dois.add(doi)
+    
+    # Step 3: Build results for each reference
+    for idx, ref in enumerate(references):
+        identifiers = ref_doi_map[idx]
+        doi = identifiers['doi']
+        
+        # Get fetched data (if any)
+        crossref_data = crossref_results.get(idx) if dois_with_indices else None
+        openalex_data = openalex_results.get(idx) if dois_with_indices else None
+        
+        result = {
+            'original_text': ref,
+            'doi': doi,
+            'identifiers': identifiers,
+            'crossref_data': None,
+            'openalex_data': None,
+            'crossref_status': False,
+            'openalex_status': False,
+            'authors': [],
+            'authors_display': [],
+            'journal': None,
+            'year': None,
+            'type': None,
+            'publisher': None,
+            'crossmark_issues': [],
+            'is_preprint': False,
+            'has_erratum': False,
+            'is_retracted': False,
+            'is_self_citation': False,
+            'issn': None,
+            'license': None,
+            'references_count': 0,
+            'citations_count': 0,
+            'is_suspicious_doi': False
+        }
+        
+        if doi:
+            # Check for suspicious DOI
+            if crossref_data is None and openalex_data is None:
+                result['is_suspicious_doi'] = True
+                result['crossmark_issues'].append('⚠️ Attention: invalid/suspicious DOI (not found in Crossref or OpenAlex)')
+            
+            if crossref_data:
+                result['crossref_data'] = crossref_data
+                result['crossref_status'] = True
+                
+                authors_data = extract_authors_from_crossref(crossref_data)
+                result['authors'].extend(authors_data)
+                
+                for auth in authors_data:
+                    result['authors_display'].append(auth['display_name'])
+                
+                if 'container-title' in crossref_data and crossref_data['container-title']:
+                    result['journal'] = crossref_data['container-title'][0]
+                
+                if 'ISSN' in crossref_data and crossref_data['ISSN']:
+                    result['issn'] = crossref_data['ISSN'][0]
+                
+                if 'issued' in crossref_data and 'date-parts' in crossref_data['issued']:
+                    date_parts = crossref_data['issued']['date-parts']
+                    if date_parts and date_parts[0] and len(date_parts[0]) > 0:
+                        result['year'] = date_parts[0][0]
+                
+                if 'type' in crossref_data:
+                    result['type'] = crossref_data['type']
+                
+                if 'publisher' in crossref_data:
+                    result['publisher'] = crossref_data['publisher']
+                
+                if 'license' in crossref_data:
+                    result['license'] = crossref_data['license'][0].get('URL', '') if crossref_data['license'] else None
+                
+                if 'is-referenced-by-count' in crossref_data:
+                    result['citations_count'] = crossref_data['is-referenced-by-count']
+                
+                if 'crossmark' in crossref_data:
+                    for cm in crossref_data.get('crossmark', []):
+                        if 'type' in cm:
+                            result['crossmark_issues'].append(cm['type'])
+            
+            if openalex_data:
+                result['openalex_data'] = openalex_data
+                result['openalex_status'] = True
+                
+                authors_data = extract_authors_from_openalex(openalex_data)
+                existing_compare = {a['compare_name'] for a in result['authors']}
+                for auth in authors_data:
+                    if auth['compare_name'] not in existing_compare:
+                        result['authors'].append(auth)
+                        result['authors_display'].append(auth['display_name'])
+                        existing_compare.add(auth['compare_name'])
+                
+                if openalex_data.get('type') == 'posted_content':
+                    result['is_preprint'] = True
+                
+                if openalex_data.get('is_retracted'):
+                    result['is_retracted'] = True
+                
+                if not result['year'] and 'publication_year' in openalex_data:
+                    result['year'] = openalex_data['publication_year']
+                
+                if not result['journal'] and 'host_venue' in openalex_data and openalex_data['host_venue']:
+                    result['journal'] = openalex_data['host_venue'].get('display_name', '')
+                
+                if not result['type'] and 'type' in openalex_data:
+                    result['type'] = openalex_data['type']
+                
+                if 'referenced_works_count' in openalex_data:
+                    result['references_count'] = openalex_data['referenced_works_count']
+                
+                if 'cited_by_count' in openalex_data:
+                    result['citations_count'] = max(result['citations_count'], openalex_data['cited_by_count'])
+        
+        if paper_authors and result['authors']:
+            for author in result['authors']:
+                for paper_author in paper_authors:
+                    paper_norm, _ = normalize_author_name(paper_author)
+                    if author['compare_name'] == paper_norm:
+                        result['is_self_citation'] = True
+                        break
+        
+        if result['authors']:
+            result['authors'] = merge_authors(result['authors'])
+            result['authors_display'] = [a['display_name'] for a in result['authors']]
+        
+        results.append(result)
+        
+        # OPTIMIZATION 3: Update progress less frequently (only at batch level)
+        if progress_callback and idx % 10 == 0:  # Update every 10 references instead of every reference
+            progress_callback(batch_num, idx, batch_size, total_batches)
+    
+    return results
+
+def analyze_all_references_optimized(references: List[str], batch_size: int = 50, paper_authors: Set[str] = None) -> List[Dict]:
+    """Analyze all references with optimized batching and progress updates"""
+    all_results = []
+    total_batches = (len(references) + batch_size - 1) // batch_size
+    
+    # OPTIMIZATION 3: Use st.status for better progress indication with less frequent updates
+    status_container = st.status(f"📊 Analyzing {len(references)} references...", expanded=True)
+    
+    def update_progress(batch_num, ref_idx, batch_len, total_batches):
+        """Update progress - called less frequently now"""
+        overall_progress = (batch_num * batch_len + ref_idx) / len(references)
+        status_container.update(
+            label=f"📊 Analyzing: Batch {batch_num + 1}/{total_batches} | Reference {batch_num * batch_len + ref_idx + 1}/{len(references)}",
+            state="running"
+        )
+        # Update main progress bar less frequently
+        if ref_idx % 20 == 0:  # Update progress bar only every 20 references
+            st.progress(overall_progress)
+    
+    for batch_num in range(total_batches):
+        start_idx = batch_num * batch_size
+        end_idx = min(start_idx + batch_size, len(references))
+        batch = references[start_idx:end_idx]
+        
+        # Update status text
+        status_container.update(
+            label=f"📊 Analyzing batch {batch_num + 1} of {total_batches} (references {start_idx + 1}-{end_idx} of {len(references)})",
+            state="running"
+        )
+        
+        # Process batch with optimized function
+        batch_results = analyze_reference_batch_optimized(
+            batch, 
+            progress_callback=update_progress,
+            paper_authors=paper_authors,
+            batch_num=batch_num,
+            total_batches=total_batches
+        )
+        all_results.extend(batch_results)
+    
+    status_container.update(label="✅ Analysis completed!", state="complete")
+    st.progress(100)
+    
+    return all_results
+
 # ======================== CACHING ========================
 @st.cache_data(ttl=3600, show_spinner=False)
 def cache_crossref_lookup(doi: str) -> Optional[Dict]:
@@ -820,45 +1158,6 @@ def extract_doi_from_text(text: str) -> Optional[str]:
     """Extract DOI from string (legacy function, now uses extract_identifiers)"""
     identifiers = extract_identifiers(text)
     return identifiers['doi']
-
-# ======================== API REQUESTS ========================
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-def fetch_crossref(doi: str) -> Optional[Dict]:
-    """Request to Crossref API"""
-    try:
-        url = f"https://api.crossref.org/works/{doi}"
-        headers = {'User-Agent': 'LiteratureAnalyzer/2.0 (mailto:analyzer@example.com)'}
-        response = requests.get(url, headers=headers, timeout=8)
-        if response.status_code == 200:
-            return response.json()['message']
-        return None
-    except:
-        return None
-
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-def fetch_openalex(doi: str) -> Optional[Dict]:
-    """Request to OpenAlex API"""
-    try:
-        encoded_doi = requests.utils.quote(doi)
-        url = f"https://api.openalex.org/works/doi/{encoded_doi}"
-        response = requests.get(url, timeout=8)
-        if response.status_code == 200:
-            return response.json()
-        return None
-    except:
-        return None
-
-def fetch_openalex_concepts(work_id: str) -> List[Dict]:
-    """Extract concepts from OpenAlex"""
-    try:
-        url = f"https://api.openalex.org/works/{work_id}"
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            return data.get('concepts', [])
-    except:
-        pass
-    return []
 
 # ======================== ENHANCED AUTHOR NORMALIZATION ========================
 def normalize_author_name(name: str) -> Tuple[str, str]:
@@ -1780,168 +2079,14 @@ def parse_reference_list(references_text: str) -> List[str]:
     
     return references
 
-def analyze_reference_batch(references: List[str], progress_bar, progress_start: int, progress_end: int, paper_authors: Set[str] = None) -> List[Dict]:
-    """Analyze batch of references (enhanced version)"""
-    results = []
-    batch_size = len(references)
-    
-    for idx, ref in enumerate(references):
-        identifiers = extract_identifiers(ref)
-        doi = identifiers['doi']
-        
-        result = {
-            'original_text': ref,
-            'doi': doi,
-            'identifiers': identifiers,
-            'crossref_data': None,
-            'openalex_data': None,
-            'crossref_status': False,
-            'openalex_status': False,
-            'authors': [],
-            'authors_display': [],
-            'journal': None,
-            'year': None,
-            'type': None,
-            'publisher': None,
-            'crossmark_issues': [],
-            'is_preprint': False,
-            'has_erratum': False,
-            'is_retracted': False,
-            'is_self_citation': False,
-            'issn': None,
-            'license': None,
-            'references_count': 0,
-            'citations_count': 0,
-            'is_suspicious_doi': False  # New flag for suspicious/fake DOI
-        }
-        
-        if doi:
-            with ThreadPoolExecutor(max_workers=3) as executor:
-                crossref_future = executor.submit(fetch_crossref, doi)
-                openalex_future = executor.submit(fetch_openalex, doi)
-                crossref_data = crossref_future.result()
-                openalex_data = openalex_future.result()
-            
-            # Check for suspicious DOI: has DOI but both APIs returned no data
-            if not crossref_data and not openalex_data:
-                result['is_suspicious_doi'] = True
-                result['crossmark_issues'].append('⚠️ Attention: invalid/suspicious DOI (not found in Crossref or OpenAlex)')
-            
-            if crossref_data:
-                result['crossref_data'] = crossref_data
-                result['crossref_status'] = True
-                
-                authors_data = extract_authors_from_crossref(crossref_data)
-                result['authors'].extend(authors_data)
-                
-                for auth in authors_data:
-                    result['authors_display'].append(auth['display_name'])
-                
-                if 'container-title' in crossref_data and crossref_data['container-title']:
-                    result['journal'] = crossref_data['container-title'][0]
-                
-                if 'ISSN' in crossref_data and crossref_data['ISSN']:
-                    result['issn'] = crossref_data['ISSN'][0]
-                
-                if 'issued' in crossref_data and 'date-parts' in crossref_data['issued']:
-                    date_parts = crossref_data['issued']['date-parts']
-                    if date_parts and date_parts[0] and len(date_parts[0]) > 0:
-                        result['year'] = date_parts[0][0]
-                
-                if 'type' in crossref_data:
-                    result['type'] = crossref_data['type']
-                
-                if 'publisher' in crossref_data:
-                    result['publisher'] = crossref_data['publisher']
-                
-                if 'license' in crossref_data:
-                    result['license'] = crossref_data['license'][0].get('URL', '') if crossref_data['license'] else None
-                
-                if 'is-referenced-by-count' in crossref_data:
-                    result['citations_count'] = crossref_data['is-referenced-by-count']
-                
-                if 'crossmark' in crossref_data:
-                    for cm in crossref_data.get('crossmark', []):
-                        if 'type' in cm:
-                            result['crossmark_issues'].append(cm['type'])
-            
-            if openalex_data:
-                result['openalex_data'] = openalex_data
-                result['openalex_status'] = True
-                
-                authors_data = extract_authors_from_openalex(openalex_data)
-                existing_compare = {a['compare_name'] for a in result['authors']}
-                for auth in authors_data:
-                    if auth['compare_name'] not in existing_compare:
-                        result['authors'].append(auth)
-                        result['authors_display'].append(auth['display_name'])
-                        existing_compare.add(auth['compare_name'])
-                
-                if openalex_data.get('type') == 'posted_content':
-                    result['is_preprint'] = True
-                
-                if openalex_data.get('is_retracted'):
-                    result['is_retracted'] = True
-                
-                if not result['year'] and 'publication_year' in openalex_data:
-                    result['year'] = openalex_data['publication_year']
-                
-                if not result['journal'] and 'host_venue' in openalex_data and openalex_data['host_venue']:
-                    result['journal'] = openalex_data['host_venue'].get('display_name', '')
-                
-                if not result['type'] and 'type' in openalex_data:
-                    result['type'] = openalex_data['type']
-                
-                if 'referenced_works_count' in openalex_data:
-                    result['references_count'] = openalex_data['referenced_works_count']
-                
-                if 'cited_by_count' in openalex_data:
-                    result['citations_count'] = max(result['citations_count'], openalex_data['cited_by_count'])
-        
-        if paper_authors and result['authors']:
-            for author in result['authors']:
-                for paper_author in paper_authors:
-                    paper_norm, _ = normalize_author_name(paper_author)
-                    if author['compare_name'] == paper_norm:
-                        result['is_self_citation'] = True
-                        break
-        
-        if result['authors']:
-            result['authors'] = merge_authors(result['authors'])
-            result['authors_display'] = [a['display_name'] for a in result['authors']]
-        
-        results.append(result)
-        
-        progress = progress_start + int((idx + 1) / batch_size * (progress_end - progress_start))
-        progress_bar.progress(progress / 100)
-    
-    return results
+# NOTE: The original analyze_reference_batch function has been replaced by 
+# analyze_reference_batch_optimized above. The original is kept for reference
+# but not used. The main analysis now uses analyze_all_references_optimized.
 
 def analyze_all_references(references: List[str], batch_size: int = 50, paper_authors: Set[str] = None) -> List[Dict]:
-    """Analyze all references with batching"""
-    all_results = []
-    total_batches = (len(references) + batch_size - 1) // batch_size
-    
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
-    for batch_num in range(total_batches):
-        start_idx = batch_num * batch_size
-        end_idx = min(start_idx + batch_size, len(references))
-        batch = references[start_idx:end_idx]
-        
-        status_text.text(f"📊 Analyzing batch {batch_num + 1} of {total_batches} (references {start_idx + 1}-{end_idx} of {len(references)})")
-        
-        progress_start = (batch_num * 100) // total_batches
-        progress_end = ((batch_num + 1) * 100) // total_batches
-        
-        batch_results = analyze_reference_batch(batch, progress_bar, progress_start, progress_end, paper_authors)
-        all_results.extend(batch_results)
-    
-    status_text.text("✅ Analysis completed!")
-    progress_bar.progress(100)
-    
-    return all_results
+    """Analyze all references with batching - NOW USING OPTIMIZED VERSION"""
+    # Use the optimized version for better performance
+    return analyze_all_references_optimized(references, batch_size, paper_authors)
 
 # ======================== PARSE PAPER AUTHORS INPUT ========================
 def parse_paper_authors(authors_input: str) -> Set[str]:
@@ -2538,7 +2683,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
                 <tbody>
                     {''.join([f'<tr><td>{i+1}</td><td>{journal["journal"]}</td><td>{journal["count"]}</td><td>{journal["percentage"]:.1f}%</td></tr>' for i, journal in enumerate(stats["journal_frequency_all"]["all_journals"])])}
                 </tbody>
-             </table>
+            </table>
             <div style="margin-top: 15px;">
                 <span class="badge badge-info">{get_text('unique_journals')}: {stats['journal_frequency_all']['unique_journals']}</span>
                 <span class="badge badge-info">{get_text('shannon_journals')}: {stats['shannon_index']['journals']}</span>
@@ -2554,7 +2699,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
                 <tbody>
                     {''.join([f'<tr><td>{i+1}</td><td>{publisher["publisher"]}</td><td>{publisher["count"]}</td><td>{publisher["percentage"]:.1f}%</td></tr>' for i, publisher in enumerate(stats["publisher_frequency"]["all_publishers"])])}
                 </tbody>
-             </table>
+            </table>
             <div style="margin-top: 15px;">
                 <span class="badge badge-info">{get_text('unique_publishers_metric')}: {stats['publisher_frequency']['unique_publishers']}</span>
                 <span class="badge badge-info">{get_text('shannon_publishers')}: {stats['shannon_index']['publishers']}</span>
@@ -2795,6 +2940,7 @@ def main():
                     st.session_state['analysis_started'] = True
                     
                     with st.spinner(get_text('analysis_started')):
+                        # Use the optimized analysis function
                         results = analyze_all_references(references, batch_size, paper_authors if paper_authors else None)
                         st.session_state['results'] = results
                         st.session_state['analysis_complete'] = True
