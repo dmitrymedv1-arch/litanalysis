@@ -172,6 +172,42 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
+    /* Custom tab buttons */
+    .custom-tab-button {
+        background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+        border: none;
+        border-radius: 12px;
+        padding: 15px 10px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s;
+        margin: 5px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .custom-tab-button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+    }
+    .custom-tab-button.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    .custom-tab-icon {
+        font-size: 28px;
+        margin-bottom: 8px;
+    }
+    .custom-tab-title {
+        font-weight: 600;
+        font-size: 14px;
+    }
+    .custom-tab-subtitle {
+        font-size: 11px;
+        opacity: 0.8;
+        margin-top: 4px;
+    }
+    
     /* Animations */
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(20px); }
@@ -217,6 +253,12 @@ st.markdown("""
     .clickable-link:hover {
         color: #764ba2;
         text-decoration: underline;
+    }
+    
+    /* Disabled filter styling */
+    .disabled-filter {
+        opacity: 0.5;
+        pointer-events: none;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -1661,6 +1703,9 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
     shannon_publishers = calculate_shannon_diversity(results, 'publishers')
     citation_classics = identify_citation_classics(results)
     
+    # Collect self-citations
+    self_citation_refs = [r for r in results if r['is_self_citation']]
+    
     return {
         'total_references': len(results),
         'total_with_doi': unique_doi_count,
@@ -1679,6 +1724,7 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         'frequently_cited': [f"{a['display_name']} — {a['count']}" for a in frequently_cited[:10]],
         'self_citations_count': len([r for r in results if r['is_self_citation']]),
         'self_citations_percent': (len([r for r in results if r['is_self_citation']]) / len(results) * 100) if results else 0,
+        'self_citation_refs': self_citation_refs,
         
         # New data
         'concepts': concepts_data,
@@ -1963,6 +2009,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         <a href="#collaboration">🤝 Collaborations</a>
         <a href="#diversity">🔄 Diversity</a>
         <a href="#classics">⭐ Citation Classics</a>
+        <a href="#selfcitations">📝 Self-Citations</a>
         <a href="#crossref_only">⚠️ Only Crossref</a>
         <a href="#openalex_only">⚠️ Only OpenAlex</a>
         <a href="#suspicious_doi">🔍 Suspicious DOIs</a>
@@ -2191,6 +2238,14 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{classic["title"][:80]}...</span><span class="rank-count">📊 {classic["citations"]} citations</span><div style="font-size: 12px; color: #666; margin-top: 5px;">{classic["journal"]} ({classic["year"]})</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(classic["doi"])}</div>' if classic.get("doi") else '') + '</div>' for i, classic in enumerate(stats['citation_classics'][:8])]) if stats['citation_classics'] else '<p>None detected</p>'}
         </div>
         
+        <div id="selfcitations" class="section">
+            <div class="section-title">📝 Self-Citations by the Author(s)</div>
+            {''.join([f'<div class="rank-item"><div><strong>📄 {ref["original_text"][:200]}...</strong></div>' + (f'<div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div>' if ref.get("doi") else '') + (f'<div style="font-size: 11px; margin-top: 5px;">📖 Journal: {ref["journal"]}</div>' if ref.get("journal") else '') + (f'<div style="font-size: 11px; margin-top: 5px;">📅 Year: {ref["year"]}</div>' if ref.get("year") else '') + '<div style="font-size: 11px; margin-top: 5px;">👨‍🎓 Authors: ' + ', '.join(ref["authors_display"][:3]) + ('...' if len(ref["authors_display"]) > 3 else '') + '</div></div>' for ref in stats.get('self_citation_refs', [])[:30]]) if stats.get('self_citation_refs') else '<p>✅ No self-citations detected</p>'}
+            <div style="margin-top: 15px;">
+                <span class="badge badge-info">Total self-citations: {stats['self_citations_count']} ({stats['self_citations_percent']:.1f}%)</span>
+            </div>
+        </div>
+        
         <div id="crossref_only" class="section">
             <div class="section-title">⚠️ References with Only Crossref (OpenAlex missing)</div>
             {''.join([f'<div class="rank-item"><div>📄 {ref["text"]}</div><div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('crossref_only_refs', [])[:20]]) if stats.get('crossref_only_refs') else '<p>✅ No references found</p>'}
@@ -2263,7 +2318,6 @@ def main():
                 st.warning("⚠️ No valid authors added. Please use format: N. Fukatsu or N Fukatsu")
         
         st.markdown("---")
-        st.info("💡 **Tips:**\n- For large lists (>500 references) processing may take several minutes\n- New metrics: identifier coverage, yearly statistics, publisher frequency, enhanced author merging")
     
     tab1, tab2, tab3 = st.tabs(["📥 Data Upload", "📊 Enhanced Analytics", "📄 HTML Report"])
     
@@ -2400,14 +2454,56 @@ def main():
             
             st.markdown("---")
             
-            tab_metrics, tab_identifiers, tab_authors, tab_journals, tab_publishers, tab_yearly, tab_concepts, tab_geo, tab_collab, tab_diversity, tab_classics, tab_crossref_only, tab_openalex_only, tab_suspicious, tab_non_doi, tab_url_sources, tab_problems = st.tabs([
-                "📊 Metrics", "🔍 Identifiers", "👨‍🎓 Authors", "📖 Journals", "🏢 Publishers",
-                "📅 Yearly", "🧠 Concepts", "🌍 Geography", "🤝 Collaborations",
-                "🔄 Diversity", "⭐ Classics", "⚠️ Only Crossref", "⚠️ Only OpenAlex",
-                "🔍 Suspicious DOI", "📄 Non-DOI", "🔗 URL Sources", "⚠️ Problems"
-            ])
+            # Custom tabs implementation with buttons
+            st.markdown("### 📑 Analysis Sections")
             
-            with tab_metrics:
+            # Initialize session state for active tab if not exists
+            if 'active_tab' not in st.session_state:
+                st.session_state.active_tab = "metrics"
+            
+            # Define tabs configuration
+            tabs_config = [
+                {"id": "metrics", "icon": "📊", "title": "Metrics", "subtitle": "Overview stats"},
+                {"id": "identifiers", "icon": "🔍", "title": "Identifiers", "subtitle": "Coverage analysis"},
+                {"id": "authors", "icon": "👨‍🎓", "title": "Authors", "subtitle": "Frequency & ORCID"},
+                {"id": "journals", "icon": "📖", "title": "Journals", "subtitle": "All journals"},
+                {"id": "publishers", "icon": "🏢", "title": "Publishers", "subtitle": "All publishers"},
+                {"id": "yearly", "icon": "📅", "title": "Yearly", "subtitle": "Temporal stats"},
+                {"id": "concepts", "icon": "🧠", "title": "Concepts", "subtitle": "Key topics"},
+                {"id": "geography", "icon": "🌍", "title": "Geography", "subtitle": "Distribution"},
+                {"id": "collaboration", "icon": "🤝", "title": "Collaborations", "subtitle": "Networks"},
+                {"id": "diversity", "icon": "🔄", "title": "Diversity", "subtitle": "Shannon index"},
+                {"id": "classics", "icon": "⭐", "title": "Classics", "subtitle": "High citations"},
+                {"id": "crossref_only", "icon": "⚠️", "title": "Only Crossref", "subtitle": "Missing OpenAlex"},
+                {"id": "openalex_only", "icon": "⚠️", "title": "Only OpenAlex", "subtitle": "Missing Crossref"},
+                {"id": "suspicious", "icon": "🔍", "title": "Suspicious DOI", "subtitle": "Invalid DOIs"},
+                {"id": "non_doi", "icon": "📄", "title": "Non-DOI", "subtitle": "Books, theses"},
+                {"id": "url_sources", "icon": "🔗", "title": "URL Sources", "subtitle": "Web links"},
+                {"id": "problems", "icon": "⚠️", "title": "Problems", "subtitle": "Issues detected"}
+            ]
+            
+            # Create buttons in rows of 6
+            cols_per_row = 6
+            for i in range(0, len(tabs_config), cols_per_row):
+                cols = st.columns(cols_per_row)
+                for j, col in enumerate(cols):
+                    if i + j < len(tabs_config):
+                        tab = tabs_config[i + j]
+                        button_style = "active" if st.session_state.active_tab == tab["id"] else ""
+                        if col.button(
+                            f"{tab['icon']}\n{tab['title']}\n{tab['subtitle']}",
+                            key=f"tab_{tab['id']}",
+                            use_container_width=True
+                        ):
+                            st.session_state.active_tab = tab["id"]
+                            st.rerun()
+            
+            st.markdown("---")
+            
+            # Display content based on active tab
+            active_tab = st.session_state.active_tab
+            
+            if active_tab == "metrics":
                 col1, col2 = st.columns(2)
                 with col1:
                     st.markdown("### 🔍 DOI Status")
@@ -2425,7 +2521,7 @@ def main():
                     st.metric("Average citations", f"{stats.get('avg_citations', 0):.1f}")
                     st.metric("Self-citations", f"{stats['self_citations_count']} ({stats['self_citations_percent']:.1f}%)")
             
-            with tab_identifiers:
+            elif active_tab == "identifiers":
                 st.markdown("### 🔍 Identifier Coverage Analysis")
                 id_df = pd.DataFrame([
                     {"Identifier type": "DOI", "Count": stats['identifier_coverage']['stats']['has_doi'], "Percentage": f"{stats['identifier_coverage']['stats']['has_doi']/stats['total_references']*100:.1f}%"},
@@ -2443,7 +2539,7 @@ def main():
                     for ref in stats['identifier_coverage']['references_without_any'][:10]:
                         st.text(ref)
             
-            with tab_authors:
+            elif active_tab == "authors":
                 st.markdown("### 👨‍🎓 Top Authors (with intelligent merging)")
                 for i, author in enumerate(stats['author_frequency_all']['all_authors'][:30], 1):
                     orcid_text = f" 🔗 ORCID: {author['orcid']}" if author.get('orcid') else ""
@@ -2460,19 +2556,19 @@ def main():
                     """, unsafe_allow_html=True)
                 st.markdown(f"**Unique authors:** {stats['author_frequency_all']['unique_authors']}")
             
-            with tab_journals:
+            elif active_tab == "journals":
                 st.markdown("### 📖 All Journals (sorted by frequency)")
                 journals_df = pd.DataFrame(stats['journal_frequency_all']['all_journals'])
                 st.dataframe(journals_df, use_container_width=True)
                 st.markdown(f"**Unique journals:** {stats['journal_frequency_all']['unique_journals']}")
             
-            with tab_publishers:
+            elif active_tab == "publishers":
                 st.markdown("### 🏢 All Publishers (sorted by frequency)")
                 publishers_df = pd.DataFrame(stats['publisher_frequency']['all_publishers'])
                 st.dataframe(publishers_df, use_container_width=True)
                 st.markdown(f"**Unique publishers:** {stats['publisher_frequency']['unique_publishers']}")
             
-            with tab_yearly:
+            elif active_tab == "yearly":
                 st.markdown("### 📅 Yearly Statistics")
                 st.markdown(f"**References with known year:** {stats['yearly_stats']['total_with_year']}")
                 st.markdown(f"**References with unknown year:** {stats['yearly_stats']['unknown_year']}")
@@ -2502,12 +2598,12 @@ def main():
                     })
                 st.dataframe(pd.DataFrame(yearly_data), use_container_width=True)
             
-            with tab_concepts:
+            elif active_tab == "concepts":
                 st.markdown("### 🧠 Key Scientific Concepts")
                 concepts_df = pd.DataFrame(stats['concepts']['concepts'][:15], columns=["Concept", "Frequency"])
                 st.dataframe(concepts_df, use_container_width=True)
             
-            with tab_geo:
+            elif active_tab == "geography":
                 st.markdown("### 🌍 Geographic Distribution")
                 if stats['geography']['countries']:
                     geo_df = pd.DataFrame(list(stats['geography']['countries'].items()), columns=["Country", "Author count"])
@@ -2515,7 +2611,7 @@ def main():
                     st.markdown(f"**Total countries:** {stats['geography']['total_countries']}")
                     st.markdown(f"**International collaboration:** {stats['geography']['international_percent']:.1f}%")
             
-            with tab_collab:
+            elif active_tab == "collaboration":
                 st.markdown("### 🤝 Collaboration Networks")
                 if stats['collaboration']['top_collaborations']:
                     st.markdown("#### Top author pairs")
@@ -2526,7 +2622,7 @@ def main():
                     for author, connections in stats['collaboration']['core_authors'][:10]:
                         st.markdown(f"• **{author}** — {connections} connections")
             
-            with tab_diversity:
+            elif active_tab == "diversity":
                 st.markdown("### 🔄 Diversity Analysis")
                 col1, col2, col3 = st.columns(3)
                 with col1:
@@ -2536,7 +2632,7 @@ def main():
                 with col3:
                     st.metric("Publishers Shannon index", stats['shannon_index']['publishers'])
             
-            with tab_classics:
+            elif active_tab == "classics":
                 st.markdown("### ⭐ Citation Classics")
                 if stats['citation_classics']:
                     for classic in stats['citation_classics'][:10]:
@@ -2549,7 +2645,7 @@ def main():
                 else:
                     st.info("No citation classics detected")
             
-            with tab_crossref_only:
+            elif active_tab == "crossref_only":
                 st.markdown("### ⚠️ References with Only Crossref (OpenAlex missing)")
                 if stats.get('crossref_only_refs'):
                     for ref in stats['crossref_only_refs'][:20]:
@@ -2557,7 +2653,7 @@ def main():
                 else:
                     st.success("✅ No references with only Crossref data")
             
-            with tab_openalex_only:
+            elif active_tab == "openalex_only":
                 st.markdown("### ⚠️ References with Only OpenAlex (Crossref missing)")
                 if stats.get('openalex_only_refs'):
                     for ref in stats['openalex_only_refs'][:20]:
@@ -2565,7 +2661,7 @@ def main():
                 else:
                     st.success("✅ No references with only OpenAlex data")
             
-            with tab_suspicious:
+            elif active_tab == "suspicious":
                 st.markdown("### 🔍 Suspicious DOIs (Not found in any database)")
                 st.markdown("These DOIs were extracted from references but returned no data from Crossref or OpenAlex. May be invalid, typo, or AI-generated.")
                 if stats.get('suspicious_doi_refs'):
@@ -2574,7 +2670,7 @@ def main():
                 else:
                     st.success("✅ No suspicious DOIs detected")
             
-            with tab_non_doi:
+            elif active_tab == "non_doi":
                 st.markdown("### 📄 Non-DOI Sources (Books, Theses, Conference Papers, etc.)")
                 if stats['identifier_coverage']['references_without_doi']:
                     for ref in stats['identifier_coverage']['references_without_doi'][:20]:
@@ -2582,7 +2678,7 @@ def main():
                 else:
                     st.success("✅ All references have DOI identifiers")
             
-            with tab_url_sources:
+            elif active_tab == "url_sources":
                 st.markdown("### 🔗 URL Sources (Web links without DOI)")
                 if stats['identifier_coverage']['references_with_only_url']:
                     for ref in stats['identifier_coverage']['references_with_only_url'][:20]:
@@ -2590,7 +2686,7 @@ def main():
                 else:
                     st.success("✅ No URL-only references found")
             
-            with tab_problems:
+            elif active_tab == "problems":
                 st.markdown("### ⚠️ Problematic References")
                 if stats['problematic_refs']:
                     for ref in stats['problematic_refs'][:15]:
@@ -2608,41 +2704,100 @@ def main():
             st.markdown("---")
             st.markdown("### 📋 Full Reference List with Filters")
             
-            col_filter1, col_filter2, col_filter3, col_filter4, col_filter5, col_filter6 = st.columns(6)
-            with col_filter1:
-                show_doi_only = st.checkbox("Only with DOI")
-            with col_filter2:
-                show_non_doi_only = st.checkbox("Only non-DOI")
-            with col_filter3:
-                show_url_only = st.checkbox("URL-links")
-            with col_filter4:
-                show_crossref_only = st.checkbox("Only Crossref")
-            with col_filter5:
-                show_openalex_only = st.checkbox("Only OpenAlex")
-            with col_filter6:
-                show_problems_only = st.checkbox("Only problematic")
+            # Initialize filter states in session state if not exists
+            if 'filter_states' not in st.session_state:
+                st.session_state.filter_states = {
+                    'doi_only': False,
+                    'non_doi_only': False,
+                    'url_only': False,
+                    'crossref_only': False,
+                    'openalex_only': False,
+                    'problematic_only': False,
+                    'self_cited_only': False
+                }
             
-            col_filter7, col_filter8 = st.columns(2)
+            # Function to handle filter changes
+            def toggle_filter(filter_name, is_checked):
+                if is_checked:
+                    # Disable all other filters
+                    for key in st.session_state.filter_states:
+                        st.session_state.filter_states[key] = False
+                    st.session_state.filter_states[filter_name] = True
+                else:
+                    st.session_state.filter_states[filter_name] = False
+            
+            col_filter1, col_filter2, col_filter3, col_filter4 = st.columns(4)
+            with col_filter1:
+                doi_only = st.checkbox(
+                    "Only with DOI",
+                    value=st.session_state.filter_states['doi_only'],
+                    key="filter_doi_only",
+                    on_change=lambda: toggle_filter('doi_only', st.session_state.filter_doi_only)
+                )
+            with col_filter2:
+                non_doi_only = st.checkbox(
+                    "Only non-DOI",
+                    value=st.session_state.filter_states['non_doi_only'],
+                    key="filter_non_doi_only",
+                    on_change=lambda: toggle_filter('non_doi_only', st.session_state.filter_non_doi_only)
+                )
+            with col_filter3:
+                url_only = st.checkbox(
+                    "URL-links",
+                    value=st.session_state.filter_states['url_only'],
+                    key="filter_url_only",
+                    on_change=lambda: toggle_filter('url_only', st.session_state.filter_url_only)
+                )
+            with col_filter4:
+                crossref_only = st.checkbox(
+                    "Only Crossref",
+                    value=st.session_state.filter_states['crossref_only'],
+                    key="filter_crossref_only",
+                    on_change=lambda: toggle_filter('crossref_only', st.session_state.filter_crossref_only)
+                )
+            
+            col_filter5, col_filter6, col_filter7, col_filter8 = st.columns(4)
+            with col_filter5:
+                openalex_only = st.checkbox(
+                    "Only OpenAlex",
+                    value=st.session_state.filter_states['openalex_only'],
+                    key="filter_openalex_only",
+                    on_change=lambda: toggle_filter('openalex_only', st.session_state.filter_openalex_only)
+                )
+            with col_filter6:
+                problematic_only = st.checkbox(
+                    "⚠️ Problematic only",
+                    value=st.session_state.filter_states['problematic_only'],
+                    key="filter_problematic_only",
+                    on_change=lambda: toggle_filter('problematic_only', st.session_state.filter_problematic_only)
+                )
             with col_filter7:
-                show_suspicious_only = st.checkbox("🔍 Suspicious DOIs only")
+                self_cited_only = st.checkbox(
+                    "🔄 Self-cited only",
+                    value=st.session_state.filter_states['self_cited_only'],
+                    key="filter_self_cited_only",
+                    on_change=lambda: toggle_filter('self_cited_only', st.session_state.filter_self_cited_only)
+                )
             with col_filter8:
                 search_term = st.text_input("Search in text", placeholder="Enter keyword...")
             
             filtered_results = results
-            if show_doi_only:
+            
+            # Apply filters based on session state
+            if st.session_state.filter_states['doi_only']:
                 filtered_results = [r for r in filtered_results if r['doi']]
-            if show_non_doi_only:
+            if st.session_state.filter_states['non_doi_only']:
                 filtered_results = [r for r in filtered_results if not r['doi']]
-            if show_url_only:
+            if st.session_state.filter_states['url_only']:
                 filtered_results = [r for r in filtered_results if r.get('identifiers', {}).get('url') and not r.get('doi')]
-            if show_crossref_only:
+            if st.session_state.filter_states['crossref_only']:
                 filtered_results = [r for r in filtered_results if r['doi'] and r['crossref_status'] and not r['openalex_status']]
-            if show_openalex_only:
+            if st.session_state.filter_states['openalex_only']:
                 filtered_results = [r for r in filtered_results if r['doi'] and r['openalex_status'] and not r['crossref_status']]
-            if show_problems_only:
+            if st.session_state.filter_states['problematic_only']:
                 filtered_results = [r for r in filtered_results if r['is_retracted'] or r['is_preprint'] or r['crossmark_issues'] or r.get('is_suspicious_doi')]
-            if show_suspicious_only:
-                filtered_results = [r for r in filtered_results if r.get('is_suspicious_doi')]
+            if st.session_state.filter_states['self_cited_only']:
+                filtered_results = [r for r in filtered_results if r['is_self_citation']]
             if search_term:
                 filtered_results = [r for r in filtered_results if search_term.lower() in r['original_text'].lower()]
             
