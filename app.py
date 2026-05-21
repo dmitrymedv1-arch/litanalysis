@@ -207,6 +207,17 @@ st.markdown("""
         font-size: 12px;
         margin-top: 40px;
     }
+    
+    /* Clickable links */
+    .clickable-link {
+        color: #667eea;
+        text-decoration: none;
+        transition: all 0.3s;
+    }
+    .clickable-link:hover {
+        color: #764ba2;
+        text-decoration: underline;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -729,6 +740,8 @@ def analyze_identifier_coverage(results: List[Dict]) -> Dict:
     }
     
     references_without_any = []
+    references_with_only_url = []
+    references_without_doi = []
     
     for result in results:
         text = result.get('original_text', '')
@@ -741,10 +754,15 @@ def analyze_identifier_coverage(results: List[Dict]) -> Dict:
             identifier_stats['has_doi'] += 1
             has_any = True
             count += 1
+        else:
+            references_without_doi.append(text[:200])
+        
         if identifiers['url']:
             identifier_stats['has_url'] += 1
             has_any = True
             count += 1
+            if not identifiers['doi']:
+                references_with_only_url.append(text[:200])
         if identifiers['arxiv']:
             identifier_stats['has_arxiv'] += 1
             has_any = True
@@ -760,7 +778,6 @@ def analyze_identifier_coverage(results: List[Dict]) -> Dict:
         
         if not has_any:
             identifier_stats['has_none'] += 1
-            references_without_any.append(text[:200])
         
         if count > 1:
             identifier_stats['multiple'] += 1
@@ -768,6 +785,8 @@ def analyze_identifier_coverage(results: List[Dict]) -> Dict:
     return {
         'stats': identifier_stats,
         'references_without_any': references_without_any[:20],
+        'references_with_only_url': references_with_only_url[:20],
+        'references_without_doi': references_without_doi[:20],
         'total_references': len(results)
     }
 
@@ -917,12 +936,18 @@ def analyze_author_frequency_all(results: List[Dict]) -> Dict:
                 'count': 0,
                 'all_names': set(),
                 'all_institutions': set(),
-                'all_countries': set()
+                'all_countries': set(),
+                'latin_name': None  # New field for storing Latin (English) name
             }
         
         # Aggregate data
         merged_authors[canonical_id]['count'] += 1
         merged_authors[canonical_id]['all_names'].add(display_name)
+        
+        # Store Latin name if available (prefer OpenAlex Latin names)
+        if author.get('raw_name') and re.match(r'^[A-Za-z\s\.]+$', author.get('raw_name', '')):
+            if not merged_authors[canonical_id]['latin_name'] or len(author.get('raw_name', '')) > len(merged_authors[canonical_id]['latin_name'] or ''):
+                merged_authors[canonical_id]['latin_name'] = author.get('raw_name')
         
         if institution:
             merged_authors[canonical_id]['all_institutions'].add(institution)
@@ -964,8 +989,15 @@ def analyze_author_frequency_all(results: List[Dict]) -> Dict:
             if country_counter:
                 best_country = country_counter.most_common(1)[0][0]
         
+        # Determine best display name: prefer Latin (English) name over Cyrillic
+        best_display_name = details['display_name']
+        if details.get('latin_name') and re.match(r'^[A-Za-z\s\.]+$', details['latin_name']):
+            # Check if current name contains Cyrillic characters
+            if any(ord(char) > 0x0400 and ord(char) < 0x0600 for char in best_display_name):
+                best_display_name = details['latin_name']
+        
         author_list.append({
-            'display_name': details['display_name'],
+            'display_name': best_display_name,
             'orcid': details['orcid'],
             'institution': best_institution,
             'country': best_country,
@@ -1035,8 +1067,14 @@ def analyze_author_frequency_all(results: List[Dict]) -> Dict:
                 if other['country'] and not merged_country:
                     merged_country = other['country']
         
-        # Choose best display name (longest, most complete)
+        # Choose best display name (longest, most complete, prefer Latin)
         best_name = max(merged_names, key=len)
+        # Check if best_name contains Cyrillic and if there's a Latin alternative
+        if any(ord(char) > 0x0400 and ord(char) < 0x0600 for char in best_name):
+            for name in merged_names:
+                if re.match(r'^[A-Za-z\s\.]+$', name):
+                    best_name = name
+                    break
         
         final_author_list.append({
             'display_name': best_name,
@@ -1190,11 +1228,13 @@ def identify_citation_classics(results: List[Dict]) -> List[Dict]:
         if citations >= threshold:
             title = result.get('openalex_data', {}).get('title', '') or \
                     result.get('crossref_data', {}).get('title', [''])[0]
+            doi = result.get('doi', '')
             classics.append({
                 'title': title[:150],
                 'citations': citations,
                 'year': result.get('year', 'Unknown'),
-                'journal': result.get('journal', 'Unknown')
+                'journal': result.get('journal', 'Unknown'),
+                'doi': doi
             })
     
     return sorted(classics, key=lambda x: x['citations'], reverse=True)[:10]
@@ -1276,7 +1316,8 @@ def analyze_reference_batch(references: List[str], progress_bar, progress_start:
             'issn': None,
             'license': None,
             'references_count': 0,
-            'citations_count': 0
+            'citations_count': 0,
+            'is_suspicious_doi': False  # New flag for suspicious/fake DOI
         }
         
         if doi:
@@ -1285,6 +1326,11 @@ def analyze_reference_batch(references: List[str], progress_bar, progress_start:
                 openalex_future = executor.submit(fetch_openalex, doi)
                 crossref_data = crossref_future.result()
                 openalex_data = openalex_future.result()
+            
+            # Check for suspicious DOI: has DOI but both APIs returned no data
+            if not crossref_data and not openalex_data:
+                result['is_suspicious_doi'] = True
+                result['crossmark_issues'].append('⚠️ Attention: invalid/suspicious DOI (not found in Crossref or OpenAlex)')
             
             if crossref_data:
                 result['crossref_data'] = crossref_data
@@ -1402,6 +1448,46 @@ def analyze_all_references(references: List[str], batch_size: int = 50, paper_au
     
     return all_results
 
+# ======================== PARSE PAPER AUTHORS INPUT ========================
+def parse_paper_authors(authors_input: str) -> Set[str]:
+    """Parse paper authors input with format validation {First Initial} {Last Name}"""
+    if not authors_input:
+        return set()
+    
+    authors = set()
+    # Split by comma, tab, or newline
+    parts = re.split(r'[,\t\n]+', authors_input)
+    
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
+        
+        # Validate format: should start with letter (initial) optionally followed by dot, then space, then last name
+        # Examples: N. Fukatsu, N Fukatsu, Z. Wei
+        pattern = r'^([A-Za-z]\.?\s+[A-Za-z]+)$'
+        if re.match(pattern, part):
+            authors.add(part)
+        else:
+            # Try to auto-correct common mistakes
+            # If format is "LastName FirstInitial" -> convert to "FirstInitial LastName"
+            parts_reverse = part.split()
+            if len(parts_reverse) == 2:
+                # Check if second part is single letter (likely initial)
+                if len(parts_reverse[1]) == 1 or (len(parts_reverse[1]) == 2 and parts_reverse[1][1] == '.'):
+                    corrected = f"{parts_reverse[1]} {parts_reverse[0]}"
+                    if re.match(r'^([A-Za-z]\.?\s+[A-Za-z]+)$', corrected):
+                        authors.add(corrected)
+                        continue
+            # If format is "First Last" without initial dot
+            if len(parts_reverse) == 2:
+                if len(parts_reverse[0]) == 1 or (len(parts_reverse[0]) == 2 and parts_reverse[0][1] == '.'):
+                    authors.add(part)
+                    continue
+            st.warning(f"Author name format not recognized: '{part}'. Expected format: 'N. Fukatsu' or 'N Fukatsu'")
+    
+    return authors
+
 # ======================== ENHANCED STATISTICS ========================
 def generate_advanced_statistics(results: List[Dict]) -> Dict:
     """Generate enhanced statistics with new metrics"""
@@ -1413,6 +1499,9 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
     year_counter = Counter()
     publisher_counter = Counter()
     problematic_refs = []
+    crossref_only_refs = []
+    openalex_only_refs = []
+    suspicious_doi_refs = []
     
     for result in results:
         if result['doi']:
@@ -1420,10 +1509,23 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
                 doi_status['both'] += 1
             elif result['crossref_status']:
                 doi_status['crossref_only'] += 1
+                crossref_only_refs.append({
+                    'text': result['original_text'][:300],
+                    'doi': result['doi']
+                })
             elif result['openalex_status']:
                 doi_status['openalex_only'] += 1
+                openalex_only_refs.append({
+                    'text': result['original_text'][:300],
+                    'doi': result['doi']
+                })
             else:
                 doi_status['none'] += 1
+                if result.get('is_suspicious_doi'):
+                    suspicious_doi_refs.append({
+                        'text': result['original_text'][:300],
+                        'doi': result['doi']
+                    })
         else:
             doi_status['none'] += 1
         
@@ -1450,6 +1552,9 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
             has_problem = True
         if result['crossmark_issues']:
             problems.extend(result['crossmark_issues'])
+            has_problem = True
+        if result.get('is_suspicious_doi'):
+            problems.append('⚠️ Suspicious DOI (not found in any database)')
             has_problem = True
         
         if has_problem:
@@ -1525,6 +1630,9 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         'years_last_5': years_last_5,
         'top_publishers': [f"{publisher} — {count}" for publisher, count in publisher_counter.most_common(10)],
         'problematic_refs': problematic_refs[:20],
+        'crossref_only_refs': crossref_only_refs[:20],
+        'openalex_only_refs': openalex_only_refs[:20],
+        'suspicious_doi_refs': suspicious_doi_refs[:20],
         'citation_stacking': citation_stacking[:10],
         'frequently_cited': [f"{a['display_name']} — {a['count']}" for a in frequently_cited[:10]],
         'self_citations_count': len([r for r in results if r['is_self_citation']]),
@@ -1555,7 +1663,22 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
 
 # ======================== HTML REPORT (ENGLISH, UPDATED) ========================
 def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_authors: Set[str] = None) -> str:
-    """Generate enhanced HTML report in English"""
+    """Generate enhanced HTML report in English with clickable links"""
+    
+    def make_clickable_doi(doi):
+        if doi:
+            return f'<a href="https://doi.org/{doi}" target="_blank" class="clickable-link">{doi}</a>'
+        return 'Not found'
+    
+    def make_clickable_orcid(orcid):
+        if orcid:
+            return f'<a href="{orcid}" target="_blank" class="clickable-link">{orcid}</a>'
+        return ''
+    
+    def make_clickable_url(url):
+        if url:
+            return f'<a href="{url}" target="_blank" class="clickable-link">{url[:80]}...</a>'
+        return ''
     
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -1764,6 +1887,15 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         tr:hover {{
             background: #f5f5f5;
         }}
+        .clickable-link {{
+            color: #667eea;
+            text-decoration: none;
+            transition: all 0.3s;
+        }}
+        .clickable-link:hover {{
+            color: #764ba2;
+            text-decoration: underline;
+        }}
         @media print {{
             .sidebar {{ display: none; }}
             .main-content {{ margin-left: 0; }}
@@ -1789,6 +1921,11 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         <a href="#collaboration">🤝 Collaborations</a>
         <a href="#diversity">🔄 Diversity</a>
         <a href="#classics">⭐ Citation Classics</a>
+        <a href="#crossref_only">⚠️ Only Crossref</a>
+        <a href="#openalex_only">⚠️ Only OpenAlex</a>
+        <a href="#suspicious_doi">🔍 Suspicious DOIs</a>
+        <a href="#non_doi">📄 Non-DOI Sources</a>
+        <a href="#url_sources">🔗 URL Sources</a>
         <a href="#problems">⚠️ Problems</a>
     </div>
     
@@ -1878,13 +2015,12 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
                     <div class="stat-label">❌ No data</div>
                 </div>
             </div>
-            {f'<div style="margin-top: 15px;"><h4>References without any identifier:</h4>{"".join([f"<div class=rank-item>📄 {ref}...</div>" for ref in stats["identifier_coverage"]["references_without_any"][:5]])}</div>' if stats['identifier_coverage']['references_without_any'] else ''}
         </div>
         
         <div id="authors" class="section">
             <div class="section-title">👨‍🎓 Author Analysis (Enhanced Merging)</div>
             <div>
-                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{author["display_name"]}</span><span class="rank-count">{author["count"]} citations</span>' + (f'<div style="font-size: 11px; color: #667eea;">🔗 ORCID: {author["orcid"]}</div>' if author.get("orcid") else '') + (f'<div style="font-size: 11px; color: #666;">🏛 {author["institution"][:50]}</div>' if author.get("institution") else '') + '<div class="progress-bar"><div class="progress-fill" style="width: ' + str(min(100, author["count"] / stats["author_frequency_all"]["all_authors"][0]["count"] * 100 if stats["author_frequency_all"]["all_authors"] else 0)) + '%;"></div></div></div>' for i, author in enumerate(stats["author_frequency_all"]["all_authors"][:30])])}
+                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{author["display_name"]}</span><span class="rank-count">{author["count"]} citations</span>' + (f'<div style="font-size: 11px; color: #667eea;">🔗 ORCID: {make_clickable_orcid(author["orcid"])}</div>' if author.get("orcid") else '') + (f'<div style="font-size: 11px; color: #666;">🏛 {author["institution"][:50]}</div>' if author.get("institution") else '') + '<div class="progress-bar"><div class="progress-fill" style="width: ' + str(min(100, author["count"] / stats["author_frequency_all"]["all_authors"][0]["count"] * 100 if stats["author_frequency_all"]["all_authors"] else 0)) + '%;"></div></div></div>' for i, author in enumerate(stats["author_frequency_all"]["all_authors"][:30])])}
             </div>
             <div style="margin-top: 15px;">
                 <span class="badge badge-info">Unique authors: {stats['author_frequency_all']['unique_authors']}</span>
@@ -2010,7 +2146,32 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         
         <div id="classics" class="section">
             <div class="section-title">⭐ Citation Classics (abnormally high citations)</div>
-            {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{classic["title"][:80]}...</span><span class="rank-count">📊 {classic["citations"]} citations</span><div style="font-size: 12px; color: #666; margin-top: 5px;">{classic["journal"]} ({classic["year"]})</div></div>' for i, classic in enumerate(stats['citation_classics'][:8])]) if stats['citation_classics'] else '<p>None detected</p>'}
+            {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{classic["title"][:80]}...</span><span class="rank-count">📊 {classic["citations"]} citations</span><div style="font-size: 12px; color: #666; margin-top: 5px;">{classic["journal"]} ({classic["year"]})</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(classic["doi"])}</div>' if classic.get("doi") else '') + '</div>' for i, classic in enumerate(stats['citation_classics'][:8])]) if stats['citation_classics'] else '<p>None detected</p>'}
+        </div>
+        
+        <div id="crossref_only" class="section">
+            <div class="section-title">⚠️ References with Only Crossref (OpenAlex missing)</div>
+            {''.join([f'<div class="rank-item"><div>📄 {ref["text"]}</div><div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('crossref_only_refs', [])[:20]]) if stats.get('crossref_only_refs') else '<p>✅ No references found</p>'}
+        </div>
+        
+        <div id="openalex_only" class="section">
+            <div class="section-title">⚠️ References with Only OpenAlex (Crossref missing)</div>
+            {''.join([f'<div class="rank-item"><div>📄 {ref["text"]}</div><div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('openalex_only_refs', [])[:20]]) if stats.get('openalex_only_refs') else '<p>✅ No references found</p>'}
+        </div>
+        
+        <div id="suspicious_doi" class="section">
+            <div class="section-title">🔍 Suspicious DOIs (Not found in Crossref or OpenAlex)</div>
+            {''.join([f'<div class="rank-item"><div class="badge badge-danger">⚠️ Attention: invalid/suspicious DOI</div><div>📄 {ref["text"]}</div><div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('suspicious_doi_refs', [])[:20]]) if stats.get('suspicious_doi_refs') else '<p>✅ No suspicious DOIs found</p>'}
+        </div>
+        
+        <div id="non_doi" class="section">
+            <div class="section-title">📄 Non-DOI Sources (Books, Theses, etc.)</div>
+            {''.join([f'<div class="rank-item">📄 {ref}...</div>' for ref in stats['identifier_coverage']['references_without_doi'][:20]]) if stats['identifier_coverage']['references_without_doi'] else '<p>✅ All references have DOI</p>'}
+        </div>
+        
+        <div id="url_sources" class="section">
+            <div class="section-title">🔗 URL Sources (Web links without DOI)</div>
+            {''.join([f'<div class="rank-item">🔗 {ref}...</div>' for ref in stats['identifier_coverage']['references_with_only_url'][:20]]) if stats['identifier_coverage']['references_with_only_url'] else '<p>✅ No URL-only references</p>'}
         </div>
         
         <div id="problems" class="section">
@@ -2042,19 +2203,22 @@ def main():
         st.markdown("---")
         st.markdown("## 👥 Paper authors (optional)")
         st.markdown("*For self-citation analysis*")
+        st.markdown("**Format:** `FirstInitial LastName` (e.g., `N. Fukatsu`, `N Fukatsu`, `Z. Wei`)")
+        st.markdown("**Separators:** comma, tab, or new line")
         
         authors_input = st.text_area(
-            "Authors (one per line)",
-            placeholder="E.V. Ramos-Fernandez\nJung HS\nZhang Wei\nSadykov V",
-            help="Enter authors in any format"
+            "Authors (one per line or comma-separated)",
+            placeholder="N. Fukatsu\nZ. Wei\nJ. Smith\nor\nN. Fukatsu, Z. Wei, J. Smith",
+            help="Enter authors in format: FirstInitial LastName"
         )
         
         paper_authors = set()
         if authors_input:
-            for line in authors_input.strip().split('\n'):
-                if line.strip():
-                    paper_authors.add(line.strip())
-            st.success(f"✅ Added {len(paper_authors)} authors")
+            paper_authors = parse_paper_authors(authors_input)
+            if paper_authors:
+                st.success(f"✅ Added {len(paper_authors)} authors")
+            else:
+                st.warning("⚠️ No valid authors added. Please use format: N. Fukatsu or N Fukatsu")
         
         st.markdown("---")
         st.info("💡 **Tips:**\n- For large lists (>500 references) processing may take several minutes\n- New metrics: identifier coverage, yearly statistics, publisher frequency, enhanced author merging")
@@ -2194,10 +2358,11 @@ def main():
             
             st.markdown("---")
             
-            tab_metrics, tab_identifiers, tab_authors, tab_journals, tab_publishers, tab_yearly, tab_concepts, tab_geo, tab_collab, tab_diversity, tab_classics, tab_problems = st.tabs([
+            tab_metrics, tab_identifiers, tab_authors, tab_journals, tab_publishers, tab_yearly, tab_concepts, tab_geo, tab_collab, tab_diversity, tab_classics, tab_crossref_only, tab_openalex_only, tab_suspicious, tab_non_doi, tab_url_sources, tab_problems = st.tabs([
                 "📊 Metrics", "🔍 Identifiers", "👨‍🎓 Authors", "📖 Journals", "🏢 Publishers",
                 "📅 Yearly", "🧠 Concepts", "🌍 Geography", "🤝 Collaborations",
-                "🔄 Diversity", "⭐ Classics", "⚠️ Problems"
+                "🔄 Diversity", "⭐ Classics", "⚠️ Only Crossref", "⚠️ Only OpenAlex",
+                "🔍 Suspicious DOI", "📄 Non-DOI", "🔗 URL Sources", "⚠️ Problems"
             ])
             
             with tab_metrics:
@@ -2337,8 +2502,51 @@ def main():
                             st.markdown(f"**Citations:** {classic['citations']}")
                             st.markdown(f"**Journal:** {classic['journal']}")
                             st.markdown(f"**Year:** {classic['year']}")
+                            if classic.get('doi'):
+                                st.markdown(f"**DOI:** [{classic['doi']}](https://doi.org/{classic['doi']})")
                 else:
                     st.info("No citation classics detected")
+            
+            with tab_crossref_only:
+                st.markdown("### ⚠️ References with Only Crossref (OpenAlex missing)")
+                if stats.get('crossref_only_refs'):
+                    for ref in stats['crossref_only_refs'][:20]:
+                        st.warning(f"📄 {ref['text']}...\n\nDOI: {ref['doi']}")
+                else:
+                    st.success("✅ No references with only Crossref data")
+            
+            with tab_openalex_only:
+                st.markdown("### ⚠️ References with Only OpenAlex (Crossref missing)")
+                if stats.get('openalex_only_refs'):
+                    for ref in stats['openalex_only_refs'][:20]:
+                        st.info(f"📄 {ref['text']}...\n\nDOI: {ref['doi']}")
+                else:
+                    st.success("✅ No references with only OpenAlex data")
+            
+            with tab_suspicious:
+                st.markdown("### 🔍 Suspicious DOIs (Not found in any database)")
+                st.markdown("These DOIs were extracted from references but returned no data from Crossref or OpenAlex. May be invalid, typo, or AI-generated.")
+                if stats.get('suspicious_doi_refs'):
+                    for ref in stats['suspicious_doi_refs'][:20]:
+                        st.error(f"⚠️ {ref['text']}...\n\nDOI: {ref['doi']}")
+                else:
+                    st.success("✅ No suspicious DOIs detected")
+            
+            with tab_non_doi:
+                st.markdown("### 📄 Non-DOI Sources (Books, Theses, Conference Papers, etc.)")
+                if stats['identifier_coverage']['references_without_doi']:
+                    for ref in stats['identifier_coverage']['references_without_doi'][:20]:
+                        st.text(ref)
+                else:
+                    st.success("✅ All references have DOI identifiers")
+            
+            with tab_url_sources:
+                st.markdown("### 🔗 URL Sources (Web links without DOI)")
+                if stats['identifier_coverage']['references_with_only_url']:
+                    for ref in stats['identifier_coverage']['references_with_only_url'][:20]:
+                        st.text(ref)
+                else:
+                    st.success("✅ No URL-only references found")
             
             with tab_problems:
                 st.markdown("### ⚠️ Problematic References")
@@ -2358,26 +2566,54 @@ def main():
             st.markdown("---")
             st.markdown("### 📋 Full Reference List with Filters")
             
-            col_filter1, col_filter2, col_filter3 = st.columns(3)
+            col_filter1, col_filter2, col_filter3, col_filter4, col_filter5, col_filter6 = st.columns(6)
             with col_filter1:
                 show_doi_only = st.checkbox("Only with DOI")
             with col_filter2:
-                show_problems_only = st.checkbox("Only problematic")
+                show_non_doi_only = st.checkbox("Only non-DOI")
             with col_filter3:
+                show_url_only = st.checkbox("URL-links")
+            with col_filter4:
+                show_crossref_only = st.checkbox("Only Crossref")
+            with col_filter5:
+                show_openalex_only = st.checkbox("Only OpenAlex")
+            with col_filter6:
+                show_problems_only = st.checkbox("Only problematic")
+            
+            col_filter7, col_filter8 = st.columns(2)
+            with col_filter7:
+                show_suspicious_only = st.checkbox("🔍 Suspicious DOIs only")
+            with col_filter8:
                 search_term = st.text_input("Search in text", placeholder="Enter keyword...")
             
             filtered_results = results
             if show_doi_only:
                 filtered_results = [r for r in filtered_results if r['doi']]
+            if show_non_doi_only:
+                filtered_results = [r for r in filtered_results if not r['doi']]
+            if show_url_only:
+                filtered_results = [r for r in filtered_results if r.get('identifiers', {}).get('url') and not r.get('doi')]
+            if show_crossref_only:
+                filtered_results = [r for r in filtered_results if r['doi'] and r['crossref_status'] and not r['openalex_status']]
+            if show_openalex_only:
+                filtered_results = [r for r in filtered_results if r['doi'] and r['openalex_status'] and not r['crossref_status']]
             if show_problems_only:
-                filtered_results = [r for r in filtered_results if r['is_retracted'] or r['is_preprint'] or r['crossmark_issues']]
+                filtered_results = [r for r in filtered_results if r['is_retracted'] or r['is_preprint'] or r['crossmark_issues'] or r.get('is_suspicious_doi')]
+            if show_suspicious_only:
+                filtered_results = [r for r in filtered_results if r.get('is_suspicious_doi')]
             if search_term:
                 filtered_results = [r for r in filtered_results if search_term.lower() in r['original_text'].lower()]
             
             st.markdown(f"**Showing {len(filtered_results)} of {len(results)} references**")
             
             for i, result in enumerate(filtered_results[:50]):
-                status_icon = "✅" if result['doi'] else "❌"
+                if result.get('is_suspicious_doi'):
+                    status_icon = "⚠️"
+                elif result['doi']:
+                    status_icon = "✅"
+                else:
+                    status_icon = "❌"
+                
                 problems_badges = []
                 if result['is_retracted']:
                     problems_badges.append('<span class="badge-danger">Retracted</span>')
@@ -2385,6 +2621,8 @@ def main():
                     problems_badges.append('<span class="badge-warning">Preprint</span>')
                 if result['is_self_citation']:
                     problems_badges.append('<span class="badge-info">Self-citation</span>')
+                if result.get('is_suspicious_doi'):
+                    problems_badges.append('<span class="badge-danger">⚠️ Suspicious DOI</span>')
                 
                 badges_html = ' '.join(problems_badges)
                 
@@ -2461,6 +2699,7 @@ Crossref + OpenAlex: {stats['doi_status']['both']}
 Only Crossref: {stats['doi_status']['crossref_only']}
 Only OpenAlex: {stats['doi_status']['openalex_only']}
 No data: {stats['doi_status']['none']}
+Suspicious DOIs: {len(stats.get('suspicious_doi_refs', []))}
 
 === TOP AUTHORS (MERGED) ===
 {chr(10).join([f"{a['display_name']}: {a['count']} citations" + (f" (ORCID: {a['orcid']})" if a.get('orcid') else "") for a in stats['author_frequency_all']['all_authors'][:20]])}
