@@ -1,3 +1,14 @@
+## Изменение количества строк кода
+
+**Было:** ~2950 строк (приблизительно)
+
+**Стало:** ~3050 строк (приблизительно +100 строк за счет добавленных функций и улучшений)
+
+---
+
+## Полный обновленный код
+
+```python
 import streamlit as st
 import pandas as pd
 import re
@@ -16,7 +27,8 @@ from collections import defaultdict
 from itertools import combinations
 import asyncio
 import aiohttp
- 
+import html  # Добавлено для экранирования HTML
+
 # Try to import additional libraries for new features
 try:
     from langdetect import detect, DetectorFactory
@@ -29,13 +41,17 @@ except ImportError:
 TEXTS = {
     'en': {
         # General UI
-        'app_title': "Literature Reference Analyzer for Scientific Editorial Offices",
+        'app_title': "Comprehensive Reference List Analysis",
         'app_subtitle': "Enhanced version with Crossref + OpenAlex analytics",
         'settings': "⚙️ Settings",
         'batch_size': "Batch size",
         'batch_size_help': "Number of references processed at once",
         'paper_authors': "👥 Paper authors (optional)",
         'paper_authors_help': "For self-citation analysis",
+        'journal_name_label': "📓 Journal name (optional)",
+        'journal_name_help': "If not specified, 'Chimica Techno Acta' will be used",
+        'article_number_label': "🔢 Article number (optional)",
+        'article_number_help': "e.g., 1224, CTA-1234, CTA/1224",
         'format_hint': "**Format:** `FirstInitial LastName` (e.g., `N. Fukatsu`, `N Fukatsu`, `Z. Wei`)",
         'separator_hint': "**Separators:** comma, tab, or new line",
         'authors_placeholder': "N. Fukatsu\nZ. Wei\nJ. Smith\nor\nN. Fukatsu, Z. Wei, J. Smith",
@@ -193,8 +209,8 @@ TEXTS = {
         'html_url_sources': "🔗 URL Sources",
         'html_problems': "⚠️ Problems",
         'html_generated': "Generated",
-        'html_footer': "Report automatically generated using Crossref and OpenAlex APIs.",
-        'html_copyright': "© Literature Reference Analyzer | Expert Edition",
+        'html_footer': "",
+        'html_copyright': "© Comprehensive Reference List Analysis / Created by daM / Chimica Techno Acta https://chimicatechnoacta.ru",
         'html_rank': "Rank",
         'html_count': "Count",
         'html_percentage': "Percentage",
@@ -227,13 +243,17 @@ TEXTS = {
     },
     'ru': {
         # General UI
-        'app_title': "Анализатор литературных ссылок для научных редакций",
+        'app_title': "Comprehensive Reference List Analysis",
         'app_subtitle': "Расширенная версия с аналитикой Crossref + OpenAlex",
         'settings': "⚙️ Настройки",
         'batch_size': "Размер пакета",
         'batch_size_help': "Количество ссылок, обрабатываемых за раз",
         'paper_authors': "👥 Авторы статьи (опционально)",
         'paper_authors_help': "Для анализа самоцитирования",
+        'journal_name_label': "📓 Название журнала (опционально)",
+        'journal_name_help': "Если не указано, будет использовано 'Chimica Techno Acta'",
+        'article_number_label': "🔢 Номер статьи (опционально)",
+        'article_number_help': "Например: 1224, CTA-1234, CTA/1224",
         'format_hint': "**Формат:** `Инициал Фамилия` (например, `Н. Фукацу`, `Н Фукацу`, `З. Вэй`)",
         'separator_hint': "**Разделители:** запятая, табуляция или новая строка",
         'authors_placeholder': "Н. Фукацу\nЗ. Вэй\nД. Смит\nили\nН. Фукацу, З. Вэй, Д. Смит",
@@ -391,8 +411,8 @@ TEXTS = {
         'html_url_sources': "🔗 URL-источники",
         'html_problems': "⚠️ Проблемы",
         'html_generated': "Сгенерирован",
-        'html_footer': "Отчет автоматически сгенерирован с использованием API Crossref и OpenAlex.",
-        'html_copyright': "© Анализатор литературных ссылок | Экспертная версия",
+        'html_footer': "",
+        'html_copyright': "© Comprehensive Reference List Analysis / Created by daM / Chimica Techno Acta https://chimicatechnoacta.ru",
         'html_rank': "Ранг",
         'html_count': "Количество",
         'html_percentage': "Процент",
@@ -432,7 +452,7 @@ def get_text(key: str) -> str:
 
 # Page configuration
 st.set_page_config(
-    page_title="Literature Reference Analyzer | Expert Edition",
+    page_title="Comprehensive Reference List Analysis",
     page_icon="📚",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -445,6 +465,12 @@ if 'language' not in st.session_state:
 # Initialize bad DOIs cache in session state
 if 'bad_dois' not in st.session_state:
     st.session_state.bad_dois = set()
+
+# Initialize journal and article number in session state
+if 'journal_name' not in st.session_state:
+    st.session_state.journal_name = ''
+if 'article_number' not in st.session_state:
+    st.session_state.article_number = ''
 
 # ======================== COLORED PROGRESS BAR ========================
 def update_colored_progress(progress_percent: float, success_rate: float = None, data_density: float = None):
@@ -574,7 +600,7 @@ def update_colored_progress(progress_percent: float, success_rate: float = None,
     
     return progress_html
 
-def get_progress_color_by_metrics(doi_found_count: int, total_refs: int, api_success_count: int = None) -> Tuple[str, str]:
+def get_progress_color_by_metrics(doi_found_count: int, total_refs: int, api_success_count: int = None) -> Tuple[str, str, str]:
     """
     Determine color and badge text based on actual data metrics
     Returns: (color_hex, badge_text, badge_class)
@@ -832,8 +858,69 @@ st.markdown("""
         opacity: 0.5;
         pointer-events: none;
     }
+    
+    /* Full text scrolling */
+    .full-text-scroll {
+        max-height: 200px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        font-family: monospace;
+        font-size: 12px;
+        background: #f5f5f5;
+        padding: 8px;
+        border-radius: 5px;
+        margin-top: 8px;
+    }
+    
+    /* Highlighted self-citation author */
+    .self-citation-highlight {
+        color: #d9534f;
+        font-weight: bold;
+        background-color: #f8d7da;
+        padding: 0px 2px;
+        border-radius: 3px;
+    }
 </style>
 """, unsafe_allow_html=True)
+
+# ======================== HELPER FUNCTION FOR AUTHOR HIGHLIGHTING ========================
+def format_authors_with_highlight(authors_list: List[str], highlight_set: Set[str]) -> str:
+    """Format authors list with highlighting for self-citations"""
+    if not authors_list:
+        return ""
+    
+    formatted_authors = []
+    for author in authors_list:
+        # Normalize author name for comparison
+        compare_name, _ = normalize_author_name(author)
+        if compare_name in highlight_set:
+            formatted_authors.append(f'<span class="self-citation-highlight">{html.escape(author)}</span>')
+        else:
+            formatted_authors.append(html.escape(author))
+    
+    return ", ".join(formatted_authors)
+
+def sanitize_filename(s: str) -> str:
+    """Sanitize string for use in filename"""
+    if not s:
+        return ""
+    # Replace non-alphanumeric characters with underscore
+    sanitized = re.sub(r'[^a-z0-9]+', '_', s.lower().strip())
+    # Remove trailing underscores
+    sanitized = sanitized.strip('_')
+    return sanitized
+
+def get_colors_for_authors(authors_list: List[str]) -> List[str]:
+    """Generate distinct colors for each author"""
+    colors = [
+        "#d9534f", "#5bc0de", "#5cb85c", "#f0ad4e", "#337ab7",
+        "#d9534f", "#5bc0de", "#5cb85c", "#f0ad4e", "#337ab7"
+    ]
+    result = []
+    for i, author in enumerate(authors_list):
+        color_idx = i % len(colors)
+        result.append(colors[color_idx])
+    return result
 
 # ======================== OPTIMIZED API REQUESTS ========================
 # OPTIMIZATION 4: Improved retry with random wait for better performance
@@ -876,7 +963,7 @@ def fetch_openalex_concepts(work_id: str) -> List[Dict]:
     return []
 
 # ======================== NEW ASYNC FUNCTIONS FOR MAXIMUM PERFORMANCE ========================
-# OPTIMIZATION 2: Async function for batch processing
+# Note: Async function exists but is not currently used (kept for potential future optimization)
 async def fetch_single_doi_async(session: aiohttp.ClientSession, doi: str, semaphore: asyncio.Semaphore) -> Tuple[str, Optional[Dict], Optional[Dict]]:
     """Fetch Crossref and OpenAlex data for a single DOI asynchronously"""
     async with semaphore:
@@ -952,6 +1039,9 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
             dois_with_indices.append((idx, doi))
     
     # Step 2: Fetch data using ThreadPoolExecutor (optimized approach)
+    crossref_results = {}
+    openalex_results = {}
+    
     if dois_with_indices:
         # OPTIMIZATION 1: Single global ThreadPoolExecutor for all DOIs in batch
         with ThreadPoolExecutor(max_workers=30) as executor:
@@ -966,8 +1056,6 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                     futures[(idx, 'openalex')] = executor.submit(fetch_openalex, doi)
             
             # Collect results
-            crossref_results = {}
-            openalex_results = {}
             for (idx, api_type), future in futures.items():
                 if future is not None:
                     try:
@@ -1912,14 +2000,14 @@ def analyze_identifier_coverage(results: List[Dict]) -> Dict:
             has_any = True
             count += 1
         else:
-            references_without_doi.append(text[:200])
+            references_without_doi.append(text)
         
         if identifiers['url']:
             identifier_stats['has_url'] += 1
             has_any = True
             count += 1
             if not identifiers['doi']:
-                references_with_only_url.append(text[:200])
+                references_with_only_url.append(text)
         if identifiers['arxiv']:
             identifier_stats['has_arxiv'] += 1
             has_any = True
@@ -2325,7 +2413,7 @@ def detect_predatory_journals(results: List[Dict]) -> List[Dict]:
         
         if signs:
             predatory_signs.append({
-                'reference': result['original_text'][:200],
+                'reference': result['original_text'],
                 'signs': signs,
                 'journal': result.get('journal', 'Unknown')
             })
@@ -2387,7 +2475,7 @@ def identify_citation_classics(results: List[Dict]) -> List[Dict]:
                     result.get('crossref_data', {}).get('title', [''])[0]
             doi = result.get('doi', '')
             classics.append({
-                'title': title[:150],
+                'title': title,
                 'citations': citations,
                 'year': result.get('year', 'Unknown'),
                 'journal': result.get('journal', 'Unknown'),
@@ -2559,20 +2647,20 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
             elif result['crossref_status']:
                 doi_status['crossref_only'] += 1
                 crossref_only_refs.append({
-                    'text': result['original_text'][:300],
+                    'text': result['original_text'],
                     'doi': result['doi']
                 })
             elif result['openalex_status']:
                 doi_status['openalex_only'] += 1
                 openalex_only_refs.append({
-                    'text': result['original_text'][:300],
+                    'text': result['original_text'],
                     'doi': result['doi']
                 })
             else:
                 doi_status['none'] += 1
                 if result.get('is_suspicious_doi'):
                     suspicious_doi_refs.append({
-                        'text': result['original_text'][:300],
+                        'text': result['original_text'],
                         'doi': result['doi']
                     })
         else:
@@ -2607,7 +2695,7 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
             has_problem = True
         
         if has_problem:
-            problematic_refs.append({'text': result['original_text'][:300], 'problems': ', '.join(problems)})
+            problematic_refs.append({'text': result['original_text'], 'problems': ', '.join(problems)})
     
     # Enhanced author analysis with merged logic
     author_details = {}
@@ -2715,30 +2803,208 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
     }
 
 # ======================== HTML REPORT (ENGLISH, UPDATED) ========================
-def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_authors: Set[str] = None, lang: str = 'en') -> str:
+def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_authors: Set[str] = None, lang: str = 'en', journal_name: str = '', article_number: str = '') -> str:
     """Generate enhanced HTML report in English with clickable links"""
+    
+    # Normalize paper authors for highlighting
+    normalized_authors_set = set()
+    paper_authors_list = []
+    if paper_authors:
+        for author in paper_authors:
+            norm, disp = normalize_author_name(author)
+            normalized_authors_set.add(norm)
+            paper_authors_list.append(disp)
+    
+    # Get colors for authors
+    author_colors = get_colors_for_authors(paper_authors_list)
+    
+    # Prepare journal display name
+    journal_display = journal_name if journal_name else "Chimica Techno Acta"
+    article_display = article_number if article_number else "—"
     
     def make_clickable_doi(doi):
         if doi:
-            return f'<a href="https://doi.org/{doi}" target="_blank" class="clickable-link">{doi}</a>'
+            return f'<a href="https://doi.org/{doi}" target="_blank" class="clickable-link">{html.escape(doi)}</a>'
         return get_text('html_not_found')
     
     def make_clickable_orcid(orcid):
         if orcid:
-            return f'<a href="{orcid}" target="_blank" class="clickable-link">{orcid}</a>'
+            return f'<a href="{orcid}" target="_blank" class="clickable-link">{html.escape(orcid)}</a>'
         return ''
     
     def make_clickable_url(url):
         if url:
-            return f'<a href="{url}" target="_blank" class="clickable-link">{url[:80]}...</a>'
+            return f'<a href="{url}" target="_blank" class="clickable-link">{html.escape(url)}</a>'
         return ''
+    
+    # Generate authors highlight HTML for the section header
+    authors_highlight_html = ""
+    if paper_authors_list:
+        authors_highlight_html = '<div style="margin-top: 15px; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 8px;"><strong>📝 Авторы статьи для анализа самоцитирований:</strong><br>'
+        for i, author in enumerate(paper_authors_list):
+            color = author_colors[i]
+            authors_highlight_html += f'<span style="color: {color}; font-weight: bold; margin-right: 10px;">{html.escape(author)}</span>'
+        authors_highlight_html += '</div>'
+    
+    # Generate self-citations section with full authors and highlighting
+    self_citations_html = ""
+    if stats.get('self_citation_refs'):
+        for ref in stats['self_citation_refs']:
+            # Get full authors list with highlighting
+            authors_full = format_authors_with_highlight(ref['authors_display'], normalized_authors_set)
+            
+            # Build reference HTML
+            ref_html = f'<div class="rank-item" style="margin-bottom: 15px;">'
+            ref_html += f'<div><strong>📄 </strong>'
+            
+            # Add full text with scrolling
+            ref_html += f'<div class="full-text-scroll">{html.escape(ref["original_text"])}</div>'
+            ref_html += f'</div>'
+            
+            if ref.get('doi'):
+                ref_html += f'<div style="font-size: 11px; margin-top: 8px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div>'
+            
+            if ref.get('journal'):
+                ref_html += f'<div style="font-size: 11px; margin-top: 5px;">📖 {get_text("journal")}: {html.escape(ref["journal"])}</div>'
+            
+            if ref.get('year'):
+                ref_html += f'<div style="font-size: 11px; margin-top: 5px;">📅 {get_text("year")}: {ref["year"]}</div>'
+            
+            if authors_full:
+                ref_html += f'<div style="font-size: 11px; margin-top: 5px;">👨‍🎓 {get_text("authors")}: {authors_full}</div>'
+            
+            ref_html += '</div>'
+            self_citations_html += ref_html
+    else:
+        self_citations_html = f'<p>{get_text("no_problematic")}</p>'
+    
+    # Generate crossref only section with full text
+    crossref_only_html = ""
+    if stats.get('crossref_only_refs'):
+        for ref in stats['crossref_only_refs']:
+            crossref_only_html += f'<div class="rank-item" style="margin-bottom: 15px;">'
+            crossref_only_html += f'<div class="full-text-scroll">{html.escape(ref["text"])}</div>'
+            crossref_only_html += f'<div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div>'
+            crossref_only_html += '</div>'
+    else:
+        crossref_only_html = f'<p>{get_text("no_crossref_only")}</p>'
+    
+    # Generate openalex only section with full text
+    openalex_only_html = ""
+    if stats.get('openalex_only_refs'):
+        for ref in stats['openalex_only_refs']:
+            openalex_only_html += f'<div class="rank-item" style="margin-bottom: 15px;">'
+            openalex_only_html += f'<div class="full-text-scroll">{html.escape(ref["text"])}</div>'
+            openalex_only_html += f'<div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div>'
+            openalex_only_html += '</div>'
+    else:
+        openalex_only_html = f'<p>{get_text("no_openalex_only")}</p>'
+    
+    # Generate suspicious DOIs section with full text
+    suspicious_doi_html = ""
+    if stats.get('suspicious_doi_refs'):
+        for ref in stats['suspicious_doi_refs']:
+            suspicious_doi_html += f'<div class="rank-item" style="margin-bottom: 15px;">'
+            suspicious_doi_html += f'<div class="badge badge-danger" style="margin-bottom: 8px;">{get_text("html_attention")}</div>'
+            suspicious_doi_html += f'<div class="full-text-scroll">{html.escape(ref["text"])}</div>'
+            suspicious_doi_html += f'<div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div>'
+            suspicious_doi_html += '</div>'
+    else:
+        suspicious_doi_html = f'<p>{get_text("no_suspicious_dois")}</p>'
+    
+    # Generate non-DOI sources section with full text
+    non_doi_html = ""
+    if stats['identifier_coverage']['references_without_doi']:
+        for ref in stats['identifier_coverage']['references_without_doi'][:20]:
+            non_doi_html += f'<div class="rank-item" style="margin-bottom: 15px;">'
+            non_doi_html += f'<div class="full-text-scroll">{html.escape(ref)}</div>'
+            non_doi_html += '</div>'
+    else:
+        non_doi_html = f'<p>{get_text("all_have_doi")}</p>'
+    
+    # Generate URL sources section with full text
+    url_sources_html = ""
+    if stats['identifier_coverage']['references_with_only_url']:
+        for ref in stats['identifier_coverage']['references_with_only_url'][:20]:
+            url_sources_html += f'<div class="rank-item" style="margin-bottom: 15px;">'
+            url_sources_html += f'<div class="full-text-scroll">{html.escape(ref)}</div>'
+            url_sources_html += '</div>'
+    else:
+        url_sources_html = f'<p>{get_text("no_url_only")}</p>'
+    
+    # Generate problematic references section with full text
+    problematic_html = ""
+    if stats['problematic_refs']:
+        for ref in stats['problematic_refs'][:15]:
+            problematic_html += f'<div class="rank-item" style="margin-bottom: 15px;">'
+            problematic_html += f'<div><span class="badge badge-danger">⚠️ {html.escape(ref["problems"])}</span></div>'
+            problematic_html += f'<div class="full-text-scroll" style="margin-top: 8px;">{html.escape(ref["text"])}</div>'
+            problematic_html += '</div>'
+    else:
+        problematic_html = f'<p>{get_text("no_problematic")}</p>'
+    
+    # Generate predatory journals section with full text
+    predatory_html = ""
+    if stats['predatory_journals']:
+        predatory_html = '<div style="margin-top: 15px;"><h4>' + get_text("predatory_journals") + ':</h4>'
+        for pred in stats['predatory_journals'][:10]:
+            predatory_html += f'<div class="rank-item" style="margin-bottom: 10px;">'
+            predatory_html += f'<div><strong>📕 {html.escape(pred["journal"])}</strong></div>'
+            predatory_html += f'<div style="font-size:12px;color:#666; margin-top: 5px;">⚠️ {", ".join([html.escape(s) for s in pred["signs"]])}</div>'
+            predatory_html += f'<div class="full-text-scroll" style="margin-top: 8px; font-size: 11px;">{html.escape(pred["reference"])}</div>'
+            predatory_html += '</div>'
+        predatory_html += '</div>'
+    
+    # Generate citation classics section with full title
+    classics_html = ""
+    if stats['citation_classics']:
+        for i, classic in enumerate(stats['citation_classics'][:10]):
+            classics_html += f'<div class="rank-item" style="margin-bottom: 15px;">'
+            classics_html += f'<span class="rank-number">{i+1}.</span>'
+            classics_html += f'<div><strong>{html.escape(classic["title"])}</strong></div>'
+            classics_html += f'<div style="font-size: 12px; color: #666; margin-top: 5px;">{html.escape(classic["journal"])} ({classic["year"]})</div>'
+            classics_html += f'<div style="font-size: 12px; margin-top: 5px;">📊 {classic["citations"]} {get_text("html_citations_label")}</div>'
+            if classic.get("doi"):
+                classics_html += f'<div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(classic["doi"])}</div>'
+            classics_html += '</div>'
+    else:
+        classics_html = f'<p>{get_text("no_citation_classics")}</p>'
+    
+    # Generate concepts section
+    concepts_html = ""
+    for concept in stats['concepts']['concepts'][:12]:
+        concepts_html += f'<div class="concept-card"><div class="concept-name">{html.escape(concept[0])}</div><div class="concept-score">{get_text("html_frequency")}: {concept[1]}</div></div>'
+    
+    # Generate geography section
+    geography_html = ""
+    if stats['geography']['countries']:
+        max_count = max(stats['geography']['countries'].values()) if stats['geography']['countries'] else 1
+        for country, count in list(stats['geography']['countries'].items())[:10]:
+            percent = (count / max_count * 100) if max_count > 0 else 0
+            geography_html += f'<div class="rank-item"><span class="rank-name">{html.escape(country)}</span><span class="rank-count">{count} {get_text("html_authors_count")}</span><div class="progress-bar"><div class="progress-fill" style="width: {percent}%;"></div></div></div>'
+    else:
+        geography_html = '<p>No geographic data available</p>'
+    
+    # Generate collaboration section
+    collaboration_html = ""
+    if stats['collaboration']['top_collaborations']:
+        for i, collab in enumerate(stats['collaboration']['top_collaborations'][:8]):
+            collaboration_html += f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(collab["author1"])} + {html.escape(collab["author2"])}</span><span class="rank-count">{collab["count"]} {get_text("html_works")}</span></div>'
+    else:
+        collaboration_html = '<p>No collaboration data available</p>'
+    
+    # Generate core authors
+    core_authors_html = ""
+    if stats['collaboration']['core_authors']:
+        core_list = [f"{html.escape(author[0])} ({author[1]} {get_text('html_connections')})" for author in stats['collaboration']['core_authors'][:5]]
+        core_authors_html = f'<span class="badge badge-info">{get_text("core_authors_label")}: {", ".join(core_list)}</span>'
     
     html = f"""<!DOCTYPE html>
 <html lang="{lang}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced Literature Reference Analysis</title>
+    <title>Comprehensive Reference List Analysis</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{
@@ -2949,6 +3215,24 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             color: #764ba2;
             text-decoration: underline;
         }}
+        .full-text-scroll {{
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            background: #f5f5f5;
+            padding: 8px;
+            border-radius: 5px;
+            margin-top: 8px;
+        }}
+        .self-citation-highlight {{
+            color: #d9534f;
+            font-weight: bold;
+            background-color: #f8d7da;
+            padding: 0px 2px;
+            border-radius: 3px;
+        }}
         @media print {{
             .sidebar {{ display: none; }}
             .main-content {{ margin-left: 0; }}
@@ -2985,7 +3269,9 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     
     <div class="main-content">
         <div class="header">
-            <h1>📚 {get_text('app_title')}</h1>
+            <h1>📚 Comprehensive Reference List Analysis</h1>
+            <div><strong>Журнал:</strong> {html.escape(journal_display)}</div>
+            <div><strong>Номер статьи:</strong> {html.escape(article_display)}</div>
             <div class="date">{get_text('html_generated')}: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}</div>
             <div style="margin-top: 15px;">
                 <span class="badge badge-success">✅ Crossref + OpenAlex</span>
@@ -3074,7 +3360,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         <div id="authors" class="section">
             <div class="section-title">{get_text('html_authors')}</div>
             <div>
-                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{author["display_name"]}</span><span class="rank-count">{author["count"]} {get_text("html_citations_label")}</span>' + (f'<div style="font-size: 11px; color: #667eea;">🔗 ORCID: {make_clickable_orcid(author["orcid"])}</div>' if author.get("orcid") else '') + (f'<div style="font-size: 11px; color: #666;">🏛 {author["institution"][:50]}</div>' if author.get("institution") else '') + '<div class="progress-bar"><div class="progress-fill" style="width: ' + str(min(100, author["count"] / stats["author_frequency_all"]["all_authors"][0]["count"] * 100 if stats["author_frequency_all"]["all_authors"] else 0)) + '%;"></div></div></div>' for i, author in enumerate(stats["author_frequency_all"]["all_authors"][:30])])}
+                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(author["display_name"])}</span><span class="rank-count">{author["count"]} {get_text("html_citations_label")}</span>' + (f'<div style="font-size: 11px; color: #667eea;">🔗 ORCID: {make_clickable_orcid(author["orcid"])}</div>' if author.get("orcid") else '') + (f'<div style="font-size: 11px; color: #666;">🏛 {html.escape(author["institution"][:50])}</div>' if author.get("institution") else '') + '<div class="progress-bar"><div class="progress-fill" style="width: ' + str(min(100, author["count"] / stats["author_frequency_all"]["all_authors"][0]["count"] * 100 if stats["author_frequency_all"]["all_authors"] else 0)) + '%;"></div></div></div>' for i, author in enumerate(stats["author_frequency_all"]["all_authors"][:30])])}
             </div>
             <div style="margin-top: 15px;">
                 <span class="badge badge-info">{get_text('unique_authors')}: {stats['author_frequency_all']['unique_authors']}</span>
@@ -3090,7 +3376,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
                     <tr><th>{get_text('html_rank')}</th><th>{get_text('journal')}</th><th>{get_text('html_count')}</th><th>{get_text('html_percentage')}</th></tr>
                 </thead>
                 <tbody>
-                    {''.join([f'<tr><td>{i+1}</td><td>{journal["journal"]}</td><td>{journal["count"]}</td><td>{journal["percentage"]:.1f}%</td></tr>' for i, journal in enumerate(stats["journal_frequency_all"]["all_journals"])])}
+                    {''.join([f'<tr><td>{i+1}</td><td>{html.escape(journal["journal"])}</td><td>{journal["count"]}</td><td>{journal["percentage"]:.1f}%</td></tr>' for i, journal in enumerate(stats["journal_frequency_all"]["all_journals"])])}
                 </tbody>
             </table>
             <div style="margin-top: 15px;">
@@ -3106,7 +3392,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
                     <tr><th>{get_text('html_rank')}</th><th>{get_text('publisher')}</th><th>{get_text('html_count')}</th><th>{get_text('html_percentage')}</th></tr>
                 </thead>
                 <tbody>
-                    {''.join([f'<tr><td>{i+1}</td><td>{publisher["publisher"]}</td><td>{publisher["count"]}</td><td>{publisher["percentage"]:.1f}%</td></tr>' for i, publisher in enumerate(stats["publisher_frequency"]["all_publishers"])])}
+                    {''.join([f'<tr><td>{i+1}</td><td>{html.escape(publisher["publisher"])}</td><td>{publisher["count"]}</td><td>{publisher["percentage"]:.1f}%</td></tr>' for i, publisher in enumerate(stats["publisher_frequency"]["all_publishers"])])}
                 </tbody>
             </table>
             <div style="margin-top: 15px;">
@@ -3152,7 +3438,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         <div id="concepts" class="section">
             <div class="section-title">{get_text('html_concepts')}</div>
             <div class="concepts-grid">
-                {''.join([f'<div class="concept-card"><div class="concept-name">{concept[0]}</div><div class="concept-score">{get_text("html_frequency")}: {concept[1]}</div></div>' for concept in stats['concepts']['concepts'][:12]])}
+                {concepts_html}
             </div>
             <div style="margin-top: 15px;">
                 <span class="badge badge-info">{get_text('unique_concepts')}: {stats['concepts']['unique_concepts']}</span>
@@ -3162,7 +3448,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         <div id="geography" class="section">
             <div class="section-title">{get_text('html_geography')}</div>
             <div>
-                {''.join([f'<div class="rank-item"><span class="rank-name">{country}</span><span class="rank-count">{count} {get_text("html_authors_count")}</span><div class="progress-bar"><div class="progress-fill" style="width: {count / max(stats["geography"]["countries"].values()) * 100 if stats["geography"]["countries"] else 0}%;"></div></div></div>' for country, count in list(stats['geography']['countries'].items())[:10]])}
+                {geography_html}
             </div>
             <div style="margin-top: 15px;">
                 <span class="badge badge-info">{get_text('total_countries')}: {stats['geography']['total_countries']}</span>
@@ -3173,10 +3459,10 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         <div id="collaboration" class="section">
             <div class="section-title">{get_text('html_collaborations')}</div>
             <div>
-                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{collab["author1"]} + {collab["author2"]}</span><span class="rank-count">{collab["count"]} {get_text("html_works")}</span></div>' for i, collab in enumerate(stats["collaboration"]["top_collaborations"][:8])])}
+                {collaboration_html}
             </div>
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_text('core_authors_label')}: {', '.join([f"{author[0]} ({author[1]} {get_text('html_connections')})" for author in stats['collaboration']['core_authors'][:5]])}</span>
+                {core_authors_html}
             </div>
         </div>
         
@@ -3200,12 +3486,13 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         
         <div id="classics" class="section">
             <div class="section-title">{get_text('html_classics')}</div>
-            {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{classic["title"][:80]}...</span><span class="rank-count">📊 {classic["citations"]} {get_text("html_citations_label")}</span><div style="font-size: 12px; color: #666; margin-top: 5px;">{classic["journal"]} ({classic["year"]})</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(classic["doi"])}</div>' if classic.get("doi") else '') + '</div>' for i, classic in enumerate(stats['citation_classics'][:8])]) if stats['citation_classics'] else f'<p>{get_text("no_citation_classics")}</p>'}
+            {classics_html}
         </div>
         
         <div id="selfcitations" class="section">
             <div class="section-title">{get_text('html_self_citations')}</div>
-            {''.join([f'<div class="rank-item"><div><strong>📄 {ref["original_text"][:200]}...</strong></div>' + (f'<div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div>' if ref.get("doi") else '') + (f'<div style="font-size: 11px; margin-top: 5px;">📖 {get_text("journal")}: {ref["journal"]}</div>' if ref.get("journal") else '') + (f'<div style="font-size: 11px; margin-top: 5px;">📅 {get_text("year")}: {ref["year"]}</div>' if ref.get("year") else '') + '<div style="font-size: 11px; margin-top: 5px;">👨‍🎓 ' + get_text("authors") + ': ' + ', '.join(ref["authors_display"][:3]) + ('...' if len(ref["authors_display"]) > 3 else '') + '</div></div>' for ref in stats.get('self_citation_refs', [])[:30]]) if stats.get('self_citation_refs') else f'<p>✅ {get_text("no_problematic")}</p>'}
+            {authors_highlight_html}
+            {self_citations_html}
             <div style="margin-top: 15px;">
                 <span class="badge badge-info">{get_text('html_total_self_citations')}: {stats['self_citations_count']} ({stats['self_citations_percent']:.1f}%)</span>
             </div>
@@ -3213,38 +3500,39 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         
         <div id="crossref_only" class="section">
             <div class="section-title">{get_text('html_crossref_only')}</div>
-            {''.join([f'<div class="rank-item"><div>📄 {ref["text"]}</div><div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('crossref_only_refs', [])[:20]]) if stats.get('crossref_only_refs') else f'<p>{get_text("no_crossref_only")}</p>'}
+            {crossref_only_html}
         </div>
         
         <div id="openalex_only" class="section">
             <div class="section-title">{get_text('html_openalex_only')}</div>
-            {''.join([f'<div class="rank-item"><div>📄 {ref["text"]}</div><div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('openalex_only_refs', [])[:20]]) if stats.get('openalex_only_refs') else f'<p>{get_text("no_openalex_only")}</p>'}
+            {openalex_only_html}
         </div>
         
         <div id="suspicious_doi" class="section">
             <div class="section-title">{get_text('html_suspicious_doi')}</div>
-            {''.join([f'<div class="rank-item"><div class="badge badge-danger">{get_text("html_attention")}</div><div>📄 {ref["text"]}</div><div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('suspicious_doi_refs', [])[:20]]) if stats.get('suspicious_doi_refs') else f'<p>{get_text("no_suspicious_dois")}</p>'}
+            <p>{get_text('suspicious_dois_hint')}</p>
+            {suspicious_doi_html}
         </div>
         
         <div id="non_doi" class="section">
             <div class="section-title">{get_text('html_non_doi')}</div>
-            {''.join([f'<div class="rank-item">📄 {ref}...</div>' for ref in stats['identifier_coverage']['references_without_doi'][:20]]) if stats['identifier_coverage']['references_without_doi'] else f'<p>{get_text("all_have_doi")}</p>'}
+            {non_doi_html}
         </div>
         
         <div id="url_sources" class="section">
             <div class="section-title">{get_text('html_url_sources')}</div>
-            {''.join([f'<div class="rank-item">🔗 {ref}...</div>' for ref in stats['identifier_coverage']['references_with_only_url'][:20]]) if stats['identifier_coverage']['references_with_only_url'] else f'<p>{get_text("no_url_only")}</p>'}
+            {url_sources_html}
         </div>
         
         <div id="problems" class="section">
             <div class="section-title">{get_text('html_problems')}</div>
-            {''.join([f'<div class="rank-item"><span class="badge badge-danger">⚠️ {ref["problems"]}</span><div style="margin-top: 8px;">{ref["text"]}...</div></div>' for ref in stats['problematic_refs'][:10]]) if stats['problematic_refs'] else f'<p>{get_text("no_problematic")}</p>'}
-            {f'<div style="margin-top: 15px;"><h4>{get_text("predatory_journals")}:</h4>{"".join([f"<div class=rank-item>📕 {pred['journal']}<br><span style=font-size:12px;color:#666;>{', '.join(pred['signs'])}</span></div>" for pred in stats['predatory_journals'][:5]])}</div>' if stats['predatory_journals'] else ''}
+            {problematic_html}
+            {predatory_html}
         </div>
         
         <div class="footer">
-            {get_text('html_footer')}
-            <br>{get_text('html_copyright')}
+            Report automatically generated.<br>
+            © Comprehensive Reference List Analysis / Created by daM / Chimica Techno Acta <a href="https://chimicatechnoacta.ru" target="_blank">https://chimicatechnoacta.ru</a>
         </div>
     </div>
 </body>
@@ -3275,6 +3563,25 @@ def main():
     with st.sidebar:
         st.markdown(f"## {get_text('settings')}")
         batch_size = st.slider(get_text('batch_size'), 10, 100, 50, help=get_text('batch_size_help'))
+        
+        st.markdown("---")
+        st.markdown(f"## {get_text('journal_name_label')}")
+        journal_name = st.text_input(
+            get_text('journal_name_label'),
+            value=st.session_state.journal_name,
+            help=get_text('journal_name_help'),
+            key="journal_name_input"
+        )
+        st.session_state.journal_name = journal_name
+        
+        st.markdown(f"## {get_text('article_number_label')}")
+        article_number = st.text_input(
+            get_text('article_number_label'),
+            value=st.session_state.article_number,
+            help=get_text('article_number_help'),
+            key="article_number_input"
+        )
+        st.session_state.article_number = article_number
         
         st.markdown("---")
         st.markdown(f"## {get_text('paper_authors')}")
@@ -3628,7 +3935,7 @@ def main():
                 st.markdown(f"### {get_text('crossref_only')}")
                 if stats.get('crossref_only_refs'):
                     for ref in stats['crossref_only_refs'][:20]:
-                        st.warning(f"📄 {ref['text']}...\n\nDOI: {ref['doi']}")
+                        st.warning(f"📄 {ref['text']}\n\nDOI: {ref['doi']}")
                 else:
                     st.success(get_text('no_crossref_only'))
             
@@ -3636,7 +3943,7 @@ def main():
                 st.markdown(f"### {get_text('openalex_only')}")
                 if stats.get('openalex_only_refs'):
                     for ref in stats['openalex_only_refs'][:20]:
-                        st.info(f"📄 {ref['text']}...\n\nDOI: {ref['doi']}")
+                        st.info(f"📄 {ref['text']}\n\nDOI: {ref['doi']}")
                 else:
                     st.success(get_text('no_openalex_only'))
             
@@ -3645,7 +3952,7 @@ def main():
                 st.markdown(get_text('suspicious_dois_hint'))
                 if stats.get('suspicious_doi_refs'):
                     for ref in stats['suspicious_doi_refs'][:20]:
-                        st.error(f"⚠️ {ref['text']}...\n\nDOI: {ref['doi']}")
+                        st.error(f"⚠️ {ref['text']}\n\nDOI: {ref['doi']}")
                 else:
                     st.success(get_text('no_suspicious_dois'))
             
@@ -3833,17 +4140,28 @@ def main():
         if 'analysis_complete' in st.session_state and st.session_state['analysis_complete']:
             results = st.session_state['results']
             paper_authors = st.session_state.get('paper_authors', set())
+            journal_name = st.session_state.get('journal_name', '')
+            article_number = st.session_state.get('article_number', '')
             stats = generate_advanced_statistics(results)
             
             st.markdown(f"### {get_text('export_report')}")
             st.markdown(get_text('download_html'))
             
-            html_report = generate_html_report_advanced(results, stats, paper_authors, st.session_state.language)
+            html_report = generate_html_report_advanced(results, stats, paper_authors, st.session_state.language, journal_name, article_number)
+            
+            # Generate filename
+            base_name = sanitize_filename(journal_name) if journal_name else "chimica_techno_acta"
+            num = sanitize_filename(article_number) if article_number else ""
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            if num:
+                file_name = f"{base_name}_{num}_{timestamp}.html"
+            else:
+                file_name = f"{base_name}_{timestamp}.html"
             
             st.download_button(
                 label=get_text('download_html'),
                 data=html_report.encode('utf-8'),
-                file_name=f"literature_analysis_expert_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
+                file_name=file_name,
                 mime="text/html"
             )
             
@@ -3851,8 +4169,10 @@ def main():
             st.markdown(f"### {get_text('text_export')}")
             
             copy_text = f"""
-=== ENHANCED LITERATURE REFERENCE ANALYSIS ===
+=== COMPREHENSIVE REFERENCE LIST ANALYSIS ===
 Date: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}
+Journal: {journal_name if journal_name else "Chimica Techno Acta"}
+Article number: {article_number if article_number else "—"}
 
 === OVERVIEW STATISTICS ===
 Total references: {stats['total_references']}
@@ -3908,3 +4228,4 @@ Publishers (Shannon): {stats['shannon_index']['publishers']}
 
 if __name__ == "__main__":
     main()
+```
