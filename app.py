@@ -877,16 +877,21 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ======================== OPTIMIZED API REQUESTS ========================
-@retry(stop=stop_after_attempt(2), wait=wait_random(min=0.5, max=1.5))
+@retry(stop=stop_after_attempt(4), wait=wait_exponential(multiplier=0.5, min=0.5, max=4))
 def fetch_crossref(doi: str) -> Optional[Dict]:
     """Request to Crossref API - OPTIMIZED with faster retry"""
     try:
-        url = f"https://api.crossref.org/works/{doi}"
+        encoded_doi = requests.utils.quote(doi)
+        url = f"https://api.crossref.org/works/{encoded_doi}"
         headers = {'User-Agent': 'LiteratureAnalyzer/2.0 (mailto:analyzer@example.com)'}
-        response = requests.get(url, headers=headers, timeout=8)
+        response = requests.get(url, headers=headers, timeout=10)
         if response.status_code == 200:
             return response.json()['message']
-        return None
+        elif response.status_code in [429, 500, 502, 503, 504]:
+            return None
+        else:
+            st.session_state.bad_dois.add(doi)
+            return None
     except:
         return None
 
