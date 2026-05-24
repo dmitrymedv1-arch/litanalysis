@@ -2786,11 +2786,47 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         for ref in stats.get('self_citation_refs', []):
             # Get full authors list for this reference
             authors_full_list = ref.get('authors_display', [])
+            
+            # Build a set of normalized paper author names
             normalized_paper_authors = set()
-            for author in paper_authors_set:
-                norm, _ = normalize_author_name(author)
+            paper_author_display = {}  # Map normalized name to display name with color
+            
+            for idx, author in enumerate(paper_authors_set):
+                norm, display = normalize_author_name(author)
                 normalized_paper_authors.add(norm)
-            formatted_authors = format_authors_with_highlight(authors_full_list, normalized_paper_authors, normalize_author_name)
+                # Get color for this author based on index in paper_authors_set
+                color = get_color_for_author(idx)
+                paper_author_display[norm] = {'display': display, 'color': color}
+            
+            # Custom highlighting function that uses colors from paper_authors_colors
+            def format_authors_with_colors(authors_list, paper_norm_set, color_map):
+                if not authors_list:
+                    return ""
+                
+                formatted_authors = []
+                for author in authors_list:
+                    # Normalize the author name for comparison
+                    norm_author, _ = normalize_author_name(author)
+                    
+                    # Check if normalized author is in the paper authors set
+                    if norm_author in paper_norm_set:
+                        escaped_author = html.escape(author)
+                        # Get color for this specific author
+                        color = color_map.get(norm_author, {}).get('color', '#d9534f')
+                        formatted_authors.append(f'<span style="color: {color}; font-weight: bold; background-color: {color}20; padding: 2px 4px; border-radius: 3px;">{escaped_author}</span>')
+                    else:
+                        formatted_authors.append(html.escape(author))
+                
+                return ', '.join(formatted_authors)
+            
+            # Build color map for paper authors (normalized name -> color info)
+            color_map = {}
+            for idx, author in enumerate(paper_authors_set):
+                norm, display = normalize_author_name(author)
+                color = get_color_for_author(idx)
+                color_map[norm] = {'display': display, 'color': color}
+            
+            formatted_authors = format_authors_with_colors(authors_full_list, normalized_paper_authors, color_map)
             
             # Get full original text
             original_text_full = html.escape(ref.get('original_text', ''))
