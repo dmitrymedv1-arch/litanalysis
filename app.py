@@ -3100,7 +3100,9 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     
     <div class="main-content">
         <div class="header">
-            <h1>📚 Comprehensive Reference List Analysis</h1>
+            <div style="display: flex; justify-content: center; margin-bottom: 15px;">
+                <img src="data:image/png;base64,{logo_base64}" style="height: 150px; width: auto;">
+            </div>
             <div style="margin-top: 10px;"><strong>{get_text('html_journal_label')}:</strong> {journal_name_display}</div>
             {f'<div><strong>{get_text("html_article_number_label")}:</strong> {article_number_display}</div>' if article_number_display else ''}
             <div class="date">{get_text('html_generated')}: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}</div>
