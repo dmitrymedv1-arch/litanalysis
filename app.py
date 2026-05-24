@@ -2788,23 +2788,23 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     # Generate self-citations section with full authors and highlighting
     self_citations_html = ""
     if stats.get('self_citation_refs'):
-        # Build color map for paper authors (normalized name -> color info)
-        paper_author_color_map = {}
-        for idx, author in enumerate(paper_authors_set):
-            norm, display = normalize_author_name(author)
-            color = get_color_for_author(idx)
-            paper_author_color_map[norm] = {
-                'display': display,
-                'color': color,
-                'original': author
-            }
-        
         for ref in stats.get('self_citation_refs', []):
             # Get full authors list for this reference
             authors_full_list = ref.get('authors_display', [])
             
-            # Custom highlighting function that uses colors from paper_author_color_map
-            def format_authors_with_correct_colors(authors_list, paper_color_map):
+            # Build a set of normalized paper author names
+            normalized_paper_authors = set()
+            paper_author_display = {}  # Map normalized name to display name with color
+            
+            for idx, author in enumerate(paper_authors_set):
+                norm, display = normalize_author_name(author)
+                normalized_paper_authors.add(norm)
+                # Get color for this author based on index in paper_authors_set
+                color = get_color_for_author(idx)
+                paper_author_display[norm] = {'display': display, 'color': color}
+            
+            # Custom highlighting function that uses colors from paper_authors_colors
+            def format_authors_with_colors(authors_list, paper_norm_set, color_map):
                 if not authors_list:
                     return ""
                 
@@ -2813,17 +2813,25 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
                     # Normalize the author name for comparison
                     norm_author, _ = normalize_author_name(author)
                     
-                    # Check if normalized author is in the paper authors map
-                    if norm_author in paper_color_map:
+                    # Check if normalized author is in the paper authors set
+                    if norm_author in paper_norm_set:
                         escaped_author = html.escape(author)
-                        color = paper_color_map[norm_author]['color']
-                        formatted_authors.append(f'<span style="color: {color}; font-weight: bold; background-color: {color}20; padding: 2px 4px; border-radius: 3px; display: inline-block;">{escaped_author}</span>')
+                        # Get color for this specific author
+                        color = color_map.get(norm_author, {}).get('color', '#d9534f')
+                        formatted_authors.append(f'<span style="color: {color}; font-weight: bold; background-color: {color}20; padding: 2px 4px; border-radius: 3px;">{escaped_author}</span>')
                     else:
                         formatted_authors.append(html.escape(author))
                 
                 return ', '.join(formatted_authors)
             
-            formatted_authors = format_authors_with_correct_colors(authors_full_list, paper_author_color_map)
+            # Build color map for paper authors (normalized name -> color info)
+            color_map = {}
+            for idx, author in enumerate(paper_authors_set):
+                norm, display = normalize_author_name(author)
+                color = get_color_for_author(idx)
+                color_map[norm] = {'display': display, 'color': color}
+            
+            formatted_authors = format_authors_with_colors(authors_full_list, normalized_paper_authors, color_map)
             
             # Get full original text
             original_text_full = html.escape(ref.get('original_text', ''))
@@ -2854,32 +2862,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         for author in paper_authors_set:
             norm, _ = normalize_author_name(author)
             normalized_paper_authors_full.add(norm)
-        
-        # Function to highlight authors in full reference list
-        def format_authors_with_highlight_full(authors_list, paper_norm_set, color_map):
-            if not authors_list:
-                return ""
-            
-            formatted_authors = []
-            for author in authors_list:
-                norm_author, _ = normalize_author_name(author)
-                
-                if norm_author in paper_norm_set:
-                    escaped_author = html.escape(author)
-                    # Find the color for this author
-                    color = "#d9534f"  # default red
-                    for paper_author, paper_color in color_map.items():
-                        paper_norm, _ = normalize_author_name(paper_author)
-                        if paper_norm == norm_author:
-                            color = paper_color
-                            break
-                    formatted_authors.append(f'<span style="color: {color}; font-weight: bold; background-color: {color}20; padding: 2px 4px; border-radius: 3px; display: inline-block;">{escaped_author}</span>')
-                else:
-                    formatted_authors.append(html.escape(author))
-            
-            return ', '.join(formatted_authors)
-        
-        formatted_authors = format_authors_with_highlight_full(authors_full_list, normalized_paper_authors_full, paper_authors_colors) if result.get('is_self_citation') else ', '.join([html.escape(a) for a in authors_full_list])
+        formatted_authors = format_authors_with_highlight(authors_full_list, normalized_paper_authors_full, normalize_author_name) if result.get('is_self_citation') else ', '.join([html.escape(a) for a in authors_full_list])
         
         original_text_full = html.escape(result.get('original_text', ''))
         doi_info = f'<div style="font-size: 13px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(result.get("doi"))}</div>' if result.get('doi') else ''
