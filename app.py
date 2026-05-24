@@ -2730,6 +2730,14 @@ def get_color_for_author(index: int) -> str:
 # ======================== HTML REPORT (ENGLISH, UPDATED) ========================
 def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_authors: Set[str] = None, lang: str = 'en', journal_name: str = '', article_number: str = '') -> str:
     """Generate enhanced HTML report in English with clickable links, full content, and self-citation highlighting"""
+    # Load and encode logo for HTML
+    import base64
+    logo_base64 = ""
+    try:
+        with open("logo.png", "rb") as img_file:
+            logo_base64 = base64.b64encode(img_file.read()).decode()
+    except FileNotFoundError:
+        pass  # Logo not found, will show nothing
     
     # Set default journal name if not provided
     if not journal_name or journal_name.strip() == '':
