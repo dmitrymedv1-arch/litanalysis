@@ -3315,7 +3315,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         
         <div id="classics" class="section">
             <div class="section-title">{get_text('html_classics')}</div>
-            {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(classic["title"])}</span><span class="rank-count">📊 {classic["citations"]} {get_text("html_citations_label")}</span><div style="font-size: 12px; color: #666; margin-top: 5px;">{html.escape(classic["journal"])} ({classic["year"]})</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(classic["doi"])}</div>' if classic.get("doi") else '') + '</div>' for i, classic in enumerate(stats['citation_classics'][:8])]) if stats['citation_classics'] else f'<p>{get_text("no_citation_classics")}</p>'}
+            {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(classic["title"] if classic["title"] else "Unknown")}</span><span class="rank-count">📊 {classic["citations"]} {get_text("html_citations_label")}</span><div style="font-size: 12px; color: #666; margin-top: 5px;">{html.escape(classic["journal"] if classic["journal"] else "Unknown")} ({classic["year"] if classic["year"] else "Unknown"})</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(classic["doi"])}</div>' if classic.get("doi") else '') + '</div>' for i, classic in enumerate(stats['citation_classics'][:8])]) if stats['citation_classics'] else f'<p>{get_text("no_citation_classics")}</p>'}
         </div>
         
         <div id="selfcitations" class="section">
