@@ -2733,7 +2733,7 @@ def get_color_for_author(index: int) -> str:
     return colors[index % len(colors)]
 
 # ======================== HTML REPORT (ENGLISH, UPDATED) ========================
-def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_authors: Set[str] = None, lang: str = 'en', journal_name: str = '', article_number: str = '') -> str:
+def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_authors: Set[str] None, lang: str = 'en', journal_name: str = '', article_number: str = '') -> str:
     """Generate enhanced HTML report in English with clickable links, full content, and self-citation highlighting"""
     # Load and encode logo for HTML
     import base64
@@ -2752,6 +2752,9 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     
     article_number_display = html.escape(article_number) if article_number and article_number.strip() else ""
     
+    # Определяем, нужно ли показывать секцию самоцитирования
+    show_self_citations_section = paper_authors and len(paper_authors) > 0
+    
     def make_clickable_doi(doi):
         if doi:
             return f'<a href="https://doi.org/{doi}" target="_blank" class="clickable-link">{html.escape(doi)}</a>'
@@ -2767,17 +2770,17 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             return f'<a href="{url}" target="_blank" class="clickable-link">{html.escape(url)}</a>'
         return ''
     
-    # Prepare self-citation authors highlighting
+    # Prepare self-citation authors highlighting (только если есть авторы)
     paper_authors_set = set()
     paper_authors_colors = {}
-    if paper_authors:
+    if show_self_citations_section and paper_authors:
         for idx, author in enumerate(paper_authors):
             paper_authors_set.add(author)
             paper_authors_colors[author] = get_color_for_author(idx)
     
-    # Generate authors display for self-citation section header
+    # Generate authors display for self-citation section header (только если есть авторы)
     authors_header_html = ""
-    if paper_authors_set:
+    if show_self_citations_section and paper_authors_set:
         authors_header_parts = []
         for author in paper_authors_set:
             escaped_author = html.escape(author)
@@ -2785,74 +2788,75 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             authors_header_parts.append(f'<span style="color: {color}; font-weight: bold;">{escaped_author}</span>')
         authors_header_html = f'<div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 8px;"><strong>{get_text("html_self_citation_authors_label")}:</strong> {", ".join(authors_header_parts)}</div>'
     
-    # Generate self-citations section with full authors and highlighting
+    # Generate self-citations section with full authors and highlighting (только если есть авторы)
     self_citations_html = ""
-    if stats.get('self_citation_refs'):
-        for ref in stats.get('self_citation_refs', []):
-            # Get full authors list for this reference
-            authors_full_list = ref.get('authors_display', [])
-            
-            # Build a set of normalized paper author names
-            normalized_paper_authors = set()
-            paper_author_display = {}  # Map normalized name to display name with color
-            
-            for idx, author in enumerate(paper_authors_set):
-                norm, display = normalize_author_name(author)
-                normalized_paper_authors.add(norm)
-                # Get color for this author based on index in paper_authors_set
-                color = get_color_for_author(idx)
-                paper_author_display[norm] = {'display': display, 'color': color}
-            
-            # Custom highlighting function that uses colors from paper_authors_colors
-            def format_authors_with_colors(authors_list, paper_norm_set, color_map):
-                if not authors_list:
-                    return ""
+    if show_self_citations_section:
+        if stats.get('self_citation_refs'):
+            for ref in stats.get('self_citation_refs', []):
+                # Get full authors list for this reference
+                authors_full_list = ref.get('authors_display', [])
                 
-                formatted_authors = []
-                for author in authors_list:
-                    # Normalize the author name for comparison
-                    norm_author, _ = normalize_author_name(author)
+                # Build a set of normalized paper author names
+                normalized_paper_authors = set()
+                paper_author_display = {}  # Map normalized name to display name with color
+                
+                for idx, author in enumerate(paper_authors_set):
+                    norm, display = normalize_author_name(author)
+                    normalized_paper_authors.add(norm)
+                    # Get color for this author based on index in paper_authors_set
+                    color = get_color_for_author(idx)
+                    paper_author_display[norm] = {'display': display, 'color': color}
+                
+                # Custom highlighting function that uses colors from paper_authors_colors
+                def format_authors_with_colors(authors_list, paper_norm_set, color_map):
+                    if not authors_list:
+                        return ""
                     
-                    # Check if normalized author is in the paper authors set
-                    if norm_author in paper_norm_set:
-                        escaped_author = html.escape(author)
-                        # Get color for this specific author
-                        color = color_map.get(norm_author, {}).get('color', '#d9534f')
-                        formatted_authors.append(f'<span style="color: {color}; font-weight: bold; background-color: {color}20; padding: 2px 4px; border-radius: 3px;">{escaped_author}</span>')
-                    else:
-                        formatted_authors.append(html.escape(author))
+                    formatted_authors = []
+                    for author in authors_list:
+                        # Normalize the author name for comparison
+                        norm_author, _ = normalize_author_name(author)
+                        
+                        # Check if normalized author is in the paper authors set
+                        if norm_author in paper_norm_set:
+                            escaped_author = html.escape(author)
+                            # Get color for this specific author
+                            color = color_map.get(norm_author, {}).get('color', '#d9534f')
+                            formatted_authors.append(f'<span style="color: {color}; font-weight: bold; background-color: {color}20; padding: 2px 4px; border-radius: 3px;">{escaped_author}</span>')
+                        else:
+                            formatted_authors.append(html.escape(author))
+                    
+                    return ', '.join(formatted_authors)
                 
-                return ', '.join(formatted_authors)
-            
-            # Build color map for paper authors (normalized name -> color info)
-            color_map = {}
-            for idx, author in enumerate(paper_authors_set):
-                norm, display = normalize_author_name(author)
-                color = get_color_for_author(idx)
-                color_map[norm] = {'display': display, 'color': color}
-            
-            formatted_authors = format_authors_with_colors(authors_full_list, normalized_paper_authors, color_map)
-            
-            # Get full original text
-            original_text_full = html.escape(ref.get('original_text', ''))
-            
-            # Get DOI and journal info
-            doi_info = f'<div style="font-size: 13px; margin-top: 8px;">🔗 DOI: {make_clickable_doi(ref.get("doi"))}</div>' if ref.get('doi') else ''
-            journal_info = f'<div style="font-size: 13px; margin-top: 5px;">📖 {get_text("journal")}: {html.escape(ref.get("journal", "Unknown"))}</div>' if ref.get('journal') else ''
-            year_info = f'<div style="font-size: 13px; margin-top: 5px;">📅 {get_text("year")}: {ref.get("year", "Unknown")}</div>' if ref.get('year') else ''
-            
-            self_citations_html += f"""
-            <div class="rank-item" style="margin-bottom: 15px;">
-                <div><strong>📄 Reference:</strong></div>
-                <div class="full-text-container">{original_text_full}</div>
-                <div style="font-size: 13px; margin-top: 8px;">👨‍🎓 {get_text("authors")}: {formatted_authors}</div>
-                {doi_info}
-                {journal_info}
-                {year_info}
-            </div>
-            """
-    else:
-        self_citations_html = f'<p>{get_text("no_problematic")}</p>'
+                # Build color map for paper authors (normalized name -> color info)
+                color_map = {}
+                for idx, author in enumerate(paper_authors_set):
+                    norm, display = normalize_author_name(author)
+                    color = get_color_for_author(idx)
+                    color_map[norm] = {'display': display, 'color': color}
+                
+                formatted_authors = format_authors_with_colors(authors_full_list, normalized_paper_authors, color_map)
+                
+                # Get full original text
+                original_text_full = html.escape(ref.get('original_text', ''))
+                
+                # Get DOI and journal info
+                doi_info = f'<div style="font-size: 13px; margin-top: 8px;">🔗 DOI: {make_clickable_doi(ref.get("doi"))}</div>' if ref.get('doi') else ''
+                journal_info = f'<div style="font-size: 13px; margin-top: 5px;">📖 {get_text("journal")}: {html.escape(ref.get("journal", "Unknown"))}</div>' if ref.get('journal') else ''
+                year_info = f'<div style="font-size: 13px; margin-top: 5px;">📅 {get_text("year")}: {ref.get("year", "Unknown")}</div>' if ref.get('year') else ''
+                
+                self_citations_html += f"""
+                <div class="rank-item" style="margin-bottom: 15px;">
+                    <div><strong>📄 Reference:</strong></div>
+                    <div class="full-text-container">{original_text_full}</div>
+                    <div style="font-size: 13px; margin-top: 8px;">👨‍🎓 {get_text("authors")}: {formatted_authors}</div>
+                    {doi_info}
+                    {journal_info}
+                    {year_info}
+                </div>
+                """
+        else:
+            self_citations_html = f'<p>{get_text("no_problematic")}</p>'
     
     # Generate full reference list with highlighting for self-citations
     full_references_html = ""
@@ -2862,7 +2866,12 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         for author in paper_authors_set:
             norm, _ = normalize_author_name(author)
             normalized_paper_authors_full.add(norm)
-        formatted_authors = format_authors_with_highlight(authors_full_list, normalized_paper_authors_full, normalize_author_name) if result.get('is_self_citation') else ', '.join([html.escape(a) for a in authors_full_list])
+        
+        # Only highlight if we have paper authors and this is a self-citation
+        if show_self_citations_section and result.get('is_self_citation'):
+            formatted_authors = format_authors_with_highlight(authors_full_list, normalized_paper_authors_full, normalize_author_name)
+        else:
+            formatted_authors = ', '.join([html.escape(a) for a in authors_full_list]) if authors_full_list else ""
         
         original_text_full = html.escape(result.get('original_text', ''))
         doi_info = f'<div style="font-size: 13px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(result.get("doi"))}</div>' if result.get('doi') else ''
@@ -3137,7 +3146,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         <a href="#collaboration">{get_text('html_collaborations')}</a>
         <a href="#diversity">{get_text('html_diversity')}</a>
         <a href="#classics">{get_text('html_classics')}</a>
-        <a href="#selfcitations">{get_text('html_self_citations')}</a>
+        {'''<a href="#selfcitations">''' + get_text('html_self_citations') + '''</a>''' if show_self_citations_section else ''}
         <a href="#crossref_only">{get_text('html_crossref_only')}</a>
         <a href="#openalex_only">{get_text('html_openalex_only')}</a>
         <a href="#suspicious_doi">{get_text('html_suspicious_doi')}</a>
@@ -3371,14 +3380,16 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(classic["title"] if classic["title"] else "Unknown")}</span><span class="rank-count">📊 {classic["citations"]} {get_text("html_citations_label")}</span><div style="font-size: 12px; color: #666; margin-top: 5px;">{html.escape(classic["journal"] if classic["journal"] else "Unknown")} ({classic["year"] if classic["year"] else "Unknown"})</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(classic["doi"])}</div>' if classic.get("doi") else '') + '</div>' for i, classic in enumerate(stats['citation_classics'][:8])]) if stats['citation_classics'] else f'<p>{get_text("no_citation_classics")}</p>'}
         </div>
         
+        {'''
         <div id="selfcitations" class="section">
-            <div class="section-title">{get_text('html_self_citations')}</div>
-            {authors_header_html}
-            {self_citations_html}
+            <div class="section-title">''' + get_text('html_self_citations') + '''</div>
+            ''' + authors_header_html + '''
+            ''' + self_citations_html + '''
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_text('html_total_self_citations')}: {stats['self_citations_count']} ({stats['self_citations_percent']:.1f}%)</span>
+                <span class="badge badge-info">''' + get_text('html_total_self_citations') + ''': ''' + str(stats['self_citations_count']) + ''' (''' + f"{stats['self_citations_percent']:.1f}" + '''%)</span>
             </div>
         </div>
+        ''' if show_self_citations_section else ''}
         
         <div id="crossref_only" class="section">
             <div class="section-title">{get_text('html_crossref_only')}</div>
