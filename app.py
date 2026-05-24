@@ -2733,7 +2733,7 @@ def get_color_for_author(index: int) -> str:
     return colors[index % len(colors)]
 
 # ======================== HTML REPORT (ENGLISH, UPDATED) ========================
-def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_authors: Set[str] None, lang: str = 'en', journal_name: str = '', article_number: str = '') -> str:
+def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_authors: Set[str] = None, lang: str = 'en', journal_name: str = '', article_number: str = '') -> str:
     """Generate enhanced HTML report in English with clickable links, full content, and self-citation highlighting"""
     # Load and encode logo for HTML
     import base64
