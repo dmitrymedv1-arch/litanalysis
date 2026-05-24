@@ -2751,6 +2751,51 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         journal_name_display = html.escape(journal_name)
     
     article_number_display = html.escape(article_number) if article_number and article_number.strip() else ""
+
+    # Prepare self-citation authors highlighting
+    paper_authors_set = set()
+    paper_authors_colors = {}
+    if paper_authors:
+        for idx, author in enumerate(paper_authors):
+            paper_authors_set.add(author)
+            paper_authors_colors[author] = get_color_for_author(idx)
+    
+    # Build color map for paper authors (using both original and normalized as keys)
+    paper_authors_color_map = {}
+    for idx, author in enumerate(paper_authors_set):
+        norm, display = normalize_author_name(author)
+        color = get_color_for_author(idx)
+        paper_authors_color_map[author] = color  # original
+        paper_authors_color_map[norm] = color    # normalized
+        paper_authors_color_map[display] = color # display version
+    
+    # Helper function to format authors with individual colors
+    def format_authors_with_individual_colors(authors_list, paper_authors_set_local, paper_authors_color_map_local):
+        """Format authors with individual colors for paper authors"""
+        if not authors_list:
+            return ""
+        
+        # Build normalized set of paper authors
+        paper_norm_set = set()
+        for author in paper_authors_set_local:
+            norm, _ = normalize_author_name(author)
+            paper_norm_set.add(norm)
+        
+        formatted_authors = []
+        for author in authors_list:
+            # Normalize the author name for comparison
+            norm_author, _ = normalize_author_name(author)
+            
+            # Check if normalized author is in paper authors
+            if norm_author in paper_norm_set:
+                escaped_author = html.escape(author)
+                # Get color from the map
+                color = paper_authors_color_map_local.get(author, paper_authors_color_map_local.get(norm_author, '#d9534f'))
+                formatted_authors.append(f'<span style="color: {color}; font-weight: bold; background-color: {color}20; padding: 2px 4px; border-radius: 3px; display: inline-block; margin: 0 1px;">{escaped_author}</span>')
+            else:
+                formatted_authors.append(html.escape(author))
+        
+        return ', '.join(formatted_authors)
     
     def make_clickable_doi(doi):
         if doi:
@@ -2767,13 +2812,6 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             return f'<a href="{url}" target="_blank" class="clickable-link">{html.escape(url)}</a>'
         return ''
     
-    # Prepare self-citation authors highlighting
-    paper_authors_set = set()
-    paper_authors_colors = {}
-    if paper_authors:
-        for idx, author in enumerate(paper_authors):
-            paper_authors_set.add(author)
-            paper_authors_colors[author] = get_color_for_author(idx)
     
     # Generate authors display for self-citation section header
     authors_header_html = ""
