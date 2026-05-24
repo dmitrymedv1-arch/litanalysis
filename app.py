@@ -3392,11 +3392,8 @@ def main():
             st.rerun()
         st.markdown("---")
     
-    col_logo, col_title = st.columns([1, 5])
-    with col_logo:
-        st.image("logo.png", width=150)
-    with col_title:
-        st.title(get_text('app_title'))
+    st.image("logo.png", width=250)
+    st.markdown("---")
     st.markdown(f"### {get_text('app_subtitle')}")
     st.markdown("---")
     
