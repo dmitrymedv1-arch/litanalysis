@@ -3185,10 +3185,12 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
                     <div class="stat-number">{stats['yearly_stats']['last_5_years']}</div>
                     <div class="stat-label">{get_text('last_5_years')}</div>
                 </div>
+                {'''
                 <div class="stat-card">
-                    <div class="stat-number">{stats['self_citations_count']}</div>
-                    <div class="stat-label">{get_text('self_citations')}</div>
+                    <div class="stat-number">''' + str(stats['self_citations_count']) + '''</div>
+                    <div class="stat-label">''' + get_text('self_citations') + '''</div>
                 </div>
+                ''' if show_self_citations_section else ''}
                 <div class="stat-card">
                     <div class="stat-number">{stats.get('total_citations_sum', 0)}</div>
                     <div class="stat-label">{get_text('total_citations')}</div>
