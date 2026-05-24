@@ -2856,7 +2856,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     
     # Generate full reference list with highlighting for self-citations
     full_references_html = ""
-    for idx, result in enumerate(results[:100]):  # Show first 100 in HTML report to avoid excessive size
+    for idx, result in enumerate(results[:300]):  # Show first 300 in HTML report to avoid excessive size
         authors_full_list = result.get('authors_display', [])
         normalized_paper_authors_full = set()
         for author in paper_authors_set:
