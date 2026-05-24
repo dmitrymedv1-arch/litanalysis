@@ -2692,7 +2692,7 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
     }
 
 # ======================== HELPER FUNCTION FOR AUTHOR HIGHLIGHTING ========================
-def format_authors_with_highlight(authors_list: List[str], highlight_authors_set: Set[str], normalize_func) -> str:
+def format_authors_with_highlight(authors_list: List[str], highlight_authors_norm_set: Set[str], normalize_func) -> str:
     """Format authors list with highlighting for self-citation authors"""
     if not authors_list:
         return ""
@@ -2701,15 +2701,9 @@ def format_authors_with_highlight(authors_list: List[str], highlight_authors_set
     for author in authors_list:
         # Normalize the author name for comparison
         norm_author, _ = normalize_func(author)
-        is_self_cited = False
         
-        for highlight_author in highlight_authors_set:
-            norm_highlight, _ = normalize_func(highlight_author)
-            if norm_author == norm_highlight:
-                is_self_cited = True
-                break
-        
-        if is_self_cited:
+        # Check if normalized author is in the pre-normalized highlight set
+        if norm_author in highlight_authors_norm_set:
             escaped_author = html.escape(author)
             formatted_authors.append(f'<span class="self-citation-author">{escaped_author}</span>')
         else:
@@ -2784,7 +2778,11 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         for ref in stats.get('self_citation_refs', []):
             # Get full authors list for this reference
             authors_full_list = ref.get('authors_display', [])
-            formatted_authors = format_authors_with_highlight(authors_full_list, paper_authors_set, normalize_author_name)
+            normalized_paper_authors = set()
+            for author in paper_authors_set:
+                norm, _ = normalize_author_name(author)
+                normalized_paper_authors.add(norm)
+            formatted_authors = format_authors_with_highlight(authors_full_list, normalized_paper_authors, normalize_author_name)
             
             # Get full original text
             original_text_full = html.escape(ref.get('original_text', ''))
@@ -2811,7 +2809,11 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     full_references_html = ""
     for idx, result in enumerate(results[:100]):  # Show first 100 in HTML report to avoid excessive size
         authors_full_list = result.get('authors_display', [])
-        formatted_authors = format_authors_with_highlight(authors_full_list, paper_authors_set, normalize_author_name) if result.get('is_self_citation') else ', '.join([html.escape(a) for a in authors_full_list])
+        normalized_paper_authors_full = set()
+        for author in paper_authors_set:
+            norm, _ = normalize_author_name(author)
+            normalized_paper_authors_full.add(norm)
+        formatted_authors = format_authors_with_highlight(authors_full_list, normalized_paper_authors_full, normalize_author_name) if result.get('is_self_citation') else ', '.join([html.escape(a) for a in authors_full_list])
         
         original_text_full = html.escape(result.get('original_text', ''))
         doi_info = f'<div style="font-size: 13px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(result.get("doi"))}</div>' if result.get('doi') else ''
