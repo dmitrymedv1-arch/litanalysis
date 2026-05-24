@@ -2792,46 +2792,8 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             # Get full authors list for this reference
             authors_full_list = ref.get('authors_display', [])
             
-            # Build a set of normalized paper author names
-            normalized_paper_authors = set()
-            paper_author_display = {}  # Map normalized name to display name with color
-            
-            for idx, author in enumerate(paper_authors_set):
-                norm, display = normalize_author_name(author)
-                normalized_paper_authors.add(norm)
-                # Get color for this author based on index in paper_authors_set
-                color = get_color_for_author(idx)
-                paper_author_display[norm] = {'display': display, 'color': color}
-            
-            # Custom highlighting function that uses colors from paper_authors_colors
-            def format_authors_with_colors(authors_list, paper_norm_set, color_map):
-                if not authors_list:
-                    return ""
-                
-                formatted_authors = []
-                for author in authors_list:
-                    # Normalize the author name for comparison
-                    norm_author, _ = normalize_author_name(author)
-                    
-                    # Check if normalized author is in the paper authors set
-                    if norm_author in paper_norm_set:
-                        escaped_author = html.escape(author)
-                        # Get color for this specific author
-                        color = color_map.get(norm_author, {}).get('color', '#d9534f')
-                        formatted_authors.append(f'<span style="color: {color}; font-weight: bold; background-color: {color}20; padding: 2px 4px; border-radius: 3px;">{escaped_author}</span>')
-                    else:
-                        formatted_authors.append(html.escape(author))
-                
-                return ', '.join(formatted_authors)
-            
-            # Build color map for paper authors (normalized name -> color info)
-            color_map = {}
-            for idx, author in enumerate(paper_authors_set):
-                norm, display = normalize_author_name(author)
-                color = get_color_for_author(idx)
-                color_map[norm] = {'display': display, 'color': color}
-            
-            formatted_authors = format_authors_with_colors(authors_full_list, normalized_paper_authors, color_map)
+            # Use the same coloring function
+            formatted_authors = format_authors_with_individual_colors(authors_full_list, paper_authors_set, paper_authors_color_map)
             
             # Get full original text
             original_text_full = html.escape(ref.get('original_text', ''))
@@ -2843,7 +2805,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             
             self_citations_html += f"""
             <div class="rank-item" style="margin-bottom: 15px;">
-                <div><strong>📄 Reference:</strong></div>
+                <div><strong>📄 Reference:</strong> <span class="badge badge-info">🔄 Self-citation</span></div>
                 <div class="full-text-container">{original_text_full}</div>
                 <div style="font-size: 13px; margin-top: 8px;">👨‍🎓 {get_text("authors")}: {formatted_authors}</div>
                 {doi_info}
@@ -2854,24 +2816,65 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     else:
         self_citations_html = f'<p>{get_text("no_problematic")}</p>'
     
-    # Generate full reference list with highlighting for self-citations
-    full_references_html = ""
-    for idx, result in enumerate(results[:300]):  # Show first 300 in HTML report to avoid excessive size
-        authors_full_list = result.get('authors_display', [])
-        normalized_paper_authors_full = set()
+    # Helper function to format authors with individual colors (to be used in both places)
+    def format_authors_with_individual_colors(authors_list, paper_authors_set, paper_authors_colors_map):
+        """Format authors with individual colors for paper authors"""
+        if not authors_list:
+            return ""
+        
+        # Build normalized set of paper authors
+        paper_norm_set = set()
         for author in paper_authors_set:
             norm, _ = normalize_author_name(author)
-            normalized_paper_authors_full.add(norm)
-        formatted_authors = format_authors_with_highlight(authors_full_list, normalized_paper_authors_full, normalize_author_name) if result.get('is_self_citation') else ', '.join([html.escape(a) for a in authors_full_list])
+            paper_norm_set.add(norm)
+        
+        formatted_authors = []
+        for author in authors_list:
+            # Normalize the author name for comparison
+            norm_author, _ = normalize_author_name(author)
+            
+            # Check if normalized author is in paper authors
+            if norm_author in paper_norm_set:
+                escaped_author = html.escape(author)
+                # Get color from the map (using original display name as key or normalized)
+                color = paper_authors_colors_map.get(author, paper_authors_colors_map.get(norm_author, '#d9534f'))
+                formatted_authors.append(f'<span style="color: {color}; font-weight: bold; background-color: {color}20; padding: 2px 4px; border-radius: 3px; display: inline-block; margin: 0 1px;">{escaped_author}</span>')
+            else:
+                formatted_authors.append(html.escape(author))
+        
+        return ', '.join(formatted_authors)
+    
+    # Build color map for paper authors (using both original and normalized as keys)
+    paper_authors_color_map = {}
+    for idx, author in enumerate(paper_authors_set):
+        norm, display = normalize_author_name(author)
+        color = get_color_for_author(idx)
+        paper_authors_color_map[author] = color  # original
+        paper_authors_color_map[norm] = color    # normalized
+        paper_authors_color_map[display] = color # display version
+    
+    # Generate full reference list with INDIVIDUAL COLOR highlighting for self-citations
+    full_references_html = ""
+    for idx, result in enumerate(results[:100]):  # Show first 100 in HTML report to avoid excessive size
+        authors_full_list = result.get('authors_display', [])
+        
+        # Always use colored formatting, but only show colors if it's a self-citation
+        if result.get('is_self_citation'):
+            formatted_authors = format_authors_with_individual_colors(authors_full_list, paper_authors_set, paper_authors_color_map)
+        else:
+            formatted_authors = ', '.join([html.escape(a) for a in authors_full_list])
         
         original_text_full = html.escape(result.get('original_text', ''))
         doi_info = f'<div style="font-size: 13px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(result.get("doi"))}</div>' if result.get('doi') else ''
         
         status_icon = "⚠️" if result.get('is_suspicious_doi') else ("✅" if result.get('doi') else "❌")
         
+        # Add self-citation badge if applicable
+        self_cite_badge = '<span class="badge badge-info" style="margin-left: 10px; font-size: 10px;">🔄 Self-citation</span>' if result.get('is_self_citation') else ''
+        
         full_references_html += f"""
         <div class="rank-item" style="margin-bottom: 15px;">
-            <div><strong>{status_icon} Reference {idx + 1}:</strong></div>
+            <div><strong>{status_icon} Reference {idx + 1}:</strong>{self_cite_badge}</div>
             <div class="full-text-container">{original_text_full}</div>
             <div style="font-size: 13px; margin-top: 5px;">👨‍🎓 {get_text("authors")}: {formatted_authors}</div>
             {doi_info}
