@@ -4002,7 +4002,25 @@ def main():
             
             html_report = generate_html_report_advanced(results, stats, paper_authors, st.session_state.language, journal_name, article_number)
             
-            # Generate filename from journal name and article number
+            # Generate filename from journal abbreviation and article number (no datetime)
+            def get_journal_abbreviation(journal_name: str) -> str:
+                """Get journal abbreviation from full name"""
+                abbreviations = {
+                    'chimica techno acta': 'CTA',
+                    'materials reports energy': 'MRE',
+                    # Add more abbreviations as needed
+                }
+                journal_lower = journal_name.lower().strip()
+                for full, abbr in abbreviations.items():
+                    if full in journal_lower:
+                        return abbr
+                # Fallback: take first letters of each word (max 3-4 letters)
+                words = re.findall(r'[A-Za-z][a-z]*', journal_name)
+                if words:
+                    abbr = ''.join(word[0].upper() for word in words[:3])
+                    return abbr if abbr else "JRNL"
+                return "JRNL"
+            
             def sanitize_filename(s: str) -> str:
                 # Remove special characters, replace spaces and punctuation with underscores
                 s = re.sub(r'[^a-z0-9]+', '_', s.lower().strip())
@@ -4010,13 +4028,20 @@ def main():
                 s = s.strip('_')
                 return s if s else "report"
             
-            base_name = sanitize_filename(journal_name) if journal_name and journal_name.strip() else "chimica_techno_acta"
-            num_part = sanitize_filename(article_number) if article_number and article_number.strip() else ""
-            
-            if num_part:
-                file_name = f"{base_name}_{num_part}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+            # Get journal abbreviation
+            if journal_name and journal_name.strip():
+                journal_abbr = get_journal_abbreviation(journal_name)
             else:
-                file_name = f"{base_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+                journal_abbr = "CTA"  # default
+            
+            # Sanitize article number for filename
+            if article_number and article_number.strip():
+                num_part = sanitize_filename(article_number)
+                # Keep only alphanumeric and dash for article number
+                num_part = re.sub(r'[^a-z0-9\-]', '', num_part)
+                file_name = f"{journal_abbr}_{num_part}.html"
+            else:
+                file_name = f"{journal_abbr}.html"
             
             st.download_button(
                 label=get_text('download_html'),
