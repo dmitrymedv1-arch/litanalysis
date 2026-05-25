@@ -3946,8 +3946,9 @@ def main():
                 self_cit_percent = stats['self_citations_percent']
                 st.markdown(f"""
                 <div class="metric-card">
-                    <div class="metric-number">{stats['self_citations_count']} ({self_cit_percent:.1f}%)</div>
+                    <div class="metric-number">{stats['self_citations_count']}</div>
                     <div class="metric-label">{get_text('self_citations')}</div>
+                    <div style="font-size: 11px; color: #155724; background-color: #d4edda; padding: 2px 8px; border-radius: 12px; margin-top: 5px; display: inline-block;">({self_cit_percent:.1f}%)</div>
                 </div>
                 """, unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
