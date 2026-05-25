@@ -922,7 +922,7 @@ def fetch_openalex_concepts(work_id: str) -> List[Dict]:
 
 # ======================== OPTIMIZED BATCH PROCESSING ========================
 def analyze_reference_batch_optimized(references: List[str], progress_callback=None, paper_authors: Set[str] = None, batch_num: int = 0, total_batches: int = 1) -> List[Dict]:
-    """Analyze batch of references using optimized ThreadPoolExecutor"""
+    """Analyze batch of references using optimized ThreadPoolExecutor with full OpenAlex support for journals and publishers"""
     results = []
     batch_size = len(references)
     
@@ -998,9 +998,11 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
             'authors': [],
             'authors_display': [],
             'journal': None,
+            'journal_from': None,  # Track source: 'crossref', 'openalex', or None
             'year': None,
             'type': None,
             'publisher': None,
+            'publisher_from': None,  # Track source: 'crossref', 'openalex', or None
             'crossmark_issues': [],
             'is_preprint': False,
             'has_erratum': False,
@@ -1019,48 +1021,66 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                 result['is_suspicious_doi'] = True
                 result['crossmark_issues'].append('⚠️ Attention: invalid/suspicious DOI (not found in Crossref or OpenAlex)')
             
+            # ==================== PROCESS CROSSREF DATA ====================
             if crossref_data:
                 result['crossref_data'] = crossref_data
                 result['crossref_status'] = True
                 
+                # Extract authors from Crossref
                 authors_data = extract_authors_from_crossref(crossref_data)
                 result['authors'].extend(authors_data)
                 
                 for auth in authors_data:
                     result['authors_display'].append(auth['display_name'])
                 
+                # Extract journal from Crossref
                 if 'container-title' in crossref_data and crossref_data['container-title']:
-                    result['journal'] = crossref_data['container-title'][0]
+                    journal_name = crossref_data['container-title'][0]
+                    if journal_name and journal_name.strip():
+                        result['journal'] = journal_name.strip()
+                        result['journal_from'] = 'crossref'
                 
+                # Extract ISSN from Crossref
                 if 'ISSN' in crossref_data and crossref_data['ISSN']:
                     result['issn'] = crossref_data['ISSN'][0]
                 
+                # Extract year from Crossref
                 if 'issued' in crossref_data and 'date-parts' in crossref_data['issued']:
                     date_parts = crossref_data['issued']['date-parts']
                     if date_parts and date_parts[0] and len(date_parts[0]) > 0:
                         result['year'] = date_parts[0][0]
                 
+                # Extract publication type
                 if 'type' in crossref_data:
                     result['type'] = crossref_data['type']
                 
-                if 'publisher' in crossref_data:
-                    result['publisher'] = crossref_data['publisher']
+                # Extract publisher from Crossref
+                if 'publisher' in crossref_data and crossref_data['publisher']:
+                    publisher_name = crossref_data['publisher']
+                    if publisher_name and publisher_name.strip():
+                        result['publisher'] = publisher_name.strip()
+                        result['publisher_from'] = 'crossref'
                 
+                # Extract license
                 if 'license' in crossref_data:
                     result['license'] = crossref_data['license'][0].get('URL', '') if crossref_data['license'] else None
                 
+                # Extract citation count
                 if 'is-referenced-by-count' in crossref_data:
                     result['citations_count'] = crossref_data['is-referenced-by-count']
                 
+                # Extract Crossmark issues
                 if 'crossmark' in crossref_data:
                     for cm in crossref_data.get('crossmark', []):
                         if 'type' in cm:
                             result['crossmark_issues'].append(cm['type'])
             
+            # ==================== PROCESS OPENALEX DATA ====================
             if openalex_data:
                 result['openalex_data'] = openalex_data
                 result['openalex_status'] = True
                 
+                # Extract authors from OpenAlex (add only unique ones)
                 authors_data = extract_authors_from_openalex(openalex_data)
                 existing_compare = {a['compare_name'] for a in result['authors']}
                 for auth in authors_data:
@@ -1069,27 +1089,159 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                         result['authors_display'].append(auth['display_name'])
                         existing_compare.add(auth['compare_name'])
                 
+                # Check if preprint
                 if openalex_data.get('type') == 'posted_content':
                     result['is_preprint'] = True
                 
+                # Check if retracted
                 if openalex_data.get('is_retracted'):
                     result['is_retracted'] = True
                 
+                # Extract year from OpenAlex (if not already set by Crossref)
                 if not result['year'] and 'publication_year' in openalex_data:
                     result['year'] = openalex_data['publication_year']
                 
-                if not result['journal'] and 'host_venue' in openalex_data and openalex_data['host_venue']:
-                    result['journal'] = openalex_data['host_venue'].get('display_name', '')
-                
+                # Extract publication type from OpenAlex (if not set)
                 if not result['type'] and 'type' in openalex_data:
                     result['type'] = openalex_data['type']
                 
+                # ========== EXTRACT JOURNAL FROM OPENALEX (MULTIPLE SOURCES) ==========
+                journal_from_openalex = None
+                
+                # Method 1: host_venue (most common for journal articles)
+                if openalex_data.get('host_venue'):
+                    host_venue = openalex_data['host_venue']
+                    if isinstance(host_venue, dict):
+                        if host_venue.get('display_name'):
+                            journal_from_openalex = host_venue['display_name'].strip()
+                        elif host_venue.get('name'):
+                            journal_from_openalex = host_venue['name'].strip()
+                
+                # Method 2: primary_location (more reliable for some records)
+                if not journal_from_openalex and openalex_data.get('primary_location'):
+                    primary = openalex_data['primary_location']
+                    if isinstance(primary, dict):
+                        if primary.get('source') and isinstance(primary['source'], dict):
+                            if primary['source'].get('display_name'):
+                                journal_from_openalex = primary['source']['display_name'].strip()
+                            elif primary['source'].get('name'):
+                                journal_from_openalex = primary['source']['name'].strip()
+                
+                # Method 3: locations array (iterate through all locations)
+                if not journal_from_openalex and openalex_data.get('locations'):
+                    for loc in openalex_data['locations']:
+                        if isinstance(loc, dict) and loc.get('source'):
+                            source = loc['source']
+                            if isinstance(source, dict):
+                                if source.get('display_name'):
+                                    journal_from_openalex = source['display_name'].strip()
+                                    break
+                                elif source.get('name'):
+                                    journal_from_openalex = source['name'].strip()
+                                    break
+                
+                # Method 4: best_open_access (sometimes contains source info)
+                if not journal_from_openalex and openalex_data.get('best_open_access'):
+                    best_oa = openalex_data['best_open_access']
+                    if isinstance(best_oa, dict) and best_oa.get('host_venue'):
+                        host = best_oa['host_venue']
+                        if isinstance(host, dict):
+                            if host.get('display_name'):
+                                journal_from_openalex = host['display_name'].strip()
+                
+                # Set journal if found and not already set by Crossref
+                if journal_from_openalex and journal_from_openalex.strip():
+                    if not result['journal']:
+                        result['journal'] = journal_from_openalex
+                        result['journal_from'] = 'openalex'
+                    # If both have data, keep Crossref as primary but log that OpenAlex also has it
+                    elif result['journal'] and journal_from_openalex != result['journal']:
+                        # Optionally, you could prefer the longer/more complete name
+                        if len(journal_from_openalex) > len(result['journal']):
+                            result['journal'] = journal_from_openalex
+                            result['journal_from'] = 'openalex_override'
+                
+                # ========== EXTRACT PUBLISHER FROM OPENALEX (MULTIPLE SOURCES) ==========
+                publisher_from_openalex = None
+                
+                # Method 1: host_venue publisher
+                if openalex_data.get('host_venue'):
+                    host_venue = openalex_data['host_venue']
+                    if isinstance(host_venue, dict):
+                        if host_venue.get('publisher'):
+                            publisher_from_openalex = host_venue['publisher'].strip()
+                        elif host_venue.get('publisher_name'):
+                            publisher_from_openalex = host_venue['publisher_name'].strip()
+                
+                # Method 2: primary_location source publisher
+                if not publisher_from_openalex and openalex_data.get('primary_location'):
+                    primary = openalex_data['primary_location']
+                    if isinstance(primary, dict) and primary.get('source'):
+                        source = primary['source']
+                        if isinstance(source, dict):
+                            if source.get('publisher'):
+                                publisher_from_openalex = source['publisher'].strip()
+                            elif source.get('publisher_name'):
+                                publisher_from_openalex = source['publisher_name'].strip()
+                
+                # Method 3: locations array source publisher
+                if not publisher_from_openalex and openalex_data.get('locations'):
+                    for loc in openalex_data['locations']:
+                        if isinstance(loc, dict) and loc.get('source'):
+                            source = loc['source']
+                            if isinstance(source, dict):
+                                if source.get('publisher'):
+                                    publisher_from_openalex = source['publisher'].strip()
+                                    break
+                                elif source.get('publisher_name'):
+                                    publisher_from_openalex = source['publisher_name'].strip()
+                                    break
+                
+                # Method 4: host_organization (for preprints, repositories, institutional papers)
+                if not publisher_from_openalex and openalex_data.get('host_organization'):
+                    host_org = openalex_data['host_organization']
+                    if isinstance(host_org, dict):
+                        if host_org.get('display_name'):
+                            publisher_from_openalex = host_org['display_name'].strip()
+                        elif host_org.get('name'):
+                            publisher_from_openalex = host_org['name'].strip()
+                    elif isinstance(host_org, str):
+                        publisher_from_openalex = host_org.strip()
+                
+                # Method 5: host_organization_name (alternative field)
+                if not publisher_from_openalex and openalex_data.get('host_organization_name'):
+                    publisher_from_openalex = openalex_data['host_organization_name'].strip()
+                
+                # Method 6: best_open_access host_venue publisher
+                if not publisher_from_openalex and openalex_data.get('best_open_access'):
+                    best_oa = openalex_data['best_open_access']
+                    if isinstance(best_oa, dict) and best_oa.get('host_venue'):
+                        host = best_oa['host_venue']
+                        if isinstance(host, dict):
+                            if host.get('publisher'):
+                                publisher_from_openalex = host['publisher'].strip()
+                
+                # Set publisher if found and not already set by Crossref
+                if publisher_from_openalex and publisher_from_openalex.strip():
+                    if not result['publisher']:
+                        result['publisher'] = publisher_from_openalex
+                        result['publisher_from'] = 'openalex'
+                    # If both have data, keep Crossref as primary but log that OpenAlex also has it
+                    elif result['publisher'] and publisher_from_openalex != result['publisher']:
+                        # Optionally, you could prefer the longer/more complete name
+                        if len(publisher_from_openalex) > len(result['publisher']):
+                            result['publisher'] = publisher_from_openalex
+                            result['publisher_from'] = 'openalex_override'
+                
+                # Extract reference count
                 if 'referenced_works_count' in openalex_data:
                     result['references_count'] = openalex_data['referenced_works_count']
                 
+                # Extract citation count (take max from both sources)
                 if 'cited_by_count' in openalex_data:
                     result['citations_count'] = max(result['citations_count'], openalex_data['cited_by_count'])
         
+        # ==================== SELF-CITATION DETECTION ====================
         if paper_authors and result['authors']:
             for author in result['authors']:
                 for paper_author in paper_authors:
@@ -1098,14 +1250,15 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                         result['is_self_citation'] = True
                         break
         
+        # Merge authors (deduplicate)
         if result['authors']:
             result['authors'] = merge_authors(result['authors'])
             result['authors_display'] = [a['display_name'] for a in result['authors']]
         
         results.append(result)
         
-        # OPTIMIZATION 3: Update progress less frequently (only at batch level)
-        if progress_callback and idx % 10 == 0:  # Update every 10 references instead of every reference
+        # Update progress less frequently (only at batch level)
+        if progress_callback and idx % 10 == 0:
             progress_callback(batch_num, idx, batch_size, total_batches)
     
     return results
