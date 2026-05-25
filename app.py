@@ -942,7 +942,7 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
     
     if dois_with_indices:
         # OPTIMIZATION 1: Single global ThreadPoolExecutor for all DOIs in batch
-        with ThreadPoolExecutor(max_workers=10) as executor:
+        with ThreadPoolExecutor(max_workers=7) as executor:
             futures = {}
             for idx, doi in dois_with_indices:
                 # Check if DOI is in bad cache
