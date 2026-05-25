@@ -3064,17 +3064,103 @@ def get_color_for_author(index: int) -> str:
 
 # ======================== HTML REPORT (ENGLISH, UPDATED) ========================
 def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_authors: Set[str] = None, lang: str = 'en', journal_name: str = '', article_number: str = '') -> str:
-    """Generate enhanced HTML report in English with clickable links, full content, and self-citation highlighting"""
-    # Load and encode logo for HTML
+    """Generate enhanced HTML report with custom PNG icons instead of emojis"""
     import base64
+    
+    # Function to encode icon to base64 for embedding directly in HTML
+    def encode_icon_base64(icon_path: str) -> str:
+        """Encode PNG icon to base64 data URI"""
+        try:
+            with open(icon_path, "rb") as f:
+                icon_data = base64.b64encode(f.read()).decode()
+            return f"data:image/png;base64,{icon_data}"
+        except FileNotFoundError:
+            # Fallback to emoji if icon not found
+            return None
+    
+    # Define icon mapping with relative paths
+    icon_base_path = "icons"  # Folder containing icons
+    icons = {
+        'overview': f"{icon_base_path}/overview.png",
+        'identifiers': f"{icon_base_path}/identifiers.png",
+        'authors': f"{icon_base_path}/authors.png",
+        'journals': f"{icon_base_path}/journals.png",
+        'publishers': f"{icon_base_path}/publishers.png",
+        'yearly': f"{icon_base_path}/yearly.png",
+        'concepts': f"{icon_base_path}/concepts.png",
+        'geography': f"{icon_base_path}/geography.png",
+        'collaboration': f"{icon_base_path}/collaboration.png",
+        'diversity': f"{icon_base_path}/diversity.png",
+        'classics': f"{icon_base_path}/classics.png",
+        'self_citations': f"{icon_base_path}/self_citations.png",
+        'crossref_only': f"{icon_base_path}/crossref_only.png",
+        'openalex_only': f"{icon_base_path}/openalex_only.png",
+        'suspicious_doi': f"{icon_base_path}/suspicious_doi.png",
+        'non_doi': f"{icon_base_path}/non_doi.png",
+        'url_sources': f"{icon_base_path}/url_sources.png",
+        'problems': f"{icon_base_path}/problems.png",
+        'full_list': f"{icon_base_path}/full_list.png",
+        'total_refs': f"{icon_base_path}/total_refs.png",
+        'doi_found': f"{icon_base_path}/doi_found.png",
+        'self_citations_alt': f"{icon_base_path}/self_citations_alt.png",
+        'total_citations': f"{icon_base_path}/total_citations.png",
+        'avg_citations': f"{icon_base_path}/avg_citations.png"
+    }
+    
+    # Encode all icons to base64
+    icon_data_uris = {}
+    for key, path in icons.items():
+        data_uri = encode_icon_base64(path)
+        if data_uri:
+            icon_data_uris[key] = data_uri
+        else:
+            # Provide emoji fallback
+            emoji_fallbacks = {
+                'overview': '📊',
+                'identifiers': '🔍',
+                'authors': '👨‍🎓',
+                'journals': '📖',
+                'publishers': '🏢',
+                'yearly': '📅',
+                'concepts': '🧠',
+                'geography': '🌍',
+                'collaboration': '🤝',
+                'diversity': '🔄',
+                'classics': '⭐',
+                'self_citations': '📝',
+                'crossref_only': '⚠️',
+                'openalex_only': '⚠️',
+                'suspicious_doi': '🔍',
+                'non_doi': '📄',
+                'url_sources': '🔗',
+                'problems': '⚠️',
+                'full_list': '📋',
+                'total_refs': '📄',
+                'doi_found': '🔗',
+                'self_citations_alt': '🔄',
+                'total_citations': '📊',
+                'avg_citations': '⭐'
+            }
+            icon_data_uris[key] = emoji_fallbacks.get(key, '•')
+    
+    # Helper function to render icon or fallback
+    def render_icon(icon_key: str, size: str = "24px") -> str:
+        """Render icon as img or fallback emoji"""
+        uri = icon_data_uris.get(icon_key)
+        if uri and uri.startswith('data:image'):
+            return f'<img src="{uri}" style="width: {size}; height: {size}; vertical-align: middle; margin-right: 8px;" alt="{icon_key}">'
+        else:
+            return f'<span style="font-size: {size}; margin-right: 8px;">{uri}</span>'
+    
+    # Load and encode logo
     logo_base64 = ""
     try:
         with open("logo.png", "rb") as img_file:
             logo_base64 = base64.b64encode(img_file.read()).decode()
     except FileNotFoundError:
-        pass  # Logo not found, will show nothing
+        pass
     
-    # Set default journal name if not provided
+    # Set default journal name
     if not journal_name or journal_name.strip() == '':
         journal_name_display = "Chimica Techno Acta"
     else:
@@ -3082,9 +3168,10 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     
     article_number_display = html.escape(article_number) if article_number and article_number.strip() else ""
     
-    # Определяем, нужно ли показывать секцию самоцитирования
+    # Determine if self-citations section should be shown
     show_self_citations_section = paper_authors and len(paper_authors) > 0
     
+    # Helper functions for clickable links
     def make_clickable_doi(doi):
         if doi:
             return f'<a href="https://doi.org/{doi}" target="_blank" class="clickable-link">{html.escape(doi)}</a>'
@@ -3095,12 +3182,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             return f'<a href="{orcid}" target="_blank" class="clickable-link">{html.escape(orcid)}</a>'
         return ''
     
-    def make_clickable_url(url):
-        if url:
-            return f'<a href="{url}" target="_blank" class="clickable-link">{html.escape(url)}</a>'
-        return ''
-    
-    # Prepare self-citation authors highlighting (только если есть авторы)
+    # Prepare self-citation authors highlighting
     paper_authors_set = set()
     paper_authors_colors = {}
     if show_self_citations_section and paper_authors:
@@ -3108,7 +3190,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             paper_authors_set.add(author)
             paper_authors_colors[author] = get_color_for_author(idx)
     
-    # Generate authors display for self-citation section header (только если есть авторы)
+    # Generate authors display for self-citation section header
     authors_header_html = ""
     if show_self_citations_section and paper_authors_set:
         authors_header_parts = []
@@ -3118,39 +3200,32 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             authors_header_parts.append(f'<span style="color: {color}; font-weight: bold;">{escaped_author}</span>')
         authors_header_html = f'<div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 8px;"><strong>{get_text("html_self_citation_authors_label")}:</strong> {", ".join(authors_header_parts)}</div>'
     
-    # Generate self-citations section with full authors and highlighting (только если есть авторы)
+    # Generate self-citations section
     self_citations_html = ""
     if show_self_citations_section:
         if stats.get('self_citation_refs'):
             for ref in stats.get('self_citation_refs', []):
-                # Get full authors list for this reference
                 authors_full_list = ref.get('authors_display', [])
                 
-                # Build a set of normalized paper author names
                 normalized_paper_authors = set()
-                paper_author_display = {}  # Map normalized name to display name with color
+                paper_author_display = {}
                 
                 for idx, author in enumerate(paper_authors_set):
                     norm, display = normalize_author_name(author)
                     normalized_paper_authors.add(norm)
-                    # Get color for this author based on index in paper_authors_set
                     color = get_color_for_author(idx)
                     paper_author_display[norm] = {'display': display, 'color': color}
                 
-                # Custom highlighting function that uses colors from paper_authors_colors
                 def format_authors_with_colors(authors_list, paper_norm_set, color_map):
                     if not authors_list:
                         return ""
                     
                     formatted_authors = []
                     for author in authors_list:
-                        # Normalize the author name for comparison
                         norm_author, _ = normalize_author_name(author)
                         
-                        # Check if normalized author is in the paper authors set
                         if norm_author in paper_norm_set:
                             escaped_author = html.escape(author)
-                            # Get color for this specific author
                             color = color_map.get(norm_author, {}).get('color', '#d9534f')
                             formatted_authors.append(f'<span style="color: {color}; font-weight: bold; background-color: {color}20; padding: 2px 4px; border-radius: 3px;">{escaped_author}</span>')
                         else:
@@ -3158,7 +3233,6 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
                     
                     return ', '.join(formatted_authors)
                 
-                # Build color map for paper authors (normalized name -> color info)
                 color_map = {}
                 for idx, author in enumerate(paper_authors_set):
                     norm, display = normalize_author_name(author)
@@ -3166,11 +3240,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
                     color_map[norm] = {'display': display, 'color': color}
                 
                 formatted_authors = format_authors_with_colors(authors_full_list, normalized_paper_authors, color_map)
-                
-                # Get full original text
                 original_text_full = html.escape(ref.get('original_text', ''))
-                
-                # Get DOI and journal info
                 doi_info = f'<div style="font-size: 13px; margin-top: 8px;">🔗 DOI: {make_clickable_doi(ref.get("doi"))}</div>' if ref.get('doi') else ''
                 journal_info = f'<div style="font-size: 13px; margin-top: 5px;">📖 {get_text("journal")}: {html.escape(ref.get("journal", "Unknown"))}</div>' if ref.get('journal') else ''
                 year_info = f'<div style="font-size: 13px; margin-top: 5px;">📅 {get_text("year")}: {ref.get("year", "Unknown")}</div>' if ref.get('year') else ''
@@ -3188,16 +3258,15 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         else:
             self_citations_html = f'<p>{get_text("no_problematic")}</p>'
     
-    # Generate full reference list with highlighting for self-citations
+    # Generate full reference list
     full_references_html = ""
-    for idx, result in enumerate(results[:300]):  # Show first 300 in HTML report to avoid excessive size
+    for idx, result in enumerate(results[:300]):
         authors_full_list = result.get('authors_display', [])
         normalized_paper_authors_full = set()
         for author in paper_authors_set:
             norm, _ = normalize_author_name(author)
             normalized_paper_authors_full.add(norm)
         
-        # Only highlight if we have paper authors and this is a self-citation
         if show_self_citations_section and result.get('is_self_citation'):
             formatted_authors = format_authors_with_highlight(authors_full_list, normalized_paper_authors_full, normalize_author_name)
         else:
@@ -3205,7 +3274,6 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         
         original_text_full = html.escape(result.get('original_text', ''))
         doi_info = f'<div style="font-size: 13px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(result.get("doi"))}</div>' if result.get('doi') else ''
-        
         status_icon = "⚠️" if result.get('is_suspicious_doi') else ("✅" if result.get('doi') else "❌")
         
         full_references_html += f"""
@@ -3217,6 +3285,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         </div>
         """
     
+    # Build the complete HTML
     html_content = f"""<!DOCTYPE html>
 <html lang="{lang}">
 <head>
@@ -3241,7 +3310,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             position: fixed;
             left: 0;
             top: 0;
-            width: 260px;
+            width: 280px;
             height: 100vh;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -3252,22 +3321,33 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         .sidebar h3 {{
             margin-bottom: 20px;
             font-size: 18px;
+            display: flex;
+            align-items: center;
         }}
         .sidebar a {{
             color: white;
             text-decoration: none;
-            display: block;
+            display: flex;
+            align-items: center;
             padding: 10px 15px;
             margin: 5px 0;
             border-radius: 8px;
             transition: all 0.3s;
+            gap: 12px;
         }}
         .sidebar a:hover {{
             background: rgba(255,255,255,0.2);
             transform: translateX(5px);
         }}
+        .sidebar-icon {{
+            width: 20px;
+            height: 20px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }}
         .main-content {{
-            margin-left: 260px;
+            margin-left: 280px;
             padding: 30px 40px;
         }}
         .header {{
@@ -3281,6 +3361,10 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         .header h1 {{
             font-size: 32px;
             margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
         }}
         .header .date {{
             opacity: 0.9;
@@ -3301,6 +3385,11 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         }}
         .stat-card:hover {{
             transform: translateY(-5px);
+        }}
+        .stat-card-icon {{
+            width: 40px;
+            height: 40px;
+            margin: 0 auto 12px auto;
         }}
         .stat-number {{
             font-size: 36px;
@@ -3328,7 +3417,9 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             margin-bottom: 20px;
             padding-bottom: 10px;
             border-bottom: 3px solid #667eea;
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
         }}
         .rank-item {{
             background: #f8f9fa;
@@ -3377,15 +3468,22 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             padding: 15px;
             text-align: center;
             border: 1px solid #667eea30;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }}
+        .concept-icon {{
+            width: 28px;
+            height: 28px;
         }}
         .concept-name {{
             font-weight: 600;
             color: #667eea;
+            flex: 1;
         }}
         .concept-score {{
             font-size: 12px;
             color: #666;
-            margin-top: 5px;
         }}
         .badge {{
             display: inline-block;
@@ -3464,26 +3562,26 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
 </head>
 <body>
     <div class="sidebar">
-        <h3>📊 {get_text('html_overview')}</h3>
-        <a href="#overview">{get_text('html_overview')}</a>
-        <a href="#identifiers">{get_text('html_identifier_coverage')}</a>
-        <a href="#authors">{get_text('html_authors')}</a>
-        <a href="#journals">{get_text('html_journals')}</a>
-        <a href="#publishers">{get_text('html_publishers')}</a>
-        <a href="#yearly">{get_text('html_yearly')}</a>
-        <a href="#concepts">{get_text('html_concepts')}</a>
-        <a href="#geography">{get_text('html_geography')}</a>
-        <a href="#collaboration">{get_text('html_collaborations')}</a>
-        <a href="#diversity">{get_text('html_diversity')}</a>
-        <a href="#classics">{get_text('html_classics')}</a>
-        {'''<a href="#selfcitations">''' + get_text('html_self_citations') + '''</a>''' if show_self_citations_section else ''}
-        <a href="#crossref_only">{get_text('html_crossref_only')}</a>
-        <a href="#openalex_only">{get_text('html_openalex_only')}</a>
-        <a href="#suspicious_doi">{get_text('html_suspicious_doi')}</a>
-        <a href="#non_doi">{get_text('html_non_doi')}</a>
-        <a href="#url_sources">{get_text('html_url_sources')}</a>
-        <a href="#problems">{get_text('html_problems')}</a>
-        <a href="#full_reference_list">📋 Full Reference List</a>
+        <h3>{render_icon('overview', '22px')} {get_text('html_overview')}</h3>
+        <a href="#overview">{render_icon('overview', '18px')} {get_text('html_overview')}</a>
+        <a href="#identifiers">{render_icon('identifiers', '18px')} {get_text('html_identifier_coverage')}</a>
+        <a href="#authors">{render_icon('authors', '18px')} {get_text('html_authors')}</a>
+        <a href="#journals">{render_icon('journals', '18px')} {get_text('html_journals')}</a>
+        <a href="#publishers">{render_icon('publishers', '18px')} {get_text('html_publishers')}</a>
+        <a href="#yearly">{render_icon('yearly', '18px')} {get_text('html_yearly')}</a>
+        <a href="#concepts">{render_icon('concepts', '18px')} {get_text('html_concepts')}</a>
+        <a href="#geography">{render_icon('geography', '18px')} {get_text('html_geography')}</a>
+        <a href="#collaboration">{render_icon('collaboration', '18px')} {get_text('html_collaborations')}</a>
+        <a href="#diversity">{render_icon('diversity', '18px')} {get_text('html_diversity')}</a>
+        <a href="#classics">{render_icon('classics', '18px')} {get_text('html_classics')}</a>
+        {f'<a href="#selfcitations">{render_icon("self_citations", "18px")} {get_text("html_self_citations")}</a>' if show_self_citations_section else ''}
+        <a href="#crossref_only">{render_icon('crossref_only', '18px')} {get_text('html_crossref_only')}</a>
+        <a href="#openalex_only">{render_icon('openalex_only', '18px')} {get_text('html_openalex_only')}</a>
+        <a href="#suspicious_doi">{render_icon('suspicious_doi', '18px')} {get_text('html_suspicious_doi')}</a>
+        <a href="#non_doi">{render_icon('non_doi', '18px')} {get_text('html_non_doi')}</a>
+        <a href="#url_sources">{render_icon('url_sources', '18px')} {get_text('html_url_sources')}</a>
+        <a href="#problems">{render_icon('problems', '18px')} {get_text('html_problems')}</a>
+        <a href="#full_reference_list">{render_icon('full_list', '18px')} 📋 Full Reference List</a>
     </div>
     
     <div class="main-content">
@@ -3501,31 +3599,37 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         </div>
         
         <div id="overview" class="section">
-            <div class="section-title">{get_text('html_overview')}</div>
+            <div class="section-title">{render_icon('overview', '28px')} {get_text('html_overview')}</div>
             <div class="stats-grid">
                 <div class="stat-card">
+                    <div class="stat-card-icon">{render_icon('total_refs', '32px')}</div>
                     <div class="stat-number">{stats['total_references']}</div>
                     <div class="stat-label">{get_text('total_references')}</div>
                 </div>
                 <div class="stat-card">
+                    <div class="stat-card-icon">{render_icon('doi_found', '32px')}</div>
                     <div class="stat-number">{stats['total_with_doi']}</div>
                     <div class="stat-label">{get_text('doi_found')}</div>
                 </div>
                 <div class="stat-card">
+                    <div class="stat-card-icon">{render_icon('yearly', '32px')}</div>
                     <div class="stat-number">{stats['yearly_stats']['last_5_years']}</div>
                     <div class="stat-label">{get_text('last_5_years')}</div>
                 </div>
-                {'''
+                {f'''
                 <div class="stat-card">
-                    <div class="stat-number">''' + str(stats['self_citations_count']) + '''</div>
-                    <div class="stat-label">''' + get_text('self_citations') + '''</div>
+                    <div class="stat-card-icon">{render_icon('self_citations_alt', '32px')}</div>
+                    <div class="stat-number">{stats['self_citations_count']}</div>
+                    <div class="stat-label">{get_text('self_citations')}</div>
                 </div>
                 ''' if show_self_citations_section else ''}
                 <div class="stat-card">
+                    <div class="stat-card-icon">{render_icon('total_citations', '32px')}</div>
                     <div class="stat-number">{stats.get('total_citations_sum', 0)}</div>
                     <div class="stat-label">{get_text('total_citations')}</div>
                 </div>
                 <div class="stat-card">
+                    <div class="stat-card-icon">{render_icon('avg_citations', '32px')}</div>
                     <div class="stat-number">{stats.get('avg_citations', 0):.1f}</div>
                     <div class="stat-label">{get_text('avg_citations')}</div>
                 </div>
@@ -3533,7 +3637,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         </div>
         
         <div id="identifiers" class="section">
-            <div class="section-title">{get_text('html_identifier_coverage')}</div>
+            <div class="section-title">{render_icon('identifiers', '28px')} {get_text('html_identifier_coverage')}</div>
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-number">{stats['identifier_coverage']['stats']['has_doi']}</div>
@@ -3567,11 +3671,11 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['doi_status']['crossref_only']}</div>
-                    <div class="stat-label">⚠️ {get_text('only_crossref')}</div>
+                    <div class="stat-label">{render_icon('crossref_only', '16px')} {get_text('only_crossref')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['doi_status']['openalex_only']}</div>
-                    <div class="stat-label">⚠️ {get_text('only_openalex')}</div>
+                    <div class="stat-label">{render_icon('openalex_only', '16px')} {get_text('only_openalex')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['doi_status']['none']}</div>
@@ -3581,7 +3685,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         </div>
         
         <div id="authors" class="section">
-            <div class="section-title">{get_text('html_authors')}</div>
+            <div class="section-title">{render_icon('authors', '28px')} {get_text('html_authors')}</div>
             <div>
                 {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(author["display_name"])}</span><span class="rank-count">{author["count"]} {get_text("html_citations_label")}</span>' + (f'<div style="font-size: 11px; color: #667eea;">🔗 ORCID: {make_clickable_orcid(author["orcid"])}</div>' if author.get("orcid") else '') + (f'<div style="font-size: 11px; color: #666;">🏛 {html.escape(author["institution"][:50])}</div>' if author.get("institution") else '') + '<div class="progress-bar"><div class="progress-fill" style="width: ' + str(min(100, author["count"] / stats["author_frequency_all"]["all_authors"][0]["count"] * 100 if stats["author_frequency_all"]["all_authors"] else 0)) + '%;"></div></div></div>' for i, author in enumerate(stats["author_frequency_all"]["all_authors"][:30])])}
             </div>
@@ -3593,7 +3697,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         </div>
         
         <div id="journals" class="section">
-            <div class="section-title">{get_text('html_journals')}</div>
+            <div class="section-title">{render_icon('journals', '28px')} {get_text('html_journals')}</div>
             <table>
                 <thead>
                     <tr><th>{get_text('html_rank')}</th><th>{get_text('journal')}</th><th>{get_text('html_count')}</th><th>{get_text('html_percentage')}</th></tr>
@@ -3609,7 +3713,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         </div>
         
         <div id="publishers" class="section">
-            <div class="section-title">{get_text('html_publishers')}</div>
+            <div class="section-title">{render_icon('publishers', '28px')} {get_text('html_publishers')}</div>
             <table>
                 <thead>
                     <tr><th>{get_text('html_rank')}</th><th>{get_text('publisher')}</th><th>{get_text('html_count')}</th><th>{get_text('html_percentage')}</th></tr>
@@ -3625,7 +3729,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         </div>
         
         <div id="yearly" class="section">
-            <div class="section-title">{get_text('html_yearly')}</div>
+            <div class="section-title">{render_icon('yearly', '28px')} {get_text('html_yearly')}</div>
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-number">{stats['yearly_stats']['last_3_years']} ({stats['yearly_stats']['last_3_years_percent']:.1f}%)</div>
@@ -3659,9 +3763,9 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         </div>
         
         <div id="concepts" class="section">
-            <div class="section-title">{get_text('html_concepts')}</div>
+            <div class="section-title">{render_icon('concepts', '28px')} {get_text('html_concepts')}</div>
             <div class="concepts-grid">
-                {''.join([f'<div class="concept-card"><div class="concept-name">{html.escape(concept[0])}</div><div class="concept-score">{get_text("html_frequency")}: {concept[1]}</div></div>' for concept in stats['concepts']['concepts'][:12]])}
+                {''.join([f'<div class="concept-card"><div class="concept-icon">{render_icon("concepts", "24px")}</div><div class="concept-name">{html.escape(concept[0])}</div><div class="concept-score">{get_text("html_frequency")}: {concept[1]}</div></div>' for concept in stats['concepts']['concepts'][:12]])}
             </div>
             <div style="margin-top: 15px;">
                 <span class="badge badge-info">{get_text('unique_concepts')}: {stats['concepts']['unique_concepts']}</span>
@@ -3669,7 +3773,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         </div>
         
         <div id="geography" class="section">
-            <div class="section-title">{get_text('html_geography')}</div>
+            <div class="section-title">{render_icon('geography', '28px')} {get_text('html_geography')}</div>
             <div>
                 {''.join([f'<div class="rank-item"><span class="rank-name">{html.escape(country)}</span><span class="rank-count">{count} {get_text("html_authors_count")}</span><div class="progress-bar"><div class="progress-fill" style="width: {count / max(stats["geography"]["countries"].values()) * 100 if stats["geography"]["countries"] else 0}%;"></div></div></div>' for country, count in list(stats['geography']['countries'].items())[:10]])}
             </div>
@@ -3680,7 +3784,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         </div>
         
         <div id="collaboration" class="section">
-            <div class="section-title">{get_text('html_collaborations')}</div>
+            <div class="section-title">{render_icon('collaboration', '28px')} {get_text('html_collaborations')}</div>
             <div>
                 {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(collab["author1"])} + {html.escape(collab["author2"])}</span><span class="rank-count">{collab["count"]} {get_text("html_works")}</span></div>' for i, collab in enumerate(stats["collaboration"]["top_collaborations"][:8])])}
             </div>
@@ -3690,7 +3794,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         </div>
         
         <div id="diversity" class="section">
-            <div class="section-title">{get_text('html_diversity')}</div>
+            <div class="section-title">{render_icon('diversity', '28px')} {get_text('html_diversity')}</div>
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-number">{stats['shannon_index']['authors']}</div>
@@ -3708,54 +3812,54 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         </div>
         
         <div id="classics" class="section">
-            <div class="section-title">{get_text('html_classics')}</div>
+            <div class="section-title">{render_icon('classics', '28px')} {get_text('html_classics')}</div>
             {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(classic["title"] if classic["title"] else "Unknown")}</span><span class="rank-count">📊 {classic["citations"]} {get_text("html_citations_label")}</span><div style="font-size: 12px; color: #666; margin-top: 5px;">{html.escape(classic["journal"] if classic["journal"] else "Unknown")} ({classic["year"] if classic["year"] else "Unknown"})</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(classic["doi"])}</div>' if classic.get("doi") else '') + '</div>' for i, classic in enumerate(stats['citation_classics'][:8])]) if stats['citation_classics'] else f'<p>{get_text("no_citation_classics")}</p>'}
         </div>
         
-        {'''
+        {f'''
         <div id="selfcitations" class="section">
-            <div class="section-title">''' + get_text('html_self_citations') + '''</div>
-            ''' + authors_header_html + '''
-            ''' + self_citations_html + '''
+            <div class="section-title">{render_icon('self_citations', '28px')} {get_text('html_self_citations')}</div>
+            {authors_header_html}
+            {self_citations_html}
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">''' + get_text('html_total_self_citations') + ''': ''' + str(stats['self_citations_count']) + ''' (''' + f"{stats['self_citations_percent']:.1f}" + '''%)</span>
+                <span class="badge badge-info">{get_text('html_total_self_citations')}: {stats['self_citations_count']} ({stats['self_citations_percent']:.1f}%)</span>
             </div>
         </div>
         ''' if show_self_citations_section else ''}
         
         <div id="crossref_only" class="section">
-            <div class="section-title">{get_text('html_crossref_only')}</div>
+            <div class="section-title">{render_icon('crossref_only', '28px')} {get_text('html_crossref_only')}</div>
             {''.join([f'<div class="rank-item"><div>📄 {html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('crossref_only_refs', [])[:20]]) if stats.get('crossref_only_refs') else f'<p>{get_text("no_crossref_only")}</p>'}
         </div>
         
         <div id="openalex_only" class="section">
-            <div class="section-title">{get_text('html_openalex_only')}</div>
+            <div class="section-title">{render_icon('openalex_only', '28px')} {get_text('html_openalex_only')}</div>
             {''.join([f'<div class="rank-item"><div>📄 {html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('openalex_only_refs', [])[:20]]) if stats.get('openalex_only_refs') else f'<p>{get_text("no_openalex_only")}</p>'}
         </div>
         
         <div id="suspicious_doi" class="section">
-            <div class="section-title">{get_text('html_suspicious_doi')}</div>
+            <div class="section-title">{render_icon('suspicious_doi', '28px')} {get_text('html_suspicious_dois')}</div>
             {''.join([f'<div class="rank-item"><div class="badge badge-danger">{get_text("html_attention")}</div><div>📄 {html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('suspicious_doi_refs', [])[:20]]) if stats.get('suspicious_doi_refs') else f'<p>{get_text("no_suspicious_dois")}</p>'}
         </div>
         
         <div id="non_doi" class="section">
-            <div class="section-title">{get_text('html_non_doi')}</div>
+            <div class="section-title">{render_icon('non_doi', '28px')} {get_text('html_non_doi')}</div>
             {''.join([f'<div class="rank-item">📄 {html.escape(ref)}</div>' for ref in stats['identifier_coverage']['references_without_doi'][:20]]) if stats['identifier_coverage']['references_without_doi'] else f'<p>{get_text("all_have_doi")}</p>'}
         </div>
         
         <div id="url_sources" class="section">
-            <div class="section-title">{get_text('html_url_sources')}</div>
+            <div class="section-title">{render_icon('url_sources', '28px')} {get_text('html_url_sources')}</div>
             {''.join([f'<div class="rank-item">🔗 {html.escape(ref)}</div>' for ref in stats['identifier_coverage']['references_with_only_url'][:20]]) if stats['identifier_coverage']['references_with_only_url'] else f'<p>{get_text("no_url_only")}</p>'}
         </div>
         
         <div id="problems" class="section">
-            <div class="section-title">{get_text('html_problems')}</div>
+            <div class="section-title">{render_icon('problems', '28px')} {get_text('html_problems')}</div>
             {''.join([f'<div class="rank-item"><span class="badge badge-danger">⚠️ {html.escape(ref["problems"])}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div></div>' for ref in stats['problematic_refs'][:10]]) if stats['problematic_refs'] else f'<p>{get_text("no_problematic")}</p>'}
             {f'<div style="margin-top: 15px;"><h4>{get_text("predatory_journals")}:</h4>{"".join([f"<div class=rank-item>📕 {html.escape(pred['journal'])}<br><span style=font-size:12px;color:#666;>{', '.join([html.escape(s) for s in pred['signs']])}</span></div>" for pred in stats['predatory_journals'][:5]])}</div>' if stats['predatory_journals'] else ''}
         </div>
         
         <div id="full_reference_list" class="section">
-            <div class="section-title">📋 Full Reference List</div>
+            <div class="section-title">{render_icon('full_list', '28px')} 📋 Full Reference List</div>
             {full_references_html}
             {f'<p style="margin-top: 15px; color: #666;">Showing first 300 of {len(results)} references</p>' if len(results) > 300 else ''}
         </div>
