@@ -3053,31 +3053,9 @@ def get_color_for_author(index: int) -> str:
 
 # ======================== HTML REPORT (ENGLISH, UPDATED) ========================
 def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_authors: Set[str] = None, lang: str = 'en', journal_name: str = '', article_number: str = '', duplicates: List[Dict] = None) -> str:
-    """Generate enhanced HTML report with custom PNG icons (NO EMOJIS)"""
+    """Generate enhanced HTML report with duplicates section, percentages, last year card, and author highlighting in Self-Citations section"""
     
     import base64
-    import os
-    
-    # ======================== ICON LOADING FUNCTION ========================
-    def load_icon_as_base64(icon_name: str) -> str:
-        """Load PNG icon from icons folder and convert to base64"""
-        icon_path = os.path.join("icons", icon_name)
-        if os.path.exists(icon_path):
-            try:
-                with open(icon_path, "rb") as img_file:
-                    return base64.b64encode(img_file.read()).decode()
-            except Exception:
-                return ""
-        return ""
-    
-    def get_icon_html(icon_name: str, alt_text: str = "", size: str = "20px") -> str:
-        """Generate HTML for PNG icon (NO EMOJI FALLBACK - only empty string if missing)"""
-        base64_icon = load_icon_as_base64(icon_name)
-        if base64_icon:
-            return f'<img src="data:image/png;base64,{base64_icon}" alt="{alt_text}" width="{size}" height="{size}" style="vertical-align: middle; margin-right: 6px;">'
-        return ""  # No emoji fallback, just empty
-    
-    # Load logo
     logo_base64 = ""
     try:
         with open("logo.png", "rb") as img_file:
@@ -3100,7 +3078,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     def make_clickable_doi(doi):
         if doi:
             return f'<a href="https://doi.org/{doi}" target="_blank" class="clickable-link">{html.escape(doi)}</a>'
-        return "Not found"
+        return get_text('html_not_found')
     
     def make_clickable_orcid(orcid):
         if orcid:
@@ -3110,7 +3088,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     # Prepare self-citation authors highlighting with colors
     paper_authors_set = set()
     paper_authors_colors = {}
-    normalized_paper_authors_map = {}
+    normalized_paper_authors_map = {}  # normalized_name -> (display_name, color)
     
     if show_self_citations_section and paper_authors:
         for idx, author in enumerate(paper_authors):
@@ -3131,6 +3109,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     
     # Function to format authors with colors for Self-Citations section
     def format_authors_with_colors_for_selfcitations(authors_list, paper_norm_map):
+        """Format authors with specific colors from paper_authors mapping"""
         if not authors_list:
             return ""
         
@@ -3147,26 +3126,29 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         
         return ', '.join(formatted_authors)
     
-    # Generate self-citations section
+    # Generate self-citations section WITH COLOR HIGHLIGHTING FOR AUTHORS
     self_citations_html = ""
     if show_self_citations_section:
         if stats.get('self_citation_refs'):
             for ref in stats.get('self_citation_refs', []):
                 authors_full_list = ref.get('authors_display', [])
+                
+                # Format authors with colors using the mapping
                 formatted_authors = format_authors_with_colors_for_selfcitations(
                     authors_full_list, 
                     normalized_paper_authors_map
                 )
+                
                 original_text_full = html.escape(ref.get('original_text', ''))
-                doi_info = f'<div style="font-size: 13px; margin-top: 8px;">{get_icon_html("link_chain.png", "DOI", "16px")} DOI: {make_clickable_doi(ref.get("doi"))}</div>' if ref.get('doi') else ''
-                journal_info = f'<div style="font-size: 13px; margin-top: 5px;">{get_icon_html("book_open.png", "Journal", "16px")} {get_text("journal")}: {html.escape(ref.get("journal", "Unknown"))}</div>' if ref.get('journal') else ''
-                year_info = f'<div style="font-size: 13px; margin-top: 5px;">{get_icon_html("calendar_year.png", "Year", "16px")} {get_text("year")}: {ref.get("year", "Unknown")}</div>' if ref.get('year') else ''
+                doi_info = f'<div style="font-size: 13px; margin-top: 8px;">🔗 DOI: {make_clickable_doi(ref.get("doi"))}</div>' if ref.get('doi') else ''
+                journal_info = f'<div style="font-size: 13px; margin-top: 5px;">📖 {get_text("journal")}: {html.escape(ref.get("journal", "Unknown"))}</div>' if ref.get('journal') else ''
+                year_info = f'<div style="font-size: 13px; margin-top: 5px;">📅 {get_text("year")}: {ref.get("year", "Unknown")}</div>' if ref.get('year') else ''
                 
                 self_citations_html += f"""
                 <div class="rank-item" style="margin-bottom: 15px;">
-                    <div><strong>Reference:</strong></div>
+                    <div><strong>📄 Reference:</strong></div>
                     <div class="full-text-container">{original_text_full}</div>
-                    <div style="font-size: 13px; margin-top: 8px;">{get_icon_html("users_group.png", "Authors", "16px")} {get_text("authors")}: {formatted_authors}</div>
+                    <div style="font-size: 13px; margin-top: 8px;">👨‍🎓 {get_text("authors")}: {formatted_authors}</div>
                     {doi_info}
                     {journal_info}
                     {year_info}
@@ -3175,12 +3157,12 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         else:
             self_citations_html = f'<p>{get_text("no_problematic")}</p>'
     
-    # Generate duplicates section
+    # Generate duplicates section (ONLY if there are Full DOI matches)
     duplicates_html = ""
     if duplicates and len(duplicates) > 0:
         duplicates_html = f"""
         <div id="duplicates" class="section">
-            <div class="section-title">{get_icon_html("duplicate_files.png", "Duplicates", "28px")} Duplicate References (Full DOI Match)</div>
+            <div class="section-title">🔄 Duplicate References (Full DOI Match)</div>
         """
         for dup in duplicates:
             ref_num_1 = dup['index1'] + 1
@@ -3188,35 +3170,30 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             doi = dup.get('doi', 'Unknown DOI')
             duplicates_html += f"""
             <div class="rank-item" style="margin-bottom: 10px;">
-                <span class="badge badge-warning">Full DOI Match</span>
+                <span class="badge badge-warning">⚠️ Full DOI Match</span>
                 <div style="margin-top: 8px;"><strong>References {ref_num_1} and {ref_num_2}</strong> — DOI: {make_clickable_doi(doi)}</div>
                 <div style="font-size: 12px; color: #666; margin-top: 5px;">Reference {ref_num_1}: {html.escape(dup['ref1'])}...</div>
                 <div style="font-size: 12px; color: #666; margin-top: 5px;">Reference {ref_num_2}: {html.escape(dup['ref2'])}...</div>
             </div>
             """
-        duplicates_html += "</div>"
+        duplicates_html += """
+        </div>
+        """
     
-    # Generate full reference list
+    # Generate full reference list WITHOUT highlighting (as requested)
     full_references_html = ""
     for idx, result in enumerate(results[:300]):
         authors_full_list = result.get('authors_display', [])
         formatted_authors = ', '.join([html.escape(a) for a in authors_full_list]) if authors_full_list else ""
         original_text_full = html.escape(result.get('original_text', ''))
-        doi_info = f'<div style="font-size: 13px; margin-top: 5px;">{get_icon_html("link_chain.png", "DOI", "16px")} DOI: {make_clickable_doi(result.get("doi"))}</div>' if result.get('doi') else ''
-        
-        # Status icon based on DOI validity
-        if result.get('is_suspicious_doi'):
-            status_icon = get_icon_html("warning_triangle.png", "Suspicious DOI", "18px")
-        elif result.get('doi'):
-            status_icon = get_icon_html("fingerprint_scan.png", "Valid DOI", "18px")
-        else:
-            status_icon = get_icon_html("warning_triangle.png", "No DOI", "18px")
+        doi_info = f'<div style="font-size: 13px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(result.get("doi"))}</div>' if result.get('doi') else ''
+        status_icon = "⚠️" if result.get('is_suspicious_doi') else ("✅" if result.get('doi') else "❌")
         
         full_references_html += f"""
         <div class="rank-item" style="margin-bottom: 15px;">
             <div><strong>{status_icon} Reference {idx + 1}:</strong></div>
             <div class="full-text-container">{original_text_full}</div>
-            <div style="font-size: 13px; margin-top: 5px;">{get_icon_html("users_group.png", "Authors", "16px")} {get_text("authors")}: {formatted_authors}</div>
+            <div style="font-size: 13px; margin-top: 5px;">👨‍🎓 {get_text("authors")}: {formatted_authors}</div>
             {doi_info}
         </div>
         """
@@ -3230,7 +3207,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         <div style="font-size: 11px; color: #155724; background-color: #d4edda; padding: 2px 8px; border-radius: 12px; margin-top: 5px; display: inline-block;">({percent:.1f}%)</div>
         """
     
-    # Build HTML content with PNG icons only (NO EMOJIS)
+    # Build HTML content
     html_content = f"""<!DOCTYPE html>
 <html lang="{lang}">
 <head>
@@ -3245,11 +3222,17 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             padding: 0;
             margin: 0;
         }}
+        .report-wrapper {{
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }}
         .sidebar {{
             position: fixed;
             left: 0;
             top: 0;
-            width: 280px;
+            width: 260px;
             height: 100vh;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -3260,16 +3243,11 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         .sidebar h3 {{
             margin-bottom: 20px;
             font-size: 18px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
         }}
         .sidebar a {{
             color: white;
             text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 12px;
+            display: block;
             padding: 10px 15px;
             margin: 5px 0;
             border-radius: 8px;
@@ -3279,12 +3257,8 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             background: rgba(255,255,255,0.2);
             transform: translateX(5px);
         }}
-        .sidebar a img {{
-            width: 20px;
-            height: 20px;
-        }}
         .main-content {{
-            margin-left: 280px;
+            margin-left: 260px;
             padding: 30px 40px;
         }}
         .header {{
@@ -3298,10 +3272,6 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         .header h1 {{
             font-size: 32px;
             margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
         }}
         .header .date {{
             opacity: 0.9;
@@ -3335,10 +3305,6 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             color: #666;
             margin-top: 10px;
             font-size: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
         }}
         .section {{
             background: white;
@@ -3353,9 +3319,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             margin-bottom: 20px;
             padding-bottom: 10px;
             border-bottom: 3px solid #667eea;
-            display: inline-flex;
-            align-items: center;
-            gap: 12px;
+            display: inline-block;
         }}
         .rank-item {{
             background: #f8f9fa;
@@ -3480,344 +3444,326 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             .sidebar {{ display: none; }}
             .main-content {{ margin-left: 0; padding: 20px; }}
         }}
-        .icon-hover {{
-            transition: transform 0.3s, filter 0.3s;
-        }}
-        .icon-hover:hover {{
-            transform: scale(1.05);
-            filter: drop-shadow(0 2px 4px rgba(102, 126, 234, 0.4));
-        }}
     </style>
 </head>
 <body>
     <div class="sidebar">
-        <h3>{get_icon_html("pie_chart.png", "Menu", "24px")} Navigation</h3>
-        <a href="#overview">{get_icon_html("chart_bar.png", "Overview", "20px")} Overview</a>
-        <a href="#identifiers">{get_icon_html("fingerprint_scan.png", "Identifiers", "20px")} Identifier Coverage</a>
-        <a href="#authors">{get_icon_html("users_group.png", "Authors", "20px")} Authors</a>
-        <a href="#journals">{get_icon_html("book_open.png", "Journals", "20px")} Journals</a>
-        <a href="#publishers">{get_icon_html("building.png", "Publishers", "20px")} Publishers</a>
-        <a href="#yearly">{get_icon_html("calendar_year.png", "Yearly", "20px")} Yearly Statistics</a>
-        <a href="#concepts">{get_icon_html("brain_nodes.png", "Concepts", "20px")} Key Concepts</a>
-        <a href="#geography">{get_icon_html("world_map.png", "Geography", "20px")} Geographic Distribution</a>
-        <a href="#collaboration">{get_icon_html("handshake_network.png", "Collaboration", "20px")} Collaboration Networks</a>
-        <a href="#diversity">{get_icon_html("diversity_flowers.png", "Diversity", "20px")} Diversity Analysis</a>
-        <a href="#classics">{get_icon_html("star_crown.png", "Classics", "20px")} Citation Classics</a>
-        {f'<a href="#selfcitations">{get_icon_html("citation_quote.png", "Self-citations", "20px")} Self-Citations</a>' if show_self_citations_section else ''}
-        {f'<a href="#duplicates">{get_icon_html("duplicate_files.png", "Duplicates", "20px")} Duplicates</a>' if duplicates and len(duplicates) > 0 else ''}
-        <a href="#crossref_only">{get_icon_html("warning_triangle.png", "Crossref only", "20px")} Only Crossref</a>
-        <a href="#openalex_only">{get_icon_html("warning_triangle.png", "OpenAlex only", "20px")} Only OpenAlex</a>
-        <a href="#suspicious_doi">{get_icon_html("magnifying_glass.png", "Suspicious", "20px")} Suspicious DOIs</a>
-        <a href="#non_doi">{get_icon_html("book_stack.png", "Non-DOI", "20px")} Non-DOI Sources</a>
-        <a href="#url_sources">{get_icon_html("link_chain.png", "URL sources", "20px")} URL Sources</a>
-        <a href="#problems">{get_icon_html("warning_triangle.png", "Problems", "20px")} Problematic References</a>
-        <a href="#full_reference_list">{get_icon_html("book_stack.png", "Full list", "20px")} Full Reference List</a>
+        <h3>📊 {get_text('html_overview')}</h3>
+        <a href="#overview">{get_text('html_overview')}</a>
+        <a href="#identifiers">{get_text('html_identifier_coverage')}</a>
+        <a href="#authors">{get_text('html_authors')}</a>
+        <a href="#journals">{get_text('html_journals')}</a>
+        <a href="#publishers">{get_text('html_publishers')}</a>
+        <a href="#yearly">{get_text('html_yearly')}</a>
+        <a href="#concepts">{get_text('html_concepts')}</a>
+        <a href="#geography">{get_text('html_geography')}</a>
+        <a href="#collaboration">{get_text('html_collaborations')}</a>
+        <a href="#diversity">{get_text('html_diversity')}</a>
+        <a href="#classics">{get_text('html_classics')}</a>
+        {'''<a href="#selfcitations">''' + get_text('html_self_citations') + '''</a>''' if show_self_citations_section else ''}
+        {'''<a href="#duplicates">🔄 Duplicates</a>''' if duplicates and len(duplicates) > 0 else ''}
+        <a href="#crossref_only">{get_text('html_crossref_only')}</a>
+        <a href="#openalex_only">{get_text('html_openalex_only')}</a>
+        <a href="#suspicious_doi">{get_text('html_suspicious_doi')}</a>
+        <a href="#non_doi">{get_text('html_non_doi')}</a>
+        <a href="#url_sources">{get_text('html_url_sources')}</a>
+        <a href="#problems">{get_text('html_problems')}</a>
+        <a href="#full_reference_list">📋 Full Reference List</a>
     </div>
     
     <div class="main-content">
         <div class="header">
             <div style="display: flex; justify-content: center; margin-bottom: 15px;">
-                <img src="data:image/png;base64,{logo_base64}" style="height: 150px; width: auto;" class="icon-hover">
+                <img src="data:image/png;base64,{logo_base64}" style="height: 150px; width: auto;">
             </div>
-            <div style="margin-top: 10px;"><strong>Journal:</strong> {journal_name_display}</div>
-            {f'<div><strong>Article number:</strong> {article_number_display}</div>' if article_number_display else ''}
-            <div class="date">Generated: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}</div>
+            <div style="margin-top: 10px;"><strong>{get_text('html_journal_label')}:</strong> {journal_name_display}</div>
+            {f'<div><strong>{get_text("html_article_number_label")}:</strong> {article_number_display}</div>' if article_number_display else ''}
+            <div class="date">{get_text('html_generated')}: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}</div>
             <div style="margin-top: 15px;">
-                <span class="badge badge-success">Crossref + OpenAlex</span>
-                <span class="badge badge-info">{get_icon_html("chart_bar.png", "Stats", "14px")} {stats['total_references']} Total References</span>
+                <span class="badge badge-success">✅ Crossref + OpenAlex</span>
+                <span class="badge badge-info">📊 {stats['total_references']} {get_text('total_references')}</span>
             </div>
         </div>
         
-        <!-- OVERVIEW SECTION -->
+        <!-- OVERVIEW SECTION with percentages -->
         <div id="overview" class="section">
-            <div class="section-title">{get_icon_html("chart_bar.png", "Overview", "28px")} Overview</div>
+            <div class="section-title">{get_text('html_overview')}</div>
             <div class="stats-grid">
                 <div class="stat-card">
                     {format_metric_with_percent(stats['total_references'], 100.0, True)}
-                    <div class="stat-label">{get_icon_html("chart_bar.png", "Total", "16px")} Total References</div>
+                    <div class="stat-label">{get_text('total_references')}</div>
                 </div>
                 <div class="stat-card">
                     {format_metric_with_percent(stats['total_with_doi'], stats.get('total_with_doi_percent', 0), True)}
-                    <div class="stat-label">{get_icon_html("fingerprint_scan.png", "DOI", "16px")} DOI Found</div>
+                    <div class="stat-label">{get_text('doi_found')}</div>
                 </div>
                 <div class="stat-card">
                     {format_metric_with_percent(stats['yearly_stats']['last_5_years'], stats['yearly_stats']['last_5_years_percent'], True)}
-                    <div class="stat-label">{get_icon_html("calendar_year.png", "Recent", "16px")} Last 5 Years</div>
+                    <div class="stat-label">{get_text('last_5_years')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['self_citations_count']}</div>
-                    <div class="stat-label">{get_icon_html("citation_quote.png", "Self-citations", "16px")} Self-Citations</div>
+                    <div class="stat-label">{get_text('self_citations')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats.get('total_citations_sum', 0)}</div>
-                    <div class="stat-label">{get_icon_html("star_crown.png", "Citations", "16px")} Total Citations</div>
+                    <div class="stat-label">{get_text('total_citations')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats.get('avg_citations', 0):.1f}</div>
-                    <div class="stat-label">{get_icon_html("chart_bar.png", "Average", "16px")} Average Citations</div>
+                    <div class="stat-label">{get_text('avg_citations')}</div>
                 </div>
             </div>
         </div>
         
-        <!-- IDENTIFIER COVERAGE SECTION -->
+        <!-- IDENTIFIER COVERAGE SECTION with percentages -->
         <div id="identifiers" class="section">
-            <div class="section-title">{get_icon_html("fingerprint_scan.png", "Identifiers", "28px")} Identifier Coverage</div>
+            <div class="section-title">{get_text('html_identifier_coverage')}</div>
             <div class="stats-grid">
                 <div class="stat-card">
                     {format_metric_with_percent(stats['identifier_coverage']['stats']['has_doi'], stats['identifier_coverage_percents']['has_doi'], True)}
-                    <div class="stat-label">{get_icon_html("link_chain.png", "DOI", "16px")} DOI</div>
+                    <div class="stat-label">{get_text('doi_found')}</div>
                 </div>
                 <div class="stat-card">
                     {format_metric_with_percent(stats['identifier_coverage']['stats']['has_url'], stats['identifier_coverage_percents']['has_url'], True)}
-                    <div class="stat-label">{get_icon_html("globe_network.png", "URL", "16px")} URL</div>
+                    <div class="stat-label">URL</div>
                 </div>
                 <div class="stat-card">
                     {format_metric_with_percent(stats['identifier_coverage']['stats']['has_arxiv'], stats['identifier_coverage_percents']['has_arxiv'], True)}
-                    <div class="stat-label">{get_icon_html("brain_nodes.png", "arXiv", "16px")} arXiv</div>
+                    <div class="stat-label">arXiv</div>
                 </div>
                 <div class="stat-card">
                     {format_metric_with_percent(stats['identifier_coverage']['stats']['has_pmid'], stats['identifier_coverage_percents']['has_pmid'], True)}
-                    <div class="stat-label">{get_icon_html("fingerprint_scan.png", "PMID", "16px")} PMID</div>
+                    <div class="stat-label">PMID</div>
                 </div>
                 <div class="stat-card">
                     {format_metric_with_percent(stats['identifier_coverage']['stats']['has_isbn'], stats['identifier_coverage_percents']['has_isbn'], True)}
-                    <div class="stat-label">{get_icon_html("book_stack.png", "ISBN", "16px")} ISBN</div>
+                    <div class="stat-label">ISBN</div>
                 </div>
                 <div class="stat-card">
                     {format_metric_with_percent(stats['identifier_coverage']['stats']['has_none'], stats['identifier_coverage_percents']['has_none'], True)}
-                    <div class="stat-label">{get_icon_html("warning_triangle.png", "None", "16px")} No Identifier</div>
+                    <div class="stat-label">{get_text('no_identifier')}</div>
                 </div>
             </div>
             <div class="stats-grid">
                 <div class="stat-card">
                     {format_metric_with_percent(stats['doi_status']['both'], stats['doi_status_percents']['both'], True)}
-                    <div class="stat-label">Crossref + OpenAlex</div>
+                    <div class="stat-label">✅ Crossref + OpenAlex</div>
                 </div>
                 <div class="stat-card">
                     {format_metric_with_percent(stats['doi_status']['crossref_only'], stats['doi_status_percents']['crossref_only'], True)}
-                    <div class="stat-label">{get_icon_html("warning_triangle.png", "Warning", "16px")} Only Crossref</div>
+                    <div class="stat-label">⚠️ {get_text('only_crossref')}</div>
                 </div>
                 <div class="stat-card">
                     {format_metric_with_percent(stats['doi_status']['openalex_only'], stats['doi_status_percents']['openalex_only'], True)}
-                    <div class="stat-label">{get_icon_html("warning_triangle.png", "Warning", "16px")} Only OpenAlex</div>
+                    <div class="stat-label">⚠️ {get_text('only_openalex')}</div>
                 </div>
                 <div class="stat-card">
                     {format_metric_with_percent(stats['doi_status']['none'], stats['doi_status_percents']['none'], True)}
-                    <div class="stat-label">{get_icon_html("warning_triangle.png", "Error", "16px")} No Data</div>
+                    <div class="stat-label">❌ {get_text('status_none')}</div>
                 </div>
             </div>
         </div>
         
-        <!-- AUTHORS SECTION -->
         <div id="authors" class="section">
-            <div class="section-title">{get_icon_html("users_group.png", "Authors", "28px")} Top Authors</div>
+            <div class="section-title">{get_text('html_authors')}</div>
             <div>
-                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{get_icon_html("users_group.png", "Author", "16px")} {html.escape(author["display_name"])}</span><span class="rank-count">{author["count"]} citations</span>' + (f'<div style="font-size: 11px; color: #667eea;">{get_icon_html("fingerprint_scan.png", "ORCID", "12px")} ORCID: {make_clickable_orcid(author["orcid"])}</div>' if author.get("orcid") else '') + (f'<div style="font-size: 11px; color: #666;">{get_icon_html("building.png", "Institution", "12px")} {html.escape(author["institution"][:50])}</div>' if author.get("institution") else '') + '<div class="progress-bar"><div class="progress-fill" style="width: ' + str(min(100, author["count"] / stats["author_frequency_all"]["all_authors"][0]["count"] * 100 if stats["author_frequency_all"]["all_authors"] else 0)) + '%;"></div></div></div>' for i, author in enumerate(stats["author_frequency_all"]["all_authors"][:30])])}
+                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(author["display_name"])}</span><span class="rank-count">{author["count"]} {get_text("html_citations_label")}</span>' + (f'<div style="font-size: 11px; color: #667eea;">🔗 ORCID: {make_clickable_orcid(author["orcid"])}</div>' if author.get("orcid") else '') + (f'<div style="font-size: 11px; color: #666;">🏛 {html.escape(author["institution"][:50])}</div>' if author.get("institution") else '') + '<div class="progress-bar"><div class="progress-fill" style="width: ' + str(min(100, author["count"] / stats["author_frequency_all"]["all_authors"][0]["count"] * 100 if stats["author_frequency_all"]["all_authors"] else 0)) + '%;"></div></div></div>' for i, author in enumerate(stats["author_frequency_all"]["all_authors"][:30])])}
             </div>
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_icon_html("users_group.png", "Unique", "12px")} Unique Authors: {stats['author_frequency_all']['unique_authors']}</span>
-                <span class="badge badge-info">{get_icon_html("diversity_flowers.png", "Shannon", "12px")} Shannon Index: {stats['shannon_index']['authors']}</span>
-                <span class="badge badge-info">{get_icon_html("fingerprint_scan.png", "ORCID", "12px")} ORCID Coverage: {stats['orcid_coverage']['with_orcid']} ({stats['orcid_coverage']['coverage_percent']:.1f}%)</span>
+                <span class="badge badge-info">{get_text('unique_authors')}: {stats['author_frequency_all']['unique_authors']}</span>
+                <span class="badge badge-info">{get_text('shannon_authors')}: {stats['shannon_index']['authors']}</span>
+                <span class="badge badge-info">{get_text('orcid_coverage')}: {stats['orcid_coverage']['with_orcid']} ({stats['orcid_coverage']['coverage_percent']:.1f}%)</span>
             </div>
         </div>
         
-        <!-- JOURNALS SECTION -->
         <div id="journals" class="section">
-            <div class="section-title">{get_icon_html("book_open.png", "Journals", "28px")} All Journals</div>
+            <div class="section-title">{get_text('html_journals')}</div>
             <table>
                 <thead>
-                    <tr><th>{get_icon_html("chart_bar.png", "Rank", "14px")} Rank</th><th>{get_icon_html("book_open.png", "Journal", "14px")} Journal</th><th>{get_icon_html("chart_bar.png", "Count", "14px")} Count</th><th>{get_icon_html("pie_chart.png", "Percentage", "14px")} Percentage</th></tr>
+                    <tr><th>{get_text('html_rank')}</th><th>{get_text('journal')}</th><th>{get_text('html_count')}</th><th>{get_text('html_percentage')}</th></tr>
                 </thead>
                 <tbody>
-                    {''.join([f'<tr><td>{i+1}</td><td>{get_icon_html("book_open.png", "Journal", "14px")} {html.escape(journal["journal"])}</td><td>{journal["count"]}</td><td>{journal["percentage"]:.1f}%</td></tr>' for i, journal in enumerate(stats["journal_frequency_all"]["all_journals"])])}
+                    {''.join([f'<tr><td>{i+1}</td><td>{html.escape(journal["journal"])}</td><td>{journal["count"]}</td><td>{journal["percentage"]:.1f}%</td></tr>' for i, journal in enumerate(stats["journal_frequency_all"]["all_journals"])])}
                 </tbody>
             </table>
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_icon_html("book_open.png", "Unique", "12px")} Unique Journals: {stats['journal_frequency_all']['unique_journals']}</span>
-                <span class="badge badge-info">{get_icon_html("diversity_flowers.png", "Shannon", "12px")} Shannon Index: {stats['shannon_index']['journals']}</span>
+                <span class="badge badge-info">{get_text('unique_journals')}: {stats['journal_frequency_all']['unique_journals']}</span>
+                <span class="badge badge-info">{get_text('shannon_journals')}: {stats['shannon_index']['journals']}</span>
             </div>
         </div>
         
-        <!-- PUBLISHERS SECTION -->
         <div id="publishers" class="section">
-            <div class="section-title">{get_icon_html("building.png", "Publishers", "28px")} All Publishers</div>
+            <div class="section-title">{get_text('html_publishers')}</div>
             <table>
                 <thead>
-                    <tr><th>{get_icon_html("chart_bar.png", "Rank", "14px")} Rank</th><th>{get_icon_html("building.png", "Publisher", "14px")} Publisher</th><th>{get_icon_html("chart_bar.png", "Count", "14px")} Count</th><th>{get_icon_html("pie_chart.png", "Percentage", "14px")} Percentage</th></tr>
+                    <tr><th>{get_text('html_rank')}</th><th>{get_text('publisher')}</th><th>{get_text('html_count')}</th><th>{get_text('html_percentage')}</th></tr>
                 </thead>
                 <tbody>
-                    {''.join([f'<tr><td>{i+1}</td><td>{get_icon_html("building.png", "Publisher", "14px")} {html.escape(publisher["publisher"])}</td><td>{publisher["count"]}</td><td>{publisher["percentage"]:.1f}%</td></tr>' for i, publisher in enumerate(stats["publisher_frequency"]["all_publishers"])])}
+                    {''.join([f'<tr><td>{i+1}</td><td>{html.escape(publisher["publisher"])}</td><td>{publisher["count"]}</td><td>{publisher["percentage"]:.1f}%</td></tr>' for i, publisher in enumerate(stats["publisher_frequency"]["all_publishers"])])}
                 </tbody>
             </table>
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_icon_html("building.png", "Unique", "12px")} Unique Publishers: {stats['publisher_frequency']['unique_publishers']}</span>
-                <span class="badge badge-info">{get_icon_html("diversity_flowers.png", "Shannon", "12px")} Shannon Index: {stats['shannon_index']['publishers']}</span>
+                <span class="badge badge-info">{get_text('unique_publishers_metric')}: {stats['publisher_frequency']['unique_publishers']}</span>
+                <span class="badge badge-info">{get_text('shannon_publishers')}: {stats['shannon_index']['publishers']}</span>
             </div>
         </div>
         
-        <!-- YEARLY STATISTICS -->
+        <!-- YEARLY STATISTICS with Last Year card (FIRST) -->
         <div id="yearly" class="section">
-            <div class="section-title">{get_icon_html("calendar_year.png", "Yearly", "28px")} Yearly Statistics</div>
+            <div class="section-title">{get_text('html_yearly')}</div>
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-number">{stats['yearly_stats']['last_year']} ({stats['yearly_stats']['last_year_percent']:.1f}%)</div>
-                    <div class="stat-label">{get_icon_html("calendar_year.png", "Last year", "16px")} Last Year ({stats['yearly_stats']['last_completed_year']})</div>
+                    <div class="stat-label">Last Year ({stats['yearly_stats']['last_completed_year']})</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['yearly_stats']['last_3_years']} ({stats['yearly_stats']['last_3_years_percent']:.1f}%)</div>
-                    <div class="stat-label">{get_icon_html("calendar_year.png", "3 years", "16px")} Last 3 Years</div>
+                    <div class="stat-label">{get_text('last_3_years')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['yearly_stats']['last_5_years']} ({stats['yearly_stats']['last_5_years_percent']:.1f}%)</div>
-                    <div class="stat-label">{get_icon_html("calendar_year.png", "5 years", "16px")} Last 5 Years</div>
+                    <div class="stat-label">{get_text('last_5_years_metric')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['yearly_stats']['last_10_years']} ({stats['yearly_stats']['last_10_years_percent']:.1f}%)</div>
-                    <div class="stat-label">{get_icon_html("calendar_year.png", "10 years", "16px")} Last 10 Years</div>
+                    <div class="stat-label">{get_text('last_10_years')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['yearly_stats']['unknown_year']}</div>
-                    <div class="stat-label">{get_icon_html("warning_triangle.png", "Unknown", "16px")} Unknown Year</div>
+                    <div class="stat-label">{get_text('references_with_unknown_year')}</div>
                 </div>
             </div>
             <div>
-                <h4>{get_icon_html("calendar_year.png", "Distribution", "18px")} Distribution by Year</h4>
-                {''.join([f'<div class="rank-item"><span class="rank-name">{get_icon_html("calendar_year.png", "Year", "14px")} {year}</span><span class="rank-count">{stats["yearly_stats"]["yearly_counts"][year]} references ({stats["yearly_stats"]["yearly_percentages"][year]:.1f}%)</span><div class="progress-bar"><div class="progress-fill" style="width: {stats["yearly_stats"]["yearly_percentages"][year]}%;"></div></div></div>' for year in sorted(stats["yearly_stats"]["yearly_counts"].keys(), reverse=True)])}
+                <h4>{get_text('yearly_distribution')}</h4>
+                {''.join([f'<div class="rank-item"><span class="rank-name">{year}</span><span class="rank-count">{stats["yearly_stats"]["yearly_counts"][year]} {get_text("references_count")} ({stats["yearly_stats"]["yearly_percentages"][year]:.1f}%)</span><div class="progress-bar"><div class="progress-fill" style="width: {stats["yearly_stats"]["yearly_percentages"][year]}%;"></div></div></div>' for year in sorted(stats["yearly_stats"]["yearly_counts"].keys(), reverse=True)])}
             </div>
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_icon_html("calendar_year.png", "Median", "12px")} Median Age: {stats['temporal']['median_age']} years</span>
-                <span class="badge badge-info">{get_icon_html("chart_bar.png", "Average", "12px")} Average Age: {stats['temporal']['average_age']:.1f} years</span>
+                <h4>{get_text('cumulative_percentage')}</h4>
+                {''.join([f'<div class="rank-item"><span class="rank-name">{year}</span><span class="rank-count">{stats["yearly_stats"]["cumulative_percentages"][year]:.1f}% {get_text("cumulative")}</span><div class="progress-bar"><div class="progress-fill" style="width: {stats["yearly_stats"]["cumulative_percentages"][year]}%;"></div></div></div>' for year in sorted(stats["yearly_stats"]["yearly_counts"].keys(), reverse=True)])}
+            </div>
+            <div style="margin-top: 15px;">
+                <span class="badge badge-info">{get_text('median_age')}: {stats['temporal']['median_age']} {get_text('years')}</span>
+                <span class="badge badge-info">{get_text('average_age')}: {stats['temporal']['average_age']:.1f} {get_text('years')}</span>
             </div>
         </div>
         
-        <!-- CONCEPTS SECTION -->
         <div id="concepts" class="section">
-            <div class="section-title">{get_icon_html("brain_nodes.png", "Concepts", "28px")} Key Scientific Concepts</div>
+            <div class="section-title">{get_text('html_concepts')}</div>
             <div class="concepts-grid">
-                {''.join([f'<div class="concept-card"><div class="concept-name">{get_icon_html("brain_nodes.png", "Concept", "16px")} {html.escape(concept[0])}</div><div class="concept-score">{get_icon_html("chart_bar.png", "Frequency", "12px")} Frequency: {concept[1]}</div></div>' for concept in stats['concepts']['concepts'][:12]])}
+                {''.join([f'<div class="concept-card"><div class="concept-name">{html.escape(concept[0])}</div><div class="concept-score">{get_text("html_frequency")}: {concept[1]}</div></div>' for concept in stats['concepts']['concepts'][:12]])}
             </div>
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_icon_html("brain_nodes.png", "Unique", "12px")} Unique Concepts: {stats['concepts']['unique_concepts']}</span>
+                <span class="badge badge-info">{get_text('unique_concepts')}: {stats['concepts']['unique_concepts']}</span>
             </div>
         </div>
         
-        <!-- GEOGRAPHY SECTION -->
         <div id="geography" class="section">
-            <div class="section-title">{get_icon_html("world_map.png", "Geography", "28px")} Geographic Distribution</div>
+            <div class="section-title">{get_text('html_geography')}</div>
             <div>
-                {''.join([f'<div class="rank-item"><span class="rank-name">{get_icon_html("world_map.png", "Country", "14px")} {html.escape(country)}</span><span class="rank-count">{count} authors</span><div class="progress-bar"><div class="progress-fill" style="width: {count / max(stats["geography"]["countries"].values()) * 100 if stats["geography"]["countries"] else 0}%;"></div></div></div>' for country, count in list(stats['geography']['countries'].items())[:10]])}
+                {''.join([f'<div class="rank-item"><span class="rank-name">{html.escape(country)}</span><span class="rank-count">{count} {get_text("html_authors_count")}</span><div class="progress-bar"><div class="progress-fill" style="width: {count / max(stats["geography"]["countries"].values()) * 100 if stats["geography"]["countries"] else 0}%;"></div></div></div>' for country, count in list(stats['geography']['countries'].items())[:10]])}
             </div>
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_icon_html("world_map.png", "Countries", "12px")} Total Countries: {stats['geography']['total_countries']}</span>
-                <span class="badge badge-info">{get_icon_html("handshake_network.png", "International", "12px")} International Collaboration: {stats['geography']['international_percent']:.1f}%</span>
+                <span class="badge badge-info">{get_text('total_countries')}: {stats['geography']['total_countries']}</span>
+                <span class="badge badge-info">{get_text('international_collaboration')}: {stats['geography']['international_percent']:.1f}%</span>
             </div>
         </div>
         
-        <!-- COLLABORATION SECTION -->
         <div id="collaboration" class="section">
-            <div class="section-title">{get_icon_html("handshake_network.png", "Collaboration", "28px")} Collaboration Networks</div>
+            <div class="section-title">{get_text('html_collaborations')}</div>
             <div>
-                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{get_icon_html("users_group.png", "Author", "14px")} {html.escape(collab["author1"])} + {html.escape(collab["author2"])}</span><span class="rank-count">{collab["count"]} joint works</span></div>' for i, collab in enumerate(stats["collaboration"]["top_collaborations"][:8])])}
+                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(collab["author1"])} + {html.escape(collab["author2"])}</span><span class="rank-count">{collab["count"]} {get_text("html_works")}</span></div>' for i, collab in enumerate(stats["collaboration"]["top_collaborations"][:8])])}
             </div>
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_icon_html("handshake_network.png", "Core authors", "12px")} Core Authors: {', '.join([f"{html.escape(author[0])} ({author[1]} connections)" for author in stats['collaboration']['core_authors'][:5]])}</span>
+                <span class="badge badge-info">{get_text('core_authors_label')}: {', '.join([f"{html.escape(author[0])} ({author[1]} {get_text('html_connections')})" for author in stats['collaboration']['core_authors'][:5]])}</span>
             </div>
         </div>
         
-        <!-- DIVERSITY SECTION -->
         <div id="diversity" class="section">
-            <div class="section-title">{get_icon_html("diversity_flowers.png", "Diversity", "28px")} Diversity Analysis</div>
+            <div class="section-title">{get_text('html_diversity')}</div>
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-number">{stats['shannon_index']['authors']}</div>
-                    <div class="stat-label">{get_icon_html("users_group.png", "Authors", "16px")} Authors Shannon Index</div>
+                    <div class="stat-label">{get_text('shannon_authors')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['shannon_index']['journals']}</div>
-                    <div class="stat-label">{get_icon_html("book_open.png", "Journals", "16px")} Journals Shannon Index</div>
+                    <div class="stat-label">{get_text('shannon_journals')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['shannon_index']['publishers']}</div>
-                    <div class="stat-label">{get_icon_html("building.png", "Publishers", "16px")} Publishers Shannon Index</div>
+                    <div class="stat-label">{get_text('shannon_publishers')}</div>
                 </div>
             </div>
         </div>
         
-        <!-- CITATION CLASSICS SECTION -->
         <div id="classics" class="section">
-            <div class="section-title">{get_icon_html("star_crown.png", "Classics", "28px")} Citation Classics</div>
-            {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{get_icon_html("star_crown.png", "Classic", "14px")} {html.escape(classic["title"] if classic["title"] else "Unknown")}</span><span class="rank-count">{classic["citations"]} citations</span><div style="font-size: 12px; color: #666; margin-top: 5px;">{get_icon_html("book_open.png", "Journal", "12px")} {html.escape(classic["journal"] if classic["journal"] else "Unknown")} ({classic["year"] if classic["year"] else "Unknown"})</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">{get_icon_html("link_chain.png", "DOI", "12px")} DOI: {make_clickable_doi(classic["doi"])}</div>' if classic.get("doi") else '') + '</div>' for i, classic in enumerate(stats['citation_classics'][:8])]) if stats['citation_classics'] else f'<p>{get_text("no_citation_classics")}</p>'}
+            <div class="section-title">{get_text('html_classics')}</div>
+            {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(classic["title"] if classic["title"] else "Unknown")}</span><span class="rank-count">📊 {classic["citations"]} {get_text("html_citations_label")}</span><div style="font-size: 12px; color: #666; margin-top: 5px;">{html.escape(classic["journal"] if classic["journal"] else "Unknown")} ({classic["year"] if classic["year"] else "Unknown"})</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(classic["doi"])}</div>' if classic.get("doi") else '') + '</div>' for i, classic in enumerate(stats['citation_classics'][:8])]) if stats['citation_classics'] else f'<p>{get_text("no_citation_classics")}</p>'}
         </div>
         
-        <!-- SELF-CITATIONS SECTION -->
-        {f'''
+        <!-- SELF-CITATIONS SECTION with COLOR HIGHLIGHTING for authors -->
+        {'''
         <div id="selfcitations" class="section">
-            <div class="section-title">{get_icon_html("citation_quote.png", "Self-citations", "28px")} Self-Citations</div>
-            {authors_header_html}
-            {self_citations_html}
+            <div class="section-title">''' + get_text('html_self_citations') + '''</div>
+            ''' + authors_header_html + '''
+            ''' + self_citations_html + '''
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_icon_html("citation_quote.png", "Total", "12px")} Total Self-Citations: {str(stats['self_citations_count'])} ({stats['self_citations_percent']:.1f}%)</span>
+                <span class="badge badge-info">''' + get_text('html_total_self_citations') + ''': ''' + str(stats['self_citations_count']) + ''' (''' + f"{stats['self_citations_percent']:.1f}" + '''%)</span>
             </div>
         </div>
         ''' if show_self_citations_section else ''}
         
-        <!-- DUPLICATES SECTION -->
+        <!-- DUPLICATES SECTION (only if duplicates exist) -->
         {duplicates_html}
         
-        <!-- CROSSREF ONLY SECTION -->
         <div id="crossref_only" class="section">
-            <div class="section-title">{get_icon_html("warning_triangle.png", "Crossref only", "28px")} References with Only Crossref</div>
-            {''.join([f'<div class="rank-item"><div>{get_icon_html("warning_triangle.png", "Warning", "16px")} {html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">{get_icon_html("link_chain.png", "DOI", "12px")} DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('crossref_only_refs', [])[:20]]) if stats.get('crossref_only_refs') else f'<p>{get_text("no_crossref_only")}</p>'}
+            <div class="section-title">{get_text('html_crossref_only')}</div>
+            {''.join([f'<div class="rank-item"><div>📄 {html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('crossref_only_refs', [])[:20]]) if stats.get('crossref_only_refs') else f'<p>{get_text("no_crossref_only")}</p>'}
         </div>
         
-        <!-- OPENALEX ONLY SECTION -->
         <div id="openalex_only" class="section">
-            <div class="section-title">{get_icon_html("warning_triangle.png", "OpenAlex only", "28px")} References with Only OpenAlex</div>
-            {''.join([f'<div class="rank-item"><div>{get_icon_html("warning_triangle.png", "Warning", "16px")} {html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">{get_icon_html("link_chain.png", "DOI", "12px")} DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('openalex_only_refs', [])[:20]]) if stats.get('openalex_only_refs') else f'<p>{get_text("no_openalex_only")}</p>'}
+            <div class="section-title">{get_text('html_openalex_only')}</div>
+            {''.join([f'<div class="rank-item"><div>📄 {html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('openalex_only_refs', [])[:20]]) if stats.get('openalex_only_refs') else f'<p>{get_text("no_openalex_only")}</p>'}
         </div>
         
-        <!-- SUSPICIOUS DOI SECTION -->
         <div id="suspicious_doi" class="section">
-            <div class="section-title">{get_icon_html("magnifying_glass.png", "Suspicious", "28px")} Suspicious DOIs</div>
-            {''.join([f'<div class="rank-item"><div class="badge badge-danger">{get_icon_html("warning_triangle.png", "Attention", "12px")} Attention: invalid/suspicious DOI</div><div>{html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">{get_icon_html("link_chain.png", "DOI", "12px")} DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('suspicious_doi_refs', [])[:20]]) if stats.get('suspicious_doi_refs') else f'<p>{get_text("no_suspicious_dois")}</p>'}
+            <div class="section-title">{get_text('html_suspicious_doi')}</div>
+            {''.join([f'<div class="rank-item"><div class="badge badge-danger">{get_text("html_attention")}</div><div>📄 {html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">🔗 DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('suspicious_doi_refs', [])[:20]]) if stats.get('suspicious_doi_refs') else f'<p>{get_text("no_suspicious_dois")}</p>'}
         </div>
         
-        <!-- NON-DOI SOURCES SECTION -->
         <div id="non_doi" class="section">
-            <div class="section-title">{get_icon_html("book_stack.png", "Non-DOI", "28px")} Non-DOI Sources</div>
-            {''.join([f'<div class="rank-item">{get_icon_html("book_stack.png", "Source", "16px")} {html.escape(ref)}</div>' for ref in stats['identifier_coverage']['references_without_doi'][:20]]) if stats['identifier_coverage']['references_without_doi'] else f'<p>{get_text("all_have_doi")}</p>'}
+            <div class="section-title">{get_text('html_non_doi')}</div>
+            {''.join([f'<div class="rank-item">📄 {html.escape(ref)}</div>' for ref in stats['identifier_coverage']['references_without_doi'][:20]]) if stats['identifier_coverage']['references_without_doi'] else f'<p>{get_text("all_have_doi")}</p>'}
         </div>
         
-        <!-- URL SOURCES SECTION -->
         <div id="url_sources" class="section">
-            <div class="section-title">{get_icon_html("link_chain.png", "URL sources", "28px")} URL Sources</div>
-            {''.join([f'<div class="rank-item">{get_icon_html("globe_network.png", "URL", "16px")} {html.escape(ref)}</div>' for ref in stats['identifier_coverage']['references_with_only_url'][:20]]) if stats['identifier_coverage']['references_with_only_url'] else f'<p>{get_text("no_url_only")}</p>'}
+            <div class="section-title">{get_text('html_url_sources')}</div>
+            {''.join([f'<div class="rank-item">🔗 {html.escape(ref)}</div>' for ref in stats['identifier_coverage']['references_with_only_url'][:20]]) if stats['identifier_coverage']['references_with_only_url'] else f'<p>{get_text("no_url_only")}</p>'}
         </div>
         
-        <!-- PROBLEMS SECTION -->
         <div id="problems" class="section">
-            <div class="section-title">{get_icon_html("warning_triangle.png", "Problems", "28px")} Problematic References</div>
-            {''.join([f'<div class="rank-item"><span class="badge badge-danger">{get_icon_html("warning_triangle.png", "Issue", "12px")} {html.escape(ref["problems"])}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div></div>' for ref in stats['problematic_refs'][:10]]) if stats['problematic_refs'] else f'<p>{get_text("no_problematic")}</p>'}
-            {f'<div style="margin-top: 15px;"><h4>{get_icon_html("warning_triangle.png", "Predatory", "18px")} Potentially Predatory Journals:</h4>{"".join([f"<div class=rank-item>{get_icon_html('warning_triangle.png', 'Journal', '14px')} {html.escape(pred['journal'])}<br><span style=font-size:12px;color:#666;>{', '.join([html.escape(s) for s in pred['signs']])}</span></div>" for pred in stats['predatory_journals'][:5]])}</div>' if stats['predatory_journals'] else ''}
+            <div class="section-title">{get_text('html_problems')}</div>
+            {''.join([f'<div class="rank-item"><span class="badge badge-danger">⚠️ {html.escape(ref["problems"])}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div></div>' for ref in stats['problematic_refs'][:10]]) if stats['problematic_refs'] else f'<p>{get_text("no_problematic")}</p>'}
+            {f'<div style="margin-top: 15px;"><h4>{get_text("predatory_journals")}:</h4>{"".join([f"<div class=rank-item>📕 {html.escape(pred['journal'])}<br><span style=font-size:12px;color:#666;>{', '.join([html.escape(s) for s in pred['signs']])}</span></div>" for pred in stats['predatory_journals'][:5]])}</div>' if stats['predatory_journals'] else ''}
         </div>
         
-        <!-- FULL REFERENCE LIST -->
         <div id="full_reference_list" class="section">
-            <div class="section-title">{get_icon_html("book_stack.png", "Full list", "28px")} Full Reference List</div>
+            <div class="section-title">📋 Full Reference List</div>
             {full_references_html}
-            {f'<p style="margin-top: 15px; color: #666;">{get_icon_html("warning_triangle.png", "Info", "14px")} Showing first 300 of {len(results)} references</p>' if len(results) > 300 else ''}
+            {f'<p style="margin-top: 15px; color: #666;">Showing first 300 of {len(results)} references</p>' if len(results) > 300 else ''}
         </div>
         
         <div class="footer">
-            {get_icon_html("chart_bar.png", "Report", "14px")} Report automatically generated.<br>
-            {get_icon_html("building.png", "Copyright", "14px")} Comprehensive Reference List Analysis / Created by daM / Chimica Techno Acta <a href="https://chimicatechnoacta.ru" target="_blank">https://chimicatechnoacta.ru</a>
+            Report automatically generated.<br>
+            © Comprehensive Reference List Analysis / Created by daM / Chimica Techno Acta <a href="https://chimicatechnoacta.ru" target="_blank">https://chimicatechnoacta.ru</a>
         </div>
     </div>
 </body>
 </html>"""
     
     return html_content
-    
+
 # ======================== UI INTERFACE (ENGLISH, UPDATED) ========================
 def main():
     # Language selector in sidebar (before anything else)
