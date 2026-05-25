@@ -2674,20 +2674,24 @@ def parse_paper_authors(authors_input: str) -> Set[str]:
 
 # ======================== ENHANCED STATISTICS ========================
 def generate_advanced_statistics(results: List[Dict]) -> Dict:
-    """Generate enhanced statistics with new metrics"""
+    """Generate enhanced statistics with new metrics - FIXED for OpenAlex publishers"""
     
     doi_status = {'both': 0, 'crossref_only': 0, 'openalex_only': 0, 'none': 0}
     author_counter = Counter()
     journal_counter = Counter()
     type_counter = Counter()
     year_counter = Counter()
-    publisher_counter = Counter()
+    publisher_counter = Counter()  # Теперь будет считать ИЗ ОБОИХ источников
     problematic_refs = []
     crossref_only_refs = []
     openalex_only_refs = []
     suspicious_doi_refs = []
     
+    # Для отладки - счетчики источников издателей
+    publisher_sources = {'crossref': 0, 'openalex': 0, 'both': 0, 'none': 0}
+    
     for result in results:
+        # DOI Status
         if result['doi']:
             if result['crossref_status'] and result['openalex_status']:
                 doi_status['both'] += 1
@@ -2713,9 +2717,83 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         else:
             doi_status['none'] += 1
         
+        # ========== JOURNAL (уже работает корректно) ==========
         if result['journal']:
             journal_counter[result['journal']] += 1
         
+        # ========== PUBLISHER - ИСПРАВЛЕНО! ==========
+        # Проверяем publisher из ЛЮБОГО источника (Crossref или OpenAlex)
+        publisher = result.get('publisher')
+        if publisher and publisher.strip():
+            publisher_counter[publisher] += 1
+            
+            # Отслеживаем источник для статистики
+            publisher_from = result.get('publisher_from', 'unknown')
+            if publisher_from == 'crossref':
+                publisher_sources['crossref'] += 1
+            elif publisher_from == 'openalex' or publisher_from == 'openalex_override':
+                publisher_sources['openalex'] += 1
+                # Если publisher_from == 'openalex_override', значит оба источника есть
+                if publisher_from == 'openalex_override':
+                    publisher_sources['both'] += 1
+            else:
+                publisher_sources['none'] += 1
+        
+        # Альтернативный способ: если publisher не в result, но есть в openalex_data
+        # (на случай, если в analyze_reference_batch_optimized что-то пропустили)
+        elif result.get('openalex_data') and not publisher:
+            openalex_data = result['openalex_data']
+            openalex_publisher = None
+            
+            # Пытаемся извлечь издателя из OpenAlex напрямую
+            if openalex_data.get('host_venue'):
+                host_venue = openalex_data['host_venue']
+                if isinstance(host_venue, dict):
+                    if host_venue.get('publisher'):
+                        openalex_publisher = host_venue['publisher'].strip()
+                    elif host_venue.get('publisher_name'):
+                        openalex_publisher = host_venue['publisher_name'].strip()
+            
+            if not openalex_publisher and openalex_data.get('primary_location'):
+                primary = openalex_data['primary_location']
+                if isinstance(primary, dict) and primary.get('source'):
+                    source = primary['source']
+                    if isinstance(source, dict):
+                        if source.get('publisher'):
+                            openalex_publisher = source['publisher'].strip()
+                        elif source.get('publisher_name'):
+                            openalex_publisher = source['publisher_name'].strip()
+            
+            if not openalex_publisher and openalex_data.get('locations'):
+                for loc in openalex_data['locations']:
+                    if isinstance(loc, dict) and loc.get('source'):
+                        source = loc['source']
+                        if isinstance(source, dict):
+                            if source.get('publisher'):
+                                openalex_publisher = source['publisher'].strip()
+                                break
+                            elif source.get('publisher_name'):
+                                openalex_publisher = source['publisher_name'].strip()
+                                break
+            
+            if not openalex_publisher and openalex_data.get('host_organization'):
+                host_org = openalex_data['host_organization']
+                if isinstance(host_org, dict):
+                    if host_org.get('display_name'):
+                        openalex_publisher = host_org['display_name'].strip()
+                    elif host_org.get('name'):
+                        openalex_publisher = host_org['name'].strip()
+                elif isinstance(host_org, str):
+                    openalex_publisher = host_org.strip()
+            
+            if openalex_publisher:
+                publisher_counter[openalex_publisher] += 1
+                publisher_sources['openalex'] += 1
+                # Обновляем result для последующего использования
+                result['publisher'] = openalex_publisher
+                result['publisher_from'] = 'openalex_fallback'
+        
+        # ========== ДРУГАЯ СТАТИСТИКА ==========
         if result['type']:
             type_name = result['type'].replace('journal-', '').replace('-', ' ')
             type_counter[type_name] += 1
@@ -2723,9 +2801,7 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         if result['year'] and isinstance(result['year'], (int, float)) and 1900 < result['year'] <= datetime.now().year:
             year_counter[int(result['year'])] += 1
         
-        if result['publisher']:
-            publisher_counter[result['publisher']] += 1
-        
+        # Проблемные ссылки
         has_problem = False
         problems = []
         if result['is_retracted']:
@@ -2792,7 +2868,7 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
     temporal_data = analyze_temporal_citations(results)
     yearly_stats = analyze_yearly_statistics(results)
     identifier_data = analyze_identifier_coverage(results)
-    publisher_freq = analyze_publisher_frequency(results)
+    publisher_freq = analyze_publisher_frequency_all(results)  # НОВАЯ ФУНКЦИЯ (см. ниже)
     journal_freq_all = analyze_journal_frequency_all(results)
     author_freq_all = analyze_author_frequency_all(results)
     orcid_data = analyze_orcid_coverage(results)
@@ -2800,7 +2876,7 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
     predatory = detect_predatory_journals(results)
     shannon_authors = calculate_shannon_diversity(results, 'authors')
     shannon_journals = calculate_shannon_diversity(results, 'journals')
-    shannon_publishers = calculate_shannon_diversity(results, 'publishers')
+    shannon_publishers = calculate_shannon_diversity_all(results)  # НОВАЯ ФУНКЦИЯ (см. ниже)
     citation_classics = identify_citation_classics(results)
     
     # Collect self-citations
@@ -2846,7 +2922,8 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         },
         'citation_classics': citation_classics,
         'total_citations_sum': sum(r.get('citations_count', 0) for r in results),
-        'avg_citations': sum(r.get('citations_count', 0) for r in results) / len(results) if results else 0
+        'avg_citations': sum(r.get('citations_count', 0) for r in results) / len(results) if results else 0,
+        'publisher_sources': publisher_sources  # Для отладки
     }
 
 # ======================== HELPER FUNCTION FOR AUTHOR HIGHLIGHTING ========================
