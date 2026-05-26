@@ -3860,7 +3860,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         
         <!-- FULL REFERENCE LIST SECTION -->
         <div id="full_reference_list" class="section">
-            {make_section_title("list", "Full Reference List with Filters")}
+            {make_section_title("list", "Full Reference List")}
             {full_references_html}
             {f'<p style="margin-top: 15px; color: #666;">Showing first 300 of {len(results)} references</p>' if len(results) > 300 else ''}
         </div>
