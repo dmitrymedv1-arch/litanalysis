@@ -3060,11 +3060,26 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     
     # ======================== LOAD ICONS AS BASE64 ========================
     def load_icon_base64(icon_name):
-        """Load icon from icons folder and convert to base64 data URL"""
+        """Load icon from GitHub RAW URL and convert to base64 data URL"""
+        import requests
+        
+        # GitHub RAW URL (замените на ваш username и репозиторий)
+        github_raw_base = "https://raw.githubusercontent.com/ВАШ_USERNAME/ВАШ_РЕПОЗИТОРИЙ/main/icons/"
+        
+        try:
+            url = github_raw_base + icon_name
+            response = requests.get(url, timeout=5)
+            if response.status_code == 200:
+                return f"data:image/png;base64,{base64.b64encode(response.content).decode()}"
+        except:
+            pass
+        
+        # Fallback: попробовать локальный файл (для локального запуска)
         icon_path = os.path.join("icons", icon_name)
         if os.path.exists(icon_path):
             with open(icon_path, "rb") as f:
                 return f"data:image/png;base64,{base64.b64encode(f.read()).decode()}"
+        
         return ""
     
     # Load all icons
