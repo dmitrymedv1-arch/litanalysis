@@ -3333,6 +3333,8 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         .sidebar-icon {{
             width: 22px;
             height: 22px;
+            background: transparent;
+            display: inline-block;
         }}
         .main-content {{
             margin-left: 260px;
