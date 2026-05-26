@@ -206,7 +206,7 @@ TEXTS = {
         'html_authors_count': "authors",
         'html_connections': "connections",
         'html_joint_works': "joint works",
-        'html_citations_label': "citations",
+        'html_citations_label': "references",
         'html_total_self_citations': "Total self-citations",
         'html_attention': "⚠️ Attention: invalid/suspicious DOI",
         'html_not_found': "Not found",
@@ -411,7 +411,7 @@ TEXTS = {
         'html_authors_count': "авторов",
         'html_connections': "связей",
         'html_joint_works': "совместных работ",
-        'html_citations_label': "цитирований",
+        'html_citations_label': "ссылок",
         'html_total_self_citations': "Всего самоцитирований",
         'html_attention': "⚠️ Внимание: недействительный/подозрительный DOI",
         'html_not_found': "Не найден",
@@ -2899,7 +2899,7 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         orcid_str = f" 🔗 ORCID: {author['orcid']}" if author.get('orcid') else ""
         inst_str = f" 🏛 {author['institution'][:30]}" if author.get('institution') else ""
         display = ' '.join([part.capitalize() for part in author['display_name'].split()])
-        top_authors_formatted.append(f"{display}{orcid_str}{inst_str} — {author['count']} {get_text('html_citations_label')}")
+        top_authors_formatted.append(f"{display}{orcid_str}{inst_str} — {author['count']} {get_text('html_occurrences_label')}")
     
     # Citation stacking analysis
     total_refs_with_journal = sum(journal_counter.values())
