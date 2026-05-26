@@ -3056,6 +3056,41 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     """Generate enhanced HTML report with PNG icons (no emojis) and professional design"""
     
     import base64
+    import os
+    
+    # ======================== LOAD ICONS AS BASE64 ========================
+    def load_icon_base64(icon_name):
+        """Load icon from icons folder and convert to base64 data URL"""
+        icon_path = os.path.join("icons", icon_name)
+        if os.path.exists(icon_path):
+            with open(icon_path, "rb") as f:
+                return f"data:image/png;base64,{base64.b64encode(f.read()).decode()}"
+        return ""
+    
+    # Load all icons
+    icons = {
+        "overview": load_icon_base64("icon_overview.png"),
+        "identifier": load_icon_base64("icon_identifier.png"),
+        "authors": load_icon_base64("icon_authors.png"),
+        "journals": load_icon_base64("icon_journals.png"),
+        "publishers": load_icon_base64("icon_publishers.png"),
+        "yearly": load_icon_base64("icon_yearly.png"),
+        "concepts": load_icon_base64("icon_concepts.png"),
+        "geography": load_icon_base64("icon_geography.png"),
+        "collaborations": load_icon_base64("icon_collaborations.png"),
+        "diversity": load_icon_base64("icon_diversity.png"),
+        "classics": load_icon_base64("icon_classics.png"),
+        "selfcitation": load_icon_base64("icon_selfcitation.png"),
+        "crossref": load_icon_base64("icon_crossref.png"),
+        "openalex": load_icon_base64("icon_openalex.png"),
+        "suspicious": load_icon_base64("icon_suspicious.png"),
+        "nondoi": load_icon_base64("icon_nondoi.png"),
+        "url": load_icon_base64("icon_url.png"),
+        "problems": load_icon_base64("icon_problems.png"),
+        "list": load_icon_base64("icon_list.png"),
+    }
+    
+    # Load logo
     logo_base64 = ""
     try:
         with open("logo.png", "rb") as img_file:
@@ -3078,7 +3113,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     def make_clickable_doi(doi):
         if doi:
             return f'<a href="https://doi.org/{doi}" target="_blank" class="clickable-link">{html.escape(doi)}</a>'
-        return get_text('html_not_found')
+        return "Not found"
     
     def make_clickable_orcid(orcid):
         if orcid:
@@ -3105,7 +3140,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             escaped_author = html.escape(author)
             color = paper_authors_colors[author]
             authors_header_parts.append(f'<span style="color: {color}; font-weight: bold;">{escaped_author}</span>')
-        authors_header_html = f'<div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 8px;"><strong>{get_text("html_self_citation_authors_label")}:</strong> {", ".join(authors_header_parts)}</div>'
+        authors_header_html = f'<div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 8px;"><strong>Paper authors for self-citation analysis:</strong> {", ".join(authors_header_parts)}</div>'
     
     def format_authors_with_colors_for_selfcitations(authors_list, paper_norm_map):
         if not authors_list:
@@ -3130,21 +3165,21 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
                 formatted_authors = format_authors_with_colors_for_selfcitations(authors_full_list, normalized_paper_authors_map)
                 original_text_full = html.escape(ref.get('original_text', ''))
                 doi_info = f'<div style="font-size: 13px; margin-top: 8px;">DOI: {make_clickable_doi(ref.get("doi"))}</div>' if ref.get('doi') else ''
-                journal_info = f'<div style="font-size: 13px; margin-top: 5px;">{get_text("journal")}: {html.escape(ref.get("journal", "Unknown"))}</div>' if ref.get('journal') else ''
-                year_info = f'<div style="font-size: 13px; margin-top: 5px;">{get_text("year")}: {ref.get("year", "Unknown")}</div>' if ref.get('year') else ''
+                journal_info = f'<div style="font-size: 13px; margin-top: 5px;">Journal: {html.escape(ref.get("journal", "Unknown"))}</div>' if ref.get('journal') else ''
+                year_info = f'<div style="font-size: 13px; margin-top: 5px;">Year: {ref.get("year", "Unknown")}</div>' if ref.get('year') else ''
                 
                 self_citations_html += f"""
                 <div class="rank-item" style="margin-bottom: 15px;">
                     <div><strong>Reference:</strong></div>
                     <div class="full-text-container">{original_text_full}</div>
-                    <div style="font-size: 13px; margin-top: 8px;">{get_text("authors")}: {formatted_authors}</div>
+                    <div style="font-size: 13px; margin-top: 8px;">Authors: {formatted_authors}</div>
                     {doi_info}
                     {journal_info}
                     {year_info}
                 </div>
                 """
         else:
-            self_citations_html = f'<p>{get_text("no_problematic")}</p>'
+            self_citations_html = f'<p>None detected</p>'
     
     # Generate duplicates section
     duplicates_html = ""
@@ -3180,63 +3215,58 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         <div class="rank-item" style="margin-bottom: 15px;">
             <div><strong>{status_icon} Reference {idx + 1}:</strong></div>
             <div class="full-text-container">{original_text_full}</div>
-            <div style="font-size: 13px; margin-top: 5px;">{get_text("authors")}: {formatted_authors}</div>
+            <div style="font-size: 13px; margin-top: 5px;">Authors: {formatted_authors}</div>
             {doi_info}
         </div>
         """
     
-    # Helper function to format metric WITHOUT emojis
-    def format_metric_no_emoji(value, percent, label):
-        return f"""
-        <div class="stat-card">
-            <div class="stat-number">{value}</div>
-            <div style="font-size: 11px; color: #155724; background-color: #d4edda; padding: 2px 8px; border-radius: 12px; margin-top: 5px; display: inline-block;">({percent:.1f}%)</div>
-            <div class="stat-label">{label}</div>
-        </div>
-        """
-    
-    # Build sidebar navigation with PNG icons
-    sidebar_icons_base = "icons/"  # Path to icons folder on GitHub
-    
+    # Build sidebar navigation with PNG icons (no emojis)
     sidebar_items = [
-        ("overview", "Overview", "icon_overview.png"),
-        ("identifiers", "Identifier Coverage", "icon_identifier.png"),
-        ("authors", "Authors", "icon_authors.png"),
-        ("journals", "Journals", "icon_journals.png"),
-        ("publishers", "Publishers", "icon_publishers.png"),
-        ("yearly", "Yearly Statistics", "icon_yearly.png"),
-        ("concepts", "Concepts", "icon_concepts.png"),
-        ("geography", "Geography", "icon_geography.png"),
-        ("collaboration", "Collaborations", "icon_collaborations.png"),
-        ("diversity", "Diversity", "icon_diversity.png"),
-        ("classics", "Citation Classics", "icon_classics.png"),
+        ("overview", "Overview", icons["overview"]),
+        ("identifiers", "Identifier Coverage", icons["identifier"]),
+        ("authors", "Authors", icons["authors"]),
+        ("journals", "Journals", icons["journals"]),
+        ("publishers", "Publishers", icons["publishers"]),
+        ("yearly", "Yearly Statistics", icons["yearly"]),
+        ("concepts", "Concepts", icons["concepts"]),
+        ("geography", "Geography", icons["geography"]),
+        ("collaboration", "Collaborations", icons["collaborations"]),
+        ("diversity", "Diversity", icons["diversity"]),
+        ("classics", "Citation Classics", icons["classics"]),
     ]
     
     if show_self_citations_section:
-        sidebar_items.append(("selfcitations", "Self-Citations", "icon_selfcitation.png"))
+        sidebar_items.append(("selfcitations", "Self-Citations", icons["selfcitation"]))
     
     if duplicates and len(duplicates) > 0:
-        sidebar_items.append(("duplicates", "Duplicates", "icon_duplicates.png"))
+        sidebar_items.append(("duplicates", "Duplicates", icons["list"]))
     
     sidebar_items.extend([
-        ("crossref_only", "Only Crossref", "icon_crossref.png"),
-        ("openalex_only", "Only OpenAlex", "icon_openalex.png"),
-        ("suspicious_doi", "Suspicious DOIs", "icon_suspicious.png"),
-        ("non_doi", "Non-DOI Sources", "icon_nondoi.png"),
-        ("url_sources", "URL Sources", "icon_url.png"),
-        ("problems", "Problems", "icon_problems.png"),
-        ("full_reference_list", "Full Reference List", "icon_list.png"),
+        ("crossref_only", "Only Crossref", icons["crossref"]),
+        ("openalex_only", "Only OpenAlex", icons["openalex"]),
+        ("suspicious_doi", "Suspicious DOIs", icons["suspicious"]),
+        ("non_doi", "Non-DOI Sources", icons["nondoi"]),
+        ("url_sources", "URL Sources", icons["url"]),
+        ("problems", "Problems", icons["problems"]),
+        ("full_reference_list", "Full Reference List", icons["list"]),
     ])
     
     sidebar_html = '<div class="sidebar">\n'
     sidebar_html += '<h3>Navigation</h3>\n'
-    for item_id, item_title, icon_file in sidebar_items:
-        sidebar_html += f'''
-        <a href="#{item_id}">
-            <img src="{sidebar_icons_base}{icon_file}" class="sidebar-icon" alt="{item_title}">
-            <span>{item_title}</span>
-        </a>
-        '''
+    for item_id, item_title, icon_src in sidebar_items:
+        if icon_src:
+            sidebar_html += f'''
+            <a href="#{item_id}">
+                <img src="{icon_src}" class="sidebar-icon" alt="{item_title}">
+                <span>{item_title}</span>
+            </a>
+            '''
+        else:
+            sidebar_html += f'''
+            <a href="#{item_id}">
+                <span>{item_title}</span>
+            </a>
+            '''
     sidebar_html += '</div>\n'
     
     # Build HTML content
@@ -3346,6 +3376,15 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             color: #666;
             margin-top: 10px;
             font-size: 14px;
+        }}
+        .stat-percent {{
+            font-size: 12px;
+            color: #155724;
+            background-color: #d4edda;
+            padding: 3px 10px;
+            border-radius: 20px;
+            margin-top: 8px;
+            display: inline-block;
         }}
         .section {{
             background: white;
@@ -3493,92 +3532,106 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     <div class="main-content">
         <div class="header">
             <div style="display: flex; justify-content: center; margin-bottom: 15px;">
-                <img src="data:image/png;base64,{logo_base64}" style="height: 150px; width: auto;">
+                <img src="data:image/png;base64,{logo_base64}" style="height: 150px; width: auto;" alt="Logo">
             </div>
-            <div style="margin-top: 10px;"><strong>{get_text('html_journal_label')}:</strong> {journal_name_display}</div>
-            {f'<div><strong>{get_text("html_article_number_label")}:</strong> {article_number_display}</div>' if article_number_display else ''}
-            <div class="date">{get_text('html_generated')}: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}</div>
+            <div style="margin-top: 10px;"><strong>Journal:</strong> {journal_name_display}</div>
+            {f'<div><strong>Article number:</strong> {article_number_display}</div>' if article_number_display else ''}
+            <div class="date">Generated: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}</div>
             <div style="margin-top: 15px;">
                 <span class="badge badge-success">Crossref + OpenAlex</span>
-                <span class="badge badge-info">{stats['total_references']} {get_text('total_references')}</span>
+                <span class="badge badge-info">{stats['total_references']} Total references</span>
             </div>
         </div>
         
-        <!-- OVERVIEW SECTION -->
+        <!-- OVERVIEW SECTION with percentages -->
         <div id="overview" class="section">
-            <div class="section-title">{get_text('html_overview')}</div>
+            <div class="section-title">Overview</div>
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-number">{stats['total_references']}</div>
-                    <div class="stat-label">{get_text('total_references')}</div>
+                    <div class="stat-percent">(100.0%)</div>
+                    <div class="stat-label">Total references</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">{stats['total_with_doi']} ({stats.get('total_with_doi_percent', 0):.1f}%)</div>
-                    <div class="stat-label">{get_text('doi_found')}</div>
+                    <div class="stat-number">{stats['total_with_doi']}</div>
+                    <div class="stat-percent">({stats.get('total_with_doi_percent', 0):.1f}%)</div>
+                    <div class="stat-label">DOI found</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">{stats['yearly_stats']['last_5_years']} ({stats['yearly_stats']['last_5_years_percent']:.1f}%)</div>
-                    <div class="stat-label">{get_text('last_5_years')}</div>
+                    <div class="stat-number">{stats['yearly_stats']['last_5_years']}</div>
+                    <div class="stat-percent">({stats['yearly_stats']['last_5_years_percent']:.1f}%)</div>
+                    <div class="stat-label">References (last 5 years)</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['self_citations_count']}</div>
-                    <div class="stat-label">{get_text('self_citations')}</div>
+                    <div class="stat-percent">({stats['self_citations_percent']:.1f}%)</div>
+                    <div class="stat-label">Self-citations</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats.get('total_citations_sum', 0)}</div>
-                    <div class="stat-label">{get_text('total_citations')}</div>
+                    <div class="stat-label">Total citations</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats.get('avg_citations', 0):.1f}</div>
-                    <div class="stat-label">{get_text('avg_citations')}</div>
+                    <div class="stat-label">Average citations</div>
                 </div>
             </div>
         </div>
         
-        <!-- IDENTIFIER COVERAGE SECTION -->
+        <!-- IDENTIFIER COVERAGE SECTION with percentages -->
         <div id="identifiers" class="section">
-            <div class="section-title">{get_text('html_identifier_coverage')}</div>
+            <div class="section-title">Identifier Coverage Analysis</div>
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-number">{stats['identifier_coverage']['stats']['has_doi']} ({stats['identifier_coverage_percents']['has_doi']:.1f}%)</div>
-                    <div class="stat-label">{get_text('doi_found')}</div>
+                    <div class="stat-number">{stats['identifier_coverage']['stats']['has_doi']}</div>
+                    <div class="stat-percent">({stats['identifier_coverage_percents']['has_doi']:.1f}%)</div>
+                    <div class="stat-label">DOI found</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">{stats['identifier_coverage']['stats']['has_url']} ({stats['identifier_coverage_percents']['has_url']:.1f}%)</div>
+                    <div class="stat-number">{stats['identifier_coverage']['stats']['has_url']}</div>
+                    <div class="stat-percent">({stats['identifier_coverage_percents']['has_url']:.1f}%)</div>
                     <div class="stat-label">URL</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">{stats['identifier_coverage']['stats']['has_arxiv']} ({stats['identifier_coverage_percents']['has_arxiv']:.1f}%)</div>
+                    <div class="stat-number">{stats['identifier_coverage']['stats']['has_arxiv']}</div>
+                    <div class="stat-percent">({stats['identifier_coverage_percents']['has_arxiv']:.1f}%)</div>
                     <div class="stat-label">arXiv</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">{stats['identifier_coverage']['stats']['has_pmid']} ({stats['identifier_coverage_percents']['has_pmid']:.1f}%)</div>
+                    <div class="stat-number">{stats['identifier_coverage']['stats']['has_pmid']}</div>
+                    <div class="stat-percent">({stats['identifier_coverage_percents']['has_pmid']:.1f}%)</div>
                     <div class="stat-label">PMID</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">{stats['identifier_coverage']['stats']['has_isbn']} ({stats['identifier_coverage_percents']['has_isbn']:.1f}%)</div>
+                    <div class="stat-number">{stats['identifier_coverage']['stats']['has_isbn']}</div>
+                    <div class="stat-percent">({stats['identifier_coverage_percents']['has_isbn']:.1f}%)</div>
                     <div class="stat-label">ISBN</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">{stats['identifier_coverage']['stats']['has_none']} ({stats['identifier_coverage_percents']['has_none']:.1f}%)</div>
+                    <div class="stat-number">{stats['identifier_coverage']['stats']['has_none']}</div>
+                    <div class="stat-percent">({stats['identifier_coverage_percents']['has_none']:.1f}%)</div>
                     <div class="stat-label">No identifier</div>
                 </div>
             </div>
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-number">{stats['doi_status']['both']} ({stats['doi_status_percents']['both']:.1f}%)</div>
+                    <div class="stat-number">{stats['doi_status']['both']}</div>
+                    <div class="stat-percent">({stats['doi_status_percents']['both']:.1f}%)</div>
                     <div class="stat-label">Crossref + OpenAlex</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">{stats['doi_status']['crossref_only']} ({stats['doi_status_percents']['crossref_only']:.1f}%)</div>
+                    <div class="stat-number">{stats['doi_status']['crossref_only']}</div>
+                    <div class="stat-percent">({stats['doi_status_percents']['crossref_only']:.1f}%)</div>
                     <div class="stat-label">Only Crossref</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">{stats['doi_status']['openalex_only']} ({stats['doi_status_percents']['openalex_only']:.1f}%)</div>
+                    <div class="stat-number">{stats['doi_status']['openalex_only']}</div>
+                    <div class="stat-percent">({stats['doi_status_percents']['openalex_only']:.1f}%)</div>
                     <div class="stat-label">Only OpenAlex</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">{stats['doi_status']['none']} ({stats['doi_status_percents']['none']:.1f}%)</div>
+                    <div class="stat-number">{stats['doi_status']['none']}</div>
+                    <div class="stat-percent">({stats['doi_status_percents']['none']:.1f}%)</div>
                     <div class="stat-label">No data</div>
                 </div>
             </div>
@@ -3586,157 +3639,161 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         
         <!-- AUTHORS SECTION -->
         <div id="authors" class="section">
-            <div class="section-title">{get_text('html_authors')}</div>
+            <div class="section-title">Top Authors (with intelligent merging)</div>
             <div>
-                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(author["display_name"])}</span><span class="rank-count">{author["count"]} {get_text("html_citations_label")}</span>' + (f'<div style="font-size: 11px; color: #667eea;">ORCID: {make_clickable_orcid(author["orcid"])}</div>' if author.get("orcid") else '') + (f'<div style="font-size: 11px; color: #666;">{html.escape(author["institution"][:50])}</div>' if author.get("institution") else '') + '<div class="progress-bar"><div class="progress-fill" style="width: ' + str(min(100, author["count"] / stats["author_frequency_all"]["all_authors"][0]["count"] * 100 if stats["author_frequency_all"]["all_authors"] else 0)) + '%;"></div></div></div>' for i, author in enumerate(stats["author_frequency_all"]["all_authors"][:30])])}
+                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(author["display_name"])}</span><span class="rank-count">{author["count"]} citations</span>' + (f'<div style="font-size: 11px; color: #667eea;">ORCID: {make_clickable_orcid(author["orcid"])}</div>' if author.get("orcid") else '') + (f'<div style="font-size: 11px; color: #666;">{html.escape(author["institution"][:50])}</div>' if author.get("institution") else '') + '<div class="progress-bar"><div class="progress-fill" style="width: ' + str(min(100, author["count"] / stats["author_frequency_all"]["all_authors"][0]["count"] * 100 if stats["author_frequency_all"]["all_authors"] else 0)) + '%;"></div></div></div>' for i, author in enumerate(stats["author_frequency_all"]["all_authors"][:30])])}
             </div>
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_text('unique_authors')}: {stats['author_frequency_all']['unique_authors']}</span>
-                <span class="badge badge-info">{get_text('shannon_authors')}: {stats['shannon_index']['authors']}</span>
-                <span class="badge badge-info">{get_text('orcid_coverage')}: {stats['orcid_coverage']['with_orcid']} ({stats['orcid_coverage']['coverage_percent']:.1f}%)</span>
+                <span class="badge badge-info">Unique authors: {stats['author_frequency_all']['unique_authors']}</span>
+                <span class="badge badge-info">Authors Shannon index: {stats['shannon_index']['authors']}</span>
+                <span class="badge badge-info">ORCID coverage: {stats['orcid_coverage']['with_orcid']} ({stats['orcid_coverage']['coverage_percent']:.1f}%)</span>
             </div>
         </div>
         
         <!-- JOURNALS SECTION -->
         <div id="journals" class="section">
-            <div class="section-title">{get_text('html_journals')}</div>
+            <div class="section-title">All Journals (sorted by frequency)</div>
             <table>
                 <thead>
-                    <tr><th>{get_text('html_rank')}</th><th>{get_text('journal')}</th><th>{get_text('html_count')}</th><th>{get_text('html_percentage')}</th></tr>
+                    <tr><th>Rank</th><th>Journal</th><th>Count</th><th>Percentage</th></tr>
                 </thead>
                 <tbody>
                     {''.join([f'<tr><td>{i+1}</td><td>{html.escape(journal["journal"])}</td><td>{journal["count"]}</td><td>{journal["percentage"]:.1f}%</td></tr>' for i, journal in enumerate(stats["journal_frequency_all"]["all_journals"])])}
                 </tbody>
             </table>
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_text('unique_journals')}: {stats['journal_frequency_all']['unique_journals']}</span>
-                <span class="badge badge-info">{get_text('shannon_journals')}: {stats['shannon_index']['journals']}</span>
+                <span class="badge badge-info">Unique journals: {stats['journal_frequency_all']['unique_journals']}</span>
+                <span class="badge badge-info">Journals Shannon index: {stats['shannon_index']['journals']}</span>
             </div>
         </div>
         
         <!-- PUBLISHERS SECTION -->
         <div id="publishers" class="section">
-            <div class="section-title">{get_text('html_publishers')}</div>
+            <div class="section-title">All Publishers (sorted by frequency)</div>
             <table>
                 <thead>
-                    <tr><th>{get_text('html_rank')}</th><th>{get_text('publisher')}</th><th>{get_text('html_count')}</th><th>{get_text('html_percentage')}</th></tr>
+                    <tr><th>Rank</th><th>Publisher</th><th>Count</th><th>Percentage</th></tr>
                 </thead>
                 <tbody>
                     {''.join([f'<tr><td>{i+1}</td><td>{html.escape(publisher["publisher"])}</td><td>{publisher["count"]}</td><td>{publisher["percentage"]:.1f}%</td></tr>' for i, publisher in enumerate(stats["publisher_frequency"]["all_publishers"])])}
                 </tbody>
             </table>
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_text('unique_publishers_metric')}: {stats['publisher_frequency']['unique_publishers']}</span>
-                <span class="badge badge-info">{get_text('shannon_publishers')}: {stats['shannon_index']['publishers']}</span>
+                <span class="badge badge-info">Unique publishers: {stats['publisher_frequency']['unique_publishers']}</span>
+                <span class="badge badge-info">Publishers Shannon index: {stats['shannon_index']['publishers']}</span>
             </div>
         </div>
         
         <!-- YEARLY STATISTICS -->
         <div id="yearly" class="section">
-            <div class="section-title">{get_text('html_yearly')}</div>
+            <div class="section-title">Yearly Statistics</div>
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-number">{stats['yearly_stats']['last_year']} ({stats['yearly_stats']['last_year_percent']:.1f}%)</div>
+                    <div class="stat-number">{stats['yearly_stats']['last_year']}</div>
+                    <div class="stat-percent">({stats['yearly_stats']['last_year_percent']:.1f}%)</div>
                     <div class="stat-label">Last Year ({stats['yearly_stats']['last_completed_year']})</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">{stats['yearly_stats']['last_3_years']} ({stats['yearly_stats']['last_3_years_percent']:.1f}%)</div>
-                    <div class="stat-label">{get_text('last_3_years')}</div>
+                    <div class="stat-number">{stats['yearly_stats']['last_3_years']}</div>
+                    <div class="stat-percent">({stats['yearly_stats']['last_3_years_percent']:.1f}%)</div>
+                    <div class="stat-label">Last 3 years</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">{stats['yearly_stats']['last_5_years']} ({stats['yearly_stats']['last_5_years_percent']:.1f}%)</div>
-                    <div class="stat-label">{get_text('last_5_years_metric')}</div>
+                    <div class="stat-number">{stats['yearly_stats']['last_5_years']}</div>
+                    <div class="stat-percent">({stats['yearly_stats']['last_5_years_percent']:.1f}%)</div>
+                    <div class="stat-label">Last 5 years</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">{stats['yearly_stats']['last_10_years']} ({stats['yearly_stats']['last_10_years_percent']:.1f}%)</div>
-                    <div class="stat-label">{get_text('last_10_years')}</div>
+                    <div class="stat-number">{stats['yearly_stats']['last_10_years']}</div>
+                    <div class="stat-percent">({stats['yearly_stats']['last_10_years_percent']:.1f}%)</div>
+                    <div class="stat-label">Last 10 years</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['yearly_stats']['unknown_year']}</div>
-                    <div class="stat-label">{get_text('references_with_unknown_year')}</div>
+                    <div class="stat-label">References with unknown year</div>
                 </div>
             </div>
             <div>
-                <h4>{get_text('yearly_distribution')}</h4>
-                {''.join([f'<div class="rank-item"><span class="rank-name">{year}</span><span class="rank-count">{stats["yearly_stats"]["yearly_counts"][year]} {get_text("references_count")} ({stats["yearly_stats"]["yearly_percentages"][year]:.1f}%)</span><div class="progress-bar"><div class="progress-fill" style="width: {stats["yearly_stats"]["yearly_percentages"][year]}%;"></div></div></div>' for year in sorted(stats["yearly_stats"]["yearly_counts"].keys(), reverse=True)])}
+                <h4>Distribution by year (from newest to oldest):</h4>
+                {''.join([f'<div class="rank-item"><span class="rank-name">{year}</span><span class="rank-count">{stats["yearly_stats"]["yearly_counts"][year]} references ({stats["yearly_stats"]["yearly_percentages"][year]:.1f}%)</span><div class="progress-bar"><div class="progress-fill" style="width: {stats["yearly_stats"]["yearly_percentages"][year]}%;"></div></div></div>' for year in sorted(stats["yearly_stats"]["yearly_counts"].keys(), reverse=True)])}
             </div>
             <div style="margin-top: 15px;">
-                <h4>{get_text('cumulative_percentage')}</h4>
-                {''.join([f'<div class="rank-item"><span class="rank-name">{year}</span><span class="rank-count">{stats["yearly_stats"]["cumulative_percentages"][year]:.1f}% {get_text("cumulative")}</span><div class="progress-bar"><div class="progress-fill" style="width: {stats["yearly_stats"]["cumulative_percentages"][year]}%;"></div></div></div>' for year in sorted(stats["yearly_stats"]["yearly_counts"].keys(), reverse=True)])}
+                <h4>Cumulative percentage:</h4>
+                {''.join([f'<div class="rank-item"><span class="rank-name">{year}</span><span class="rank-count">{stats["yearly_stats"]["cumulative_percentages"][year]:.1f}% cumulative</span><div class="progress-bar"><div class="progress-fill" style="width: {stats["yearly_stats"]["cumulative_percentages"][year]}%;"></div></div></div>' for year in sorted(stats["yearly_stats"]["yearly_counts"].keys(), reverse=True)])}
             </div>
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_text('median_age')}: {stats['temporal']['median_age']} years</span>
-                <span class="badge badge-info">{get_text('average_age')}: {stats['temporal']['average_age']:.1f} years</span>
+                <span class="badge badge-info">Median age: {stats['temporal']['median_age']} years</span>
+                <span class="badge badge-info">Average age: {stats['temporal']['average_age']:.1f} years</span>
             </div>
         </div>
         
         <!-- CONCEPTS SECTION -->
         <div id="concepts" class="section">
-            <div class="section-title">{get_text('html_concepts')}</div>
+            <div class="section-title">Key Scientific Concepts</div>
             <div class="concepts-grid">
-                {''.join([f'<div class="concept-card"><div class="concept-name">{html.escape(concept[0])}</div><div class="concept-score">{get_text("html_frequency")}: {concept[1]}</div></div>' for concept in stats['concepts']['concepts'][:12]])}
+                {''.join([f'<div class="concept-card"><div class="concept-name">{html.escape(concept[0])}</div><div class="concept-score">Frequency: {concept[1]}</div></div>' for concept in stats['concepts']['concepts'][:12]])}
             </div>
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_text('unique_concepts')}: {stats['concepts']['unique_concepts']}</span>
+                <span class="badge badge-info">Unique concepts: {stats['concepts']['unique_concepts']}</span>
             </div>
         </div>
         
         <!-- GEOGRAPHY SECTION -->
         <div id="geography" class="section">
-            <div class="section-title">{get_text('html_geography')}</div>
+            <div class="section-title">Geographic Distribution</div>
             <div>
-                {''.join([f'<div class="rank-item"><span class="rank-name">{html.escape(country)}</span><span class="rank-count">{count} {get_text("html_authors_count")}</span><div class="progress-bar"><div class="progress-fill" style="width: {count / max(stats["geography"]["countries"].values()) * 100 if stats["geography"]["countries"] else 0}%;"></div></div></div>' for country, count in list(stats['geography']['countries'].items())[:10]])}
+                {''.join([f'<div class="rank-item"><span class="rank-name">{html.escape(country)}</span><span class="rank-count">{count} authors</span><div class="progress-bar"><div class="progress-fill" style="width: {count / max(stats["geography"]["countries"].values()) * 100 if stats["geography"]["countries"] else 0}%;"></div></div></div>' for country, count in list(stats['geography']['countries'].items())[:10]])}
             </div>
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_text('total_countries')}: {stats['geography']['total_countries']}</span>
-                <span class="badge badge-info">{get_text('international_collaboration')}: {stats['geography']['international_percent']:.1f}%</span>
+                <span class="badge badge-info">Total countries: {stats['geography']['total_countries']}</span>
+                <span class="badge badge-info">International collaboration: {stats['geography']['international_percent']:.1f}%</span>
             </div>
         </div>
         
         <!-- COLLABORATION SECTION -->
         <div id="collaboration" class="section">
-            <div class="section-title">{get_text('html_collaborations')}</div>
+            <div class="section-title">Collaboration Networks</div>
             <div>
-                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(collab["author1"])} + {html.escape(collab["author2"])}</span><span class="rank-count">{collab["count"]} works</span></div>' for i, collab in enumerate(stats["collaboration"]["top_collaborations"][:8])])}
+                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(collab["author1"])} + {html.escape(collab["author2"])}</span><span class="rank-count">{collab["count"]} joint works</span></div>' for i, collab in enumerate(stats["collaboration"]["top_collaborations"][:8])])}
             </div>
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_text('core_authors_label')}: {', '.join([f"{html.escape(author[0])} ({author[1]} connections)" for author in stats['collaboration']['core_authors'][:5]])}</span>
+                <span class="badge badge-info">Core authors: {', '.join([f"{html.escape(author[0])} ({author[1]} connections)" for author in stats['collaboration']['core_authors'][:5]])}</span>
             </div>
         </div>
         
         <!-- DIVERSITY SECTION -->
         <div id="diversity" class="section">
-            <div class="section-title">{get_text('html_diversity')}</div>
+            <div class="section-title">Diversity Analysis</div>
             <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-number">{stats['shannon_index']['authors']}</div>
-                    <div class="stat-label">{get_text('shannon_authors')}</div>
+                    <div class="stat-label">Authors Shannon index</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['shannon_index']['journals']}</div>
-                    <div class="stat-label">{get_text('shannon_journals')}</div>
+                    <div class="stat-label">Journals Shannon index</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{stats['shannon_index']['publishers']}</div>
-                    <div class="stat-label">{get_text('shannon_publishers')}</div>
+                    <div class="stat-label">Publishers Shannon index</div>
                 </div>
             </div>
         </div>
         
         <!-- CITATION CLASSICS SECTION -->
         <div id="classics" class="section">
-            <div class="section-title">{get_text('html_classics')}</div>
-            {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(classic["title"] if classic["title"] else "Unknown")}</span><span class="rank-count">Citations: {classic["citations"]}</span><div style="font-size: 12px; color: #666; margin-top: 5px;">{html.escape(classic["journal"] if classic["journal"] else "Unknown")} ({classic["year"] if classic["year"] else "Unknown"})</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(classic["doi"])}</div>' if classic.get("doi") else '') + '</div>' for i, classic in enumerate(stats['citation_classics'][:8])]) if stats['citation_classics'] else f'<p>{get_text("no_citation_classics")}</p>'}
+            <div class="section-title">Citation Classics</div>
+            {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(classic["title"] if classic["title"] else "Unknown")}</span><span class="rank-count">Citations: {classic["citations"]}</span><div style="font-size: 12px; color: #666; margin-top: 5px;">{html.escape(classic["journal"] if classic["journal"] else "Unknown")} ({classic["year"] if classic["year"] else "Unknown"})</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(classic["doi"])}</div>' if classic.get("doi") else '') + '</div>' for i, classic in enumerate(stats['citation_classics'][:8])]) if stats['citation_classics'] else f'<p>No citation classics detected</p>'}
         </div>
         
         <!-- SELF-CITATIONS SECTION -->
-        {'''
+        {f'''
         <div id="selfcitations" class="section">
-            <div class="section-title">''' + get_text('html_self_citations') + '''</div>
-            ''' + authors_header_html + '''
-            ''' + self_citations_html + '''
+            <div class="section-title">Self-Citations</div>
+            {authors_header_html}
+            {self_citations_html}
             <div style="margin-top: 15px;">
-                <span class="badge badge-info">''' + get_text('html_total_self_citations') + ''': ''' + str(stats['self_citations_count']) + ''' (''' + f"{stats['self_citations_percent']:.1f}" + '''%)</span>
+                <span class="badge badge-info">Total self-citations: {stats['self_citations_count']} ({stats['self_citations_percent']:.1f}%)</span>
             </div>
         </div>
         ''' if show_self_citations_section else ''}
@@ -3746,44 +3803,45 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         
         <!-- ONLY CROSSREF SECTION -->
         <div id="crossref_only" class="section">
-            <div class="section-title">{get_text('html_crossref_only')}</div>
-            {''.join([f'<div class="rank-item"><div>{html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('crossref_only_refs', [])[:20]]) if stats.get('crossref_only_refs') else f'<p>{get_text("no_crossref_only")}</p>'}
+            <div class="section-title">References with Only Crossref (OpenAlex missing)</div>
+            {''.join([f'<div class="rank-item"><div>{html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('crossref_only_refs', [])[:20]]) if stats.get('crossref_only_refs') else '<p>No references with only Crossref data</p>'}
         </div>
         
         <!-- ONLY OPENALEX SECTION -->
         <div id="openalex_only" class="section">
-            <div class="section-title">{get_text('html_openalex_only')}</div>
-            {''.join([f'<div class="rank-item"><div>{html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('openalex_only_refs', [])[:20]]) if stats.get('openalex_only_refs') else f'<p>{get_text("no_openalex_only")}</p>'}
+            <div class="section-title">References with Only OpenAlex (Crossref missing)</div>
+            {''.join([f'<div class="rank-item"><div>{html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('openalex_only_refs', [])[:20]]) if stats.get('openalex_only_refs') else '<p>No references with only OpenAlex data</p>'}
         </div>
         
         <!-- SUSPICIOUS DOIS SECTION -->
         <div id="suspicious_doi" class="section">
-            <div class="section-title">{get_text('html_suspicious_doi')}</div>
-            {''.join([f'<div class="rank-item"><div class="badge badge-danger">Attention: invalid/suspicious DOI</div><div>{html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('suspicious_doi_refs', [])[:20]]) if stats.get('suspicious_doi_refs') else f'<p>{get_text("no_suspicious_dois")}</p>'}
+            <div class="section-title">Suspicious DOIs (Not found in any database)</div>
+            <div style="margin-bottom: 15px; font-size: 13px; color: #666;">These DOIs were extracted from references but returned no data from Crossref or OpenAlex. May be invalid, typo, or AI-generated.</div>
+            {''.join([f'<div class="rank-item"><div class="badge badge-danger">Attention: invalid/suspicious DOI</div><div>{html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('suspicious_doi_refs', [])[:20]]) if stats.get('suspicious_doi_refs') else '<p>No suspicious DOIs detected</p>'}
         </div>
         
         <!-- NON-DOI SOURCES SECTION -->
         <div id="non_doi" class="section">
-            <div class="section-title">{get_text('html_non_doi')}</div>
-            {''.join([f'<div class="rank-item">{html.escape(ref)}</div>' for ref in stats['identifier_coverage']['references_without_doi'][:20]]) if stats['identifier_coverage']['references_without_doi'] else f'<p>{get_text("all_have_doi")}</p>'}
+            <div class="section-title">Non-DOI Sources (Books, Theses, Conference Papers, etc.)</div>
+            {''.join([f'<div class="rank-item">{html.escape(ref)}</div>' for ref in stats['identifier_coverage']['references_without_doi'][:20]]) if stats['identifier_coverage']['references_without_doi'] else '<p>All references have DOI identifiers</p>'}
         </div>
         
         <!-- URL SOURCES SECTION -->
         <div id="url_sources" class="section">
-            <div class="section-title">{get_text('html_url_sources')}</div>
-            {''.join([f'<div class="rank-item">{html.escape(ref)}</div>' for ref in stats['identifier_coverage']['references_with_only_url'][:20]]) if stats['identifier_coverage']['references_with_only_url'] else f'<p>{get_text("no_url_only")}</p>'}
+            <div class="section-title">URL Sources (Web links without DOI)</div>
+            {''.join([f'<div class="rank-item">{html.escape(ref)}</div>' for ref in stats['identifier_coverage']['references_with_only_url'][:20]]) if stats['identifier_coverage']['references_with_only_url'] else '<p>No URL-only references found</p>'}
         </div>
         
         <!-- PROBLEMS SECTION -->
         <div id="problems" class="section">
-            <div class="section-title">{get_text('html_problems')}</div>
-            {''.join([f'<div class="rank-item"><span class="badge badge-danger">{html.escape(ref["problems"])}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div></div>' for ref in stats['problematic_refs'][:10]]) if stats['problematic_refs'] else f'<p>{get_text("no_problematic")}</p>'}
-            {f'<div style="margin-top: 15px;"><h4>{get_text("predatory_journals")}:</h4>{"".join([f"<div class=rank-item>{html.escape(pred['journal'])}<br><span style=font-size:12px;color:#666;>{', '.join([html.escape(s) for s in pred['signs']])}</span></div>" for pred in stats['predatory_journals'][:5]])}</div>' if stats['predatory_journals'] else ''}
+            <div class="section-title">Problematic References</div>
+            {''.join([f'<div class="rank-item"><span class="badge badge-danger">{html.escape(ref["problems"])}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div></div>' for ref in stats['problematic_refs'][:10]]) if stats['problematic_refs'] else '<p>No problematic references detected</p>'}
+            {f'<div style="margin-top: 15px;"><h4>Potentially Predatory Journals:</h4>{"".join([f"<div class=rank-item>{html.escape(pred['journal'])}<br><span style=font-size:12px;color:#666;>{', '.join([html.escape(s) for s in pred['signs']])}</span></div>" for pred in stats['predatory_journals'][:5]])}</div>' if stats['predatory_journals'] else ''}
         </div>
         
         <!-- FULL REFERENCE LIST SECTION -->
         <div id="full_reference_list" class="section">
-            <div class="section-title">Full Reference List</div>
+            <div class="section-title">Full Reference List with Filters</div>
             {full_references_html}
             {f'<p style="margin-top: 15px; color: #666;">Showing first 300 of {len(results)} references</p>' if len(results) > 300 else ''}
         </div>
