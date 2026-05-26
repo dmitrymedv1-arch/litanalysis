@@ -3058,37 +3058,45 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     import base64
     import os
     
-    # ======================== LOAD ICONS AS BASE64 ========================
-    def load_icon_base64(icon_name):
-        """Load icon from icons folder (same logic as logo)"""
-        try:
-            with open(f"icons/{icon_name}", "rb") as f:
-                return f"data:image/png;base64,{base64.b64encode(f.read()).decode()}"
-        except FileNotFoundError:
-            return ""
+    # Load logo (works correctly)
+    logo_base64 = ""
+    try:
+        with open("logo.png", "rb") as img_file:
+            logo_base64 = base64.b64encode(img_file.read()).decode()
+    except FileNotFoundError:
+        pass
     
-    # Load all icons
-    icons = {
-        "overview": load_icon_base64("icon_overview.png"),
-        "identifier": load_icon_base64("icon_identifier.png"),
-        "authors": load_icon_base64("icon_authors.png"),
-        "journals": load_icon_base64("icon_journals.png"),
-        "publishers": load_icon_base64("icon_publishers.png"),
-        "yearly": load_icon_base64("icon_yearly.png"),
-        "concepts": load_icon_base64("icon_concepts.png"),
-        "geography": load_icon_base64("icon_geography.png"),
-        "collaborations": load_icon_base64("icon_collaborations.png"),
-        "diversity": load_icon_base64("icon_diversity.png"),
-        "classics": load_icon_base64("icon_classics.png"),
-        "selfcitation": load_icon_base64("icon_selfcitation.png"),
-        "crossref": load_icon_base64("icon_crossref.png"),
-        "openalex": load_icon_base64("icon_openalex.png"),
-        "suspicious": load_icon_base64("icon_suspicious.png"),
-        "nondoi": load_icon_base64("icon_nondoi.png"),
-        "url": load_icon_base64("icon_url.png"),
-        "problems": load_icon_base64("icon_problems.png"),
-        "list": load_icon_base64("icon_list.png"),
-    }
+    # Load all icons as base64 (SAME LOGIC AS LOGO)
+    icons = {}
+    
+    icon_files = [
+        ("overview", "icon_overview.png"),
+        ("identifier", "icon_identifier.png"),
+        ("authors", "icon_authors.png"),
+        ("journals", "icon_journals.png"),
+        ("publishers", "icon_publishers.png"),
+        ("yearly", "icon_yearly.png"),
+        ("concepts", "icon_concepts.png"),
+        ("geography", "icon_geography.png"),
+        ("collaborations", "icon_collaborations.png"),
+        ("diversity", "icon_diversity.png"),
+        ("classics", "icon_classics.png"),
+        ("selfcitation", "icon_selfcitation.png"),
+        ("crossref", "icon_crossref.png"),
+        ("openalex", "icon_openalex.png"),
+        ("suspicious", "icon_suspicious.png"),
+        ("nondoi", "icon_nondoi.png"),
+        ("url", "icon_url.png"),
+        ("problems", "icon_problems.png"),
+        ("list", "icon_list.png"),
+    ]
+    
+    for key, filename in icon_files:
+        try:
+            with open(f"icons/{filename}", "rb") as f:
+                icons[key] = f"data:image/png;base64,{base64.b64encode(f.read()).decode()}"
+        except FileNotFoundError:
+            icons[key] = ""
     
     # Load logo
     logo_base64 = ""
