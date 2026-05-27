@@ -1814,145 +1814,127 @@ def get_author_disambiguation_key(author: Dict) -> str:
     return f"raw:{raw_name}"
 
 def extract_authors_from_crossref(data: Dict) -> List[Dict]:
-    """Extract authors from Crossref with improved affiliation handling"""
+    """
+    Extract authors from Crossref with improved affiliation handling.
+    Note: Crossref has less structured data than OpenAlex, so we do our best.
+    """
     authors = []
-    if 'author' in data and data['author']:
-        for author in data['author']:
-            given = author.get('given', '')
-            family = author.get('family', '')
-            orcid = author.get('ORCID', None)
-            
-            # Extract affiliations from Crossref if available
-            affiliations = []
-            countries = []
-            
-            if 'affiliation' in author and author['affiliation']:
-                for aff in author['affiliation']:
-                    if 'name' in aff:
-                        aff_name = aff['name']
-                        affiliations.append(aff_name)
-                        # Try to infer country from affiliation name
-                        country = infer_country_from_institution_name(aff_name)
-                        if country:
-                            countries.append(country)
-            
-            # Remove duplicate countries
-            countries = list(dict.fromkeys(countries))
-            
-            if family and given:
-                raw_name = f"{given} {family}"
-                compare_name, display_name = normalize_author_name(raw_name)
-                authors.append({
-                    'compare_name': compare_name,
-                    'display_name': display_name,
-                    'raw_name': raw_name,
-                    'orcid': orcid,
-                    'family': family,
-                    'given': given,
-                    'affiliations': affiliations,
-                    'institutions': affiliations,  # Alias for compatibility
-                    'country': countries[0] if countries else '',
-                    'countries': countries,
-                    'institution': affiliations[0] if affiliations else ''
-                })
-            elif family:
-                compare_name, display_name = normalize_author_name(family)
-                authors.append({
-                    'compare_name': compare_name,
-                    'display_name': display_name,
-                    'raw_name': family,
-                    'orcid': orcid,
-                    'family': family,
-                    'given': '',
-                    'affiliations': affiliations,
-                    'institutions': affiliations,
-                    'country': countries[0] if countries else '',
-                    'countries': countries,
-                    'institution': affiliations[0] if affiliations else ''
-                })
+    
+    if 'author' not in data or not data['author']:
+        return authors
+    
+    for author in data['author']:
+        given = author.get('given', '')
+        family = author.get('family', '')
+        orcid = author.get('ORCID', None)
+        
+        if not family:
+            continue
+        
+        raw_name = f"{given} {family}".strip() if given else family
+        compare_name, display_name = normalize_author_name(raw_name)
+        
+        # Extract affiliations from Crossref
+        affiliations = []
+        countries = []
+        
+        if 'affiliation' in author and author['affiliation']:
+            for aff in author['affiliation']:
+                aff_name = aff.get('name', '')
+                if aff_name:
+                    affiliations.append(aff_name)
+                    # Try to infer country from affiliation name (fallback only)
+                    country = infer_country_from_institution_name(aff_name)
+                    if country:
+                        countries.append(country)
+        
+        # Remove duplicates
+        affiliations = list(dict.fromkeys(affiliations))
+        countries = list(dict.fromkeys(countries))
+        
+        author_info = {
+            'compare_name': compare_name,
+            'display_name': display_name,
+            'raw_name': raw_name,
+            'orcid': orcid,
+            'family': family,
+            'given': given,
+            # Country information
+            'country': countries[0] if countries else '',
+            'countries': countries,
+            # Institution information
+            'institution': affiliations[0] if affiliations else '',
+            'institutions': affiliations,
+            'affiliations': affiliations
+        }
+        
+        authors.append(author_info)
+    
     return authors
 
 def extract_authors_from_openalex(data: Dict) -> List[Dict]:
-    """Extract authors from OpenAlex with CORRECT institution and country extraction"""
+    """
+    Extract authors from OpenAlex with PROPER institution and country extraction.
+    Uses structured fields from API - NO PARSING OF RAW STRINGS.
+    """
     authors = []
     
-    if 'authorships' in data and data['authorships']:
-        for authorship in data['authorships']:
-            author = authorship.get('author', {})
-            display_name_raw = author.get('display_name', '')
-            orcid = author.get('orcid', None)
-            
-            # CRITICAL FIX: Extract clean institutions and countries from structured data
-            institutions = authorship.get('institutions', [])
-            clean_institutions = []
-            countries = []
-            institution_countries = []  # For tracking per-institution countries
-            
-            for inst in institutions:
-                # Get clean institution name from display_name (NOT raw string)
-                inst_name = inst.get('display_name', '')
-                if inst_name:
-                    clean_institutions.append(inst_name)
-                
-                # Get country code from structured field (MOST RELIABLE)
-                country_code = inst.get('country_code', '')
-                if country_code and country_code != 'XX':  # 'XX' means unknown
-                    countries.append(country_code)
-                    institution_countries.append(country_code)
-            
-            # Remove duplicates while preserving order
-            clean_institutions = list(dict.fromkeys(clean_institutions))
-            countries = list(dict.fromkeys(countries))
-            
-            # Determine primary country (first institution's country or most common)
-            primary_country = ''
-            if institution_countries:
-                # Use first institution's country as primary (most common in academic papers)
-                primary_country = institution_countries[0]
-            
-            # Also get raw affiliation strings for debugging/fallback only
-            raw_affiliation_strings = authorship.get('raw_affiliation_strings', [])
-            
-            if display_name_raw:
-                compare_name, display_name = normalize_author_name(display_name_raw)
-                authors.append({
-                    'compare_name': compare_name,
-                    'display_name': display_name,
-                    'raw_name': display_name_raw,
-                    'orcid': orcid,
-                    'country': primary_country,  # Primary country for this author
-                    'countries': countries,  # All countries this author is affiliated with
-                    'institution': clean_institutions[0] if clean_institutions else '',  # Primary institution
-                    'institutions': clean_institutions,  # All institutions
-                    'affiliations': clean_institutions,  # Alias for compatibility
-                    'family': display_name_raw.split()[-1] if display_name_raw.split() else '',
-                    'given': display_name_raw.split()[0] if display_name_raw.split() else '',
-                    'raw_affiliations': raw_affiliation_strings  # For reference only
-                })
+    if 'authorships' not in data or not data['authorships']:
+        return authors
     
-    # Fallback: if no authorships but has author field (legacy format)
-    if not authors and 'author' in data and data['author']:
-        for author in data['author']:
-            given = author.get('given', '')
-            family = author.get('family', '')
-            orcid = author.get('ORCID', None)
+    for authorship in data['authorships']:
+        author_data = authorship.get('author', {})
+        display_name_raw = author_data.get('display_name', '')
+        orcid = author_data.get('orcid', None)
+        
+        if not display_name_raw:
+            continue
+        
+        # ========== CRITICAL: EXTRACT FROM STRUCTURED INSTITUTIONS FIELD ==========
+        institutions = authorship.get('institutions', [])
+        
+        # Clean institution names (from display_name, NOT raw strings)
+        clean_institution_names = []
+        country_codes = []
+        
+        for inst in institutions:
+            # Get clean institution name from display_name
+            inst_name = inst.get('display_name', '')
+            if inst_name:
+                clean_institution_names.append(inst_name)
             
-            if family and given:
-                raw_name = f"{given} {family}"
-                compare_name, display_name = normalize_author_name(raw_name)
-                authors.append({
-                    'compare_name': compare_name,
-                    'display_name': display_name,
-                    'raw_name': raw_name,
-                    'orcid': orcid,
-                    'country': '',
-                    'countries': [],
-                    'institution': '',
-                    'institutions': [],
-                    'affiliations': [],
-                    'family': family,
-                    'given': given
-                })
+            # Get country code from structured field (MOST RELIABLE SOURCE)
+            country_code = inst.get('country_code', '')
+            if country_code and country_code != 'XX':  # 'XX' means unknown
+                country_codes.append(country_code)
+        
+        # Remove duplicates while preserving order
+        clean_institution_names = list(dict.fromkeys(clean_institution_names))
+        country_codes = list(dict.fromkeys(country_codes))
+        
+        # Determine primary country (first institution's country)
+        primary_country = country_codes[0] if country_codes else ''
+        
+        # Normalize author name
+        compare_name, display_name = normalize_author_name(display_name_raw)
+        
+        author_info = {
+            'compare_name': compare_name,
+            'display_name': display_name,
+            'raw_name': display_name_raw,
+            'orcid': orcid,
+            # Country information
+            'country': primary_country,
+            'countries': country_codes,  # All countries this author is affiliated with
+            # Institution information
+            'institution': clean_institution_names[0] if clean_institution_names else '',
+            'institutions': clean_institution_names,
+            'affiliations': clean_institution_names,  # Alias for compatibility
+            # Raw data for debugging (not used for analysis)
+            'raw_affiliations': authorship.get('raw_affiliation_strings', [])
+        }
+        
+        authors.append(author_info)
     
     return authors
 
@@ -2136,101 +2118,98 @@ def extract_concepts_from_references(results: List[Dict]) -> Dict:
     }
 
 def analyze_geographic_distribution(results: List[Dict]) -> Dict:
-    """Geographic analysis with THREE types using CORRECT country codes from OpenAlex institutions"""
+    """
+    Geographic analysis with THREE types using CORRECT country extraction.
+    Based on the working reference code logic.
+    """
     
     # Type 1: Unique countries per reference (collaboration level)
-    reference_countries = []  # List of sets, one per reference
+    country_single_counter = Counter()  # Each reference counted once per unique country
+    country_combined_counter = Counter()  # Country combinations for collaboration analysis
+    
     # Type 2: Authors per country (individual distribution)
     author_country_counter = Counter()
-    # Type 3: Collaboration patterns
-    collaboration_patterns = Counter()  # e.g., 'RU' for single, 'CN;RU' for collaboration
-    country_pair_counter = Counter()  # For collaboration matrix
     
-    # NEW: Track author-level data for more accurate statistics
-    author_country_map = defaultdict(set)  # author_name -> set of countries
+    # Track per-reference data
+    reference_countries = []  # List of country sets per reference
     
     for result in results:
-        # Collect all countries from authors in this reference using STRUCTURED data
-        ref_countries = set()
-        ref_authors_countries = []  # For tracking per-author
+        # Collect all countries from authors in this reference
+        ref_countries_set = set()
+        ref_authors_countries = []  # For author-level counting
         
         for author in result.get('authors', []):
-            # PRIMARY: Use the 'countries' field (list of countries from institutions)
+            # PRIMARY SOURCE: Use the 'countries' field from OpenAlex
             countries = author.get('countries', [])
             
-            # SECONDARY: If empty, try 'country' field (primary country)
+            # SECONDARY: Use 'country' field if available
             if not countries and author.get('country'):
                 countries = [author['country']]
             
-            # TERTIARY: Last resort - try to infer from institutions
-            if not countries and author.get('institutions'):
-                for inst in author.get('institutions', []):
-                    country = infer_country_from_institution_name(inst)
-                    if country:
-                        countries.append(country)
-            
-            # Remove invalid/unknown codes
+            # Clean: remove empty and 'XX' (unknown)
             countries = [c for c in countries if c and c != 'XX']
             
             if countries:
-                # Track author-level data
-                author_name = author.get('compare_name', '')
-                for country in countries:
-                    author_country_map[author_name].add(country)
-                    ref_authors_countries.append(country)
-                
-                # Type 2: Count each occurrence of a country per author
-                # (each author counted once per unique country they're affiliated with)
+                # Type 2: Count each author with their unique countries
+                # (each author counted once per unique country)
                 unique_countries_for_author = set(countries)
                 for country in unique_countries_for_author:
                     author_country_counter[country] += 1
                 
-                # Type 1: Add to reference-level set (each country counted once per reference)
+                # Type 1: Add to reference-level set
                 for country in unique_countries_for_author:
-                    ref_countries.add(country)
+                    ref_countries_set.add(country)
         
-        if ref_countries:
-            # Type 1: Add unique countries for this reference
-            reference_countries.append(ref_countries)
+        if ref_countries_set:
+            # Type 1: Count each reference once per unique country
+            for country in ref_countries_set:
+                country_single_counter[country] += 1
             
-            # Type 3: Determine collaboration pattern
-            sorted_countries = sorted(ref_countries)
+            # Type 3: Track collaboration patterns
+            sorted_countries = sorted(ref_countries_set)
             if len(sorted_countries) == 1:
-                pattern = sorted_countries[0]
-                collaboration_patterns[pattern] += 1
+                # Single country collaboration
+                country_combined_counter[sorted_countries[0]] += 1
             else:
-                pattern = ';'.join(sorted_countries)
-                collaboration_patterns[pattern] += 1
-                
-                # Count country pairs for matrix (each unordered pair)
-                for i in range(len(sorted_countries)):
-                    for j in range(i + 1, len(sorted_countries)):
-                        pair = tuple(sorted([sorted_countries[i], sorted_countries[j]]))
-                        country_pair_counter[pair] += 1
+                # International collaboration
+                combination = ';'.join(sorted_countries)
+                country_combined_counter[combination] += 1
+            
+            reference_countries.append(ref_countries_set)
         else:
-            # No country data for this reference
             reference_countries.append(set())
     
-    # Aggregate Type 1: Count occurrences of each country across references
-    country_ref_counter = Counter()
-    for ref_countries in reference_countries:
-        for country in ref_countries:
-            country_ref_counter[country] += 1
-    
-    # Prepare Type 1 results (unique countries per reference)
-    type1_countries = dict(country_ref_counter.most_common())
-    
-    # Prepare Type 2 results (authors per country) - already have author_country_counter
-    type2_countries = dict(author_country_counter.most_common())
+    # Prepare Type 1 results (single country counts per reference)
+    type1_data = []
+    for country, count in country_single_counter.most_common():
+        type1_data.append({'Country': country, 'Type': 'single', 'Count': count})
     
     # Prepare Type 3 results (collaboration patterns)
-    type3_patterns = dict(collaboration_patterns.most_common())
+    type3_data = []
+    for pattern, count in country_combined_counter.most_common():
+        if ';' in pattern:
+            type3_data.append({'Country': pattern, 'Type': 'combined', 'Count': count})
+        else:
+            # Single country patterns are already in type1_data
+            pass
     
-    # Calculate single-country vs international stats
-    single_country_count = sum(count for pattern, count in collaboration_patterns.items() if ';' not in pattern)
-    international_count = sum(count for pattern, count in collaboration_patterns.items() if ';' in pattern)
+    # Combine all results (matching the working code format)
+    all_results = type1_data + type3_data
     
-    # Prepare collaboration matrix (top country pairs)
+    # Calculate collaboration statistics
+    single_country_count = sum(1 for pattern in country_combined_counter if ';' not in pattern)
+    international_count = sum(count for pattern, count in country_combined_counter.items() if ';' in pattern)
+    
+    # Prepare collaboration matrix (country pairs)
+    country_pair_counter = Counter()
+    for ref_countries in reference_countries:
+        if len(ref_countries) > 1:
+            sorted_countries = sorted(ref_countries)
+            for i in range(len(sorted_countries)):
+                for j in range(i + 1, len(sorted_countries)):
+                    pair = tuple(sorted([sorted_countries[i], sorted_countries[j]]))
+                    country_pair_counter[pair] += 1
+    
     collaboration_matrix = []
     for (c1, c2), count in country_pair_counter.most_common(20):
         collaboration_matrix.append({
@@ -2239,23 +2218,18 @@ def analyze_geographic_distribution(results: List[Dict]) -> Dict:
             'count': count
         })
     
-    # NEW: Calculate additional metrics
-    total_authors_with_country = sum(len(countries) for countries in author_country_map.values())
-    unique_authors_with_country = len(author_country_map)
-    
     return {
-        'type1_unique_countries_per_reference': type1_countries,
-        'type2_authors_per_country': type2_countries,
-        'type3_collaboration_patterns': type3_patterns,
+        'geographic_data': all_results,  # Matching working code format
+        'type1_unique_countries_per_reference': dict(country_single_counter.most_common()),
+        'type2_authors_per_country': dict(author_country_counter.most_common()),
+        'type3_collaboration_patterns': dict(country_combined_counter.most_common()),
         'single_country_count': single_country_count,
         'international_count': international_count,
         'collaboration_matrix': collaboration_matrix,
         'total_references_with_country': len([rc for rc in reference_countries if rc]),
         'total_references': len(results),
-        # NEW metrics
-        'total_authors_with_country': total_authors_with_country,
-        'unique_authors_with_country': unique_authors_with_country,
-        'author_country_map': dict(author_country_map)  # For debugging
+        # NEW: Author-level country counts
+        'author_country_distribution': dict(author_country_counter.most_common())
     }
 
 def analyze_collaboration_network(results: List[Dict]) -> Dict:
@@ -2540,53 +2514,61 @@ def analyze_journal_frequency_all(results: List[Dict]) -> Dict:
     }
 
 def analyze_author_frequency_all(results: List[Dict]) -> Dict:
-    """Analyze author frequency with CORRECT country and institution extraction"""
+    """
+    Analyze author frequency with PROPER merging using ORCID as primary key.
+    This matches the working reference code logic.
+    """
     
-    # Step 1: Collect all author records from all references
-    all_author_records = []
+    # Step 1: Collect all author occurrences
+    author_occurrences = []  # List of author dicts, each occurrence is separate
     
     for result in results:
         for author in result.get('authors', []):
-            # Ensure author has all required fields
-            if not author.get('compare_name'):
-                if author.get('display_name'):
-                    compare_name, display_name = normalize_author_name(author['display_name'])
-                    author['compare_name'] = compare_name
-                    author['display_name'] = display_name
+            # Ensure we have normalized name
+            if not author.get('compare_name') and author.get('display_name'):
+                compare_name, display_name = normalize_author_name(author['display_name'])
+                author['compare_name'] = compare_name
+                author['display_name'] = display_name
             
-            all_author_records.append(author)
+            author_occurrences.append(author)
     
-    # Step 2: Merge using ORCID as primary key, then normalized name
-    merged_authors = {}  # key -> merged author dict
+    # Step 2: Merge using ORCID as primary key
+    merged_authors = {}  # key -> merged author
     
-    for author in all_author_records:
+    for author in author_occurrences:
         orcid = author.get('orcid')
         compare_name = author.get('compare_name', '')
         
-        # Determine merge key
+        # Determine merge key (ORCID has highest priority)
         if orcid:
             merge_key = f"orcid:{orcid}"
         elif compare_name:
             merge_key = f"name:{compare_name}"
         else:
-            # Skip authors without any identifier
-            continue
+            continue  # Skip authors without identifier
         
         if merge_key not in merged_authors:
-            # Create new merged author entry
+            # Create new merged author
             merged_authors[merge_key] = {
                 'display_name': author.get('display_name', 'Unknown'),
                 'compare_name': compare_name,
                 'orcid': orcid,
                 'count': 1,
-                'affiliations': set(),
-                'institutions': set(),  # Added for consistency
                 'countries': set(),
-                'raw_names': set(),
-                'institution': author.get('institution', '')
+                'institutions': set(),
+                'affiliations': set()
             }
             
-            # Add affiliations/institutions
+            # Add countries
+            countries = author.get('countries', [])
+            if isinstance(countries, list):
+                for c in countries:
+                    if c:
+                        merged_authors[merge_key]['countries'].add(c)
+            elif author.get('country'):
+                merged_authors[merge_key]['countries'].add(author['country'])
+            
+            # Add institutions
             institutions = author.get('institutions', [])
             if isinstance(institutions, list):
                 for inst in institutions:
@@ -2599,45 +2581,11 @@ def analyze_author_frequency_all(results: List[Dict]) -> Dict:
                 for aff in affiliations:
                     if aff:
                         merged_authors[merge_key]['affiliations'].add(aff)
-            elif affiliations:
-                merged_authors[merge_key]['affiliations'].add(str(affiliations))
-            
-            # Add countries
-            countries = author.get('countries', [])
-            if isinstance(countries, list):
-                for c in countries:
-                    if c:
-                        merged_authors[merge_key]['countries'].add(c)
-            elif author.get('country'):
-                merged_authors[merge_key]['countries'].add(author['country'])
-            
-            # Add raw names
-            if author.get('raw_name'):
-                merged_authors[merge_key]['raw_names'].add(author['raw_name'])
-            elif author.get('display_name'):
-                merged_authors[merge_key]['raw_names'].add(author['display_name'])
         
         else:
-            # Merge into existing entry
+            # Merge into existing author
             existing = merged_authors[merge_key]
             existing['count'] += 1
-            
-            # Merge institutions
-            institutions = author.get('institutions', [])
-            if isinstance(institutions, list):
-                for inst in institutions:
-                    if inst:
-                        existing['institutions'].add(inst)
-                        existing['affiliations'].add(inst)
-            
-            # Merge affiliations
-            affiliations = author.get('affiliations', [])
-            if isinstance(affiliations, list):
-                for aff in affiliations:
-                    if aff:
-                        existing['affiliations'].add(aff)
-            elif affiliations:
-                existing['affiliations'].add(str(affiliations))
             
             # Merge countries
             countries = author.get('countries', [])
@@ -2648,49 +2596,45 @@ def analyze_author_frequency_all(results: List[Dict]) -> Dict:
             elif author.get('country'):
                 existing['countries'].add(author['country'])
             
-            # Merge raw names
-            if author.get('raw_name'):
-                existing['raw_names'].add(author['raw_name'])
-            elif author.get('display_name'):
-                existing['raw_names'].add(author['display_name'])
+            # Merge institutions
+            institutions = author.get('institutions', [])
+            if isinstance(institutions, list):
+                for inst in institutions:
+                    if inst:
+                        existing['institutions'].add(inst)
+                        existing['affiliations'].add(inst)
+            
+            affiliations = author.get('affiliations', [])
+            if isinstance(affiliations, list):
+                for aff in affiliations:
+                    if aff:
+                        existing['affiliations'].add(aff)
             
             # Update ORCID if missing
-            if not existing.get('orcid') and author.get('orcid'):
-                existing['orcid'] = author['orcid']
-            
-            # Update display_name to best version
-            current_name = existing['display_name']
-            new_name = author.get('display_name', '')
-            if new_name:
-                current_is_latin = all(ord(c) < 128 for c in current_name)
-                new_is_latin = all(ord(c) < 128 for c in new_name)
-                
-                if new_is_latin and not current_is_latin:
-                    existing['display_name'] = new_name
-                elif len(new_name) > len(current_name) and (new_is_latin == current_is_latin):
-                    existing['display_name'] = new_name
-            
-            # Update institution if needed
-            if not existing.get('institution') and author.get('institution'):
-                existing['institution'] = author['institution']
+            if not existing.get('orcid') and orcid:
+                existing['orcid'] = orcid
     
-    # Step 3: Convert to final list and convert sets to sorted lists
+    # Step 3: Convert to final list format
     author_list = []
     for key, author in merged_authors.items():
         # Get primary country (most common or first)
         countries_list = sorted(list(author['countries']))
         primary_country = countries_list[0] if countries_list else ''
         
+        # Get primary institution
+        institutions_list = sorted(list(author['institutions']))
+        primary_institution = institutions_list[0] if institutions_list else ''
+        
         author_list.append({
             'display_name': author['display_name'],
             'compare_name': author['compare_name'],
             'orcid': author.get('orcid'),
             'count': author['count'],
-            'affiliations': sorted(list(author['affiliations']))[:10],
-            'institutions': sorted(list(author['institutions']))[:10],
-            'countries': countries_list,
             'country': primary_country,
-            'institution': author.get('institution', '')
+            'countries': countries_list,
+            'institution': primary_institution,
+            'institutions': institutions_list,
+            'affiliations': sorted(list(author['affiliations']))[:10]  # Limit for display
         })
     
     # Step 4: Sort by count descending
@@ -3167,12 +3111,14 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
     author_data = analyze_author_frequency_all(results)
     sorted_authors = author_data['all_authors']
     
+    # Форматируем топ авторов для отображения (без HTML в данных)
     top_authors_formatted = []
     for author in sorted_authors[:20]:
         orcid_str = f" 🔗 ORCID: {author['orcid']}" if author.get('orcid') else ""
         inst_str = f" 🏛 {author['institution'][:30]}" if author.get('institution') else ""
+        country_str = f" 🌍 {author['country']}" if author.get('country') else ""  # ← ДОБАВЛЕНО
         display = author['display_name']
-        top_authors_formatted.append(f"{display}{orcid_str}{inst_str} — {author['count']} {get_text('html_citations_label')}")
+        top_authors_formatted.append(f"{display}{orcid_str}{inst_str}{country_str} — {author['count']} {get_text('html_citations_label')}")  # ← ДОБАВЛЕН country_str
     
     # Citation stacking analysis
     total_refs_with_journal = sum(journal_counter.values())
@@ -3281,6 +3227,79 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         # Debug info
         'publisher_sources': publisher_sources
     }
+
+def display_top_authors(stats: Dict):
+    """Display top authors with proper ORCID and affiliation information"""
+    st.markdown(f"### {get_text('top_authors')}")
+    
+    for i, author in enumerate(stats['author_frequency_all']['all_authors'][:30], 1):
+        # Format ORCID as clickable link if exists
+        orcid_html = ""
+        if author.get('orcid'):
+            orcid_url = author['orcid']
+            if not orcid_url.startswith('http'):
+                orcid_url = f"https://orcid.org/{orcid_url}"
+            orcid_html = f' 🔗 <a href="{orcid_url}" target="_blank" style="color: #667eea; text-decoration: none;">ORCID</a>'
+        
+        # Format institution
+        inst_text = f" 🏛 {author['institution'][:50]}" if author.get('institution') else ""
+        
+        # Format country
+        country_text = f" 🌍 {author['country']}" if author.get('country') else ""
+        
+        # Format affiliations (if multiple)
+        affiliations_text = ""
+        if author.get('affiliations') and len(author['affiliations']) > 1:
+            aff_list = author['affiliations'][:3]
+            affiliations_text = f"<div style='font-size: 11px; color: #666; margin-top: 5px;'><strong>All affiliations:</strong><br>{'<br>'.join([html.escape(aff[:80]) for aff in aff_list])}</div>"
+        
+        st.markdown(f"""
+        <div class="rank-item">
+            <span class="rank-number">{i}.</span>
+            <span class="rank-name">{author['display_name']}{orcid_html}{inst_text}{country_text}</span>
+            <span class="rank-count">{author['count']} {get_text('html_citations_label')}</span>
+            <div class="progress-bar-custom">
+                <div class="progress-fill" style="width: {author['count'] / stats['author_frequency_all']['all_authors'][0]['count'] * 100 if stats['author_frequency_all']['all_authors'] else 0}%;"></div>
+            </div>
+            {affiliations_text}
+        </div>
+        """, unsafe_allow_html=True)
+
+def display_geography_section(stats: Dict):
+    """Display geography section with three types of statistics"""
+    
+    st.markdown(f"### {get_text('geographic_distribution')}")
+    
+    geo_data = stats['geography']
+    
+    # Display geographic data in table format (matching working code)
+    if geo_data.get('geographic_data'):
+        geo_df = pd.DataFrame(geo_data['geographic_data'])
+        st.dataframe(geo_df, use_container_width=True)
+    
+    # Also show collaboration matrix if available
+    if geo_data.get('collaboration_matrix'):
+        st.markdown(f"#### {get_text('collaboration_matrix')}")
+        collab_df = pd.DataFrame(geo_data['collaboration_matrix'][:15])
+        st.dataframe(collab_df, use_container_width=True)
+    
+    # Show summary statistics
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric(
+            get_text('single_country'), 
+            geo_data.get('single_country_count', 0)
+        )
+    with col2:
+        st.metric(
+            get_text('international_collab'), 
+            geo_data.get('international_count', 0)
+        )
+    with col3:
+        st.metric(
+            get_text('total_references_with_country'), 
+            geo_data.get('total_references_with_country', 0)
+        )
 
 # ======================== HELPER FUNCTION FOR AUTHOR HIGHLIGHTING ========================
 def format_authors_with_highlight(authors_list: List[str], highlight_authors_norm_set: Set[str], normalize_func) -> str:
