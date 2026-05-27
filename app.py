@@ -1353,122 +1353,119 @@ def extract_authors_from_openalex(data: Dict) -> List[Dict]:
 
 def merge_authors(authors_list: List[Dict]) -> List[Dict]:
     """
-    Merge duplicate authors using ORCID as primary key,
-    then normalized name as secondary key.
-    Simplified version for reference list analysis.
+    Merge duplicate authors using NORMALIZED NAME as primary key,
+    then ORCID as secondary key for cross-referencing.
+    This matches the logic from the working reference code.
     """
-    orcid_map = {}  # orcid -> merged author
-    name_map = {}   # compare_name -> merged author (for authors without ORCID)
+    # First, merge by normalized name (compare_name)
+    name_merged = {}
     
     for author in authors_list:
-        orcid = author.get('orcid')
         compare_name = author.get('compare_name', '')
+        if not compare_name:
+            continue
         
-        # Priority 1: Use ORCID if available
-        if orcid:
-            if orcid in orcid_map:
-                # Merge with existing ORCID record
-                existing = orcid_map[orcid]
-                existing['count'] = existing.get('count', 0) + 1
-                
-                # Merge countries (use set to avoid duplicates)
-                if author.get('countries'):
-                    existing['countries'] = list(set(existing.get('countries', []) + author.get('countries', [])))
-                elif author.get('country') and author['country']:
-                    existing['countries'] = list(set(existing.get('countries', []) + [author['country']]))
-                
-                # Merge institutions/affiliations
-                if author.get('institutions'):
-                    existing['institutions'] = list(set(existing.get('institutions', []) + author.get('institutions', [])))
-                if author.get('affiliations'):
-                    existing['affiliations'] = list(set(existing.get('affiliations', []) + author.get('affiliations', [])))
-                
-                # Keep best display_name (prefer Latin, then longer)
-                if author.get('display_name') and len(author['display_name']) > len(existing.get('display_name', '')):
-                    existing['display_name'] = author['display_name']
-                
-                # Update institution if empty
-                if not existing.get('institution') and author.get('institution'):
-                    existing['institution'] = author['institution']
-            else:
-                # New ORCID record
-                new_author = author.copy()
-                new_author['count'] = 1
-                new_author['countries'] = author.get('countries', [])
-                if author.get('country') and author['country']:
-                    if author['country'] not in new_author['countries']:
-                        new_author['countries'].append(author['country'])
-                new_author['institutions'] = author.get('institutions', [])
-                new_author['affiliations'] = author.get('affiliations', [])
-                orcid_map[orcid] = new_author
+        if compare_name not in name_merged:
+            # Create new merged author
+            name_merged[compare_name] = {
+                'display_name': author.get('display_name', 'Unknown'),
+                'compare_name': compare_name,
+                'orcid': author.get('orcid', ''),
+                'count': 1,
+                'countries': set(),
+                'institutions': set(),
+                'affiliations': set()
+            }
+            
+            # Add countries
+            countries = author.get('countries', [])
+            if isinstance(countries, list):
+                for c in countries:
+                    if c:
+                        name_merged[compare_name]['countries'].add(c)
+            elif author.get('country'):
+                name_merged[compare_name]['countries'].add(author['country'])
+            
+            # Add institutions
+            institutions = author.get('institutions', [])
+            if isinstance(institutions, list):
+                for inst in institutions:
+                    if inst:
+                        clean_inst = clean_affiliation(inst)
+                        if clean_inst:
+                            name_merged[compare_name]['institutions'].add(clean_inst)
+                            name_merged[compare_name]['affiliations'].add(clean_inst)
+            
+            affiliations = author.get('affiliations', [])
+            if isinstance(affiliations, list):
+                for aff in affiliations:
+                    if aff:
+                        clean_aff = clean_affiliation(aff)
+                        if clean_aff:
+                            name_merged[compare_name]['affiliations'].add(clean_aff)
+        else:
+            # Merge into existing author
+            existing = name_merged[compare_name]
+            existing['count'] += 1
+            
+            # Merge countries
+            countries = author.get('countries', [])
+            if isinstance(countries, list):
+                for c in countries:
+                    if c:
+                        existing['countries'].add(c)
+            elif author.get('country'):
+                existing['countries'].add(author['country'])
+            
+            # Merge institutions
+            institutions = author.get('institutions', [])
+            if isinstance(institutions, list):
+                for inst in institutions:
+                    if inst:
+                        clean_inst = clean_affiliation(inst)
+                        if clean_inst:
+                            existing['institutions'].add(clean_inst)
+                            existing['affiliations'].add(clean_inst)
+            
+            affiliations = author.get('affiliations', [])
+            if isinstance(affiliations, list):
+                for aff in affiliations:
+                    if aff:
+                        clean_aff = clean_affiliation(aff)
+                        if clean_aff:
+                            existing['affiliations'].add(clean_aff)
+            
+            # Update ORCID if missing (but don't create new entry)
+            if not existing.get('orcid') and author.get('orcid'):
+                existing['orcid'] = author['orcid']
+    
+    # Convert to list format
+    result = []
+    for compare_name, author in name_merged.items():
+        # Get primary country
+        countries_list = sorted(list(author['countries']))
+        primary_country = countries_list[0] if countries_list else ''
         
-        # Priority 2: Use normalized name (Lastname I.)
-        elif compare_name:
-            if compare_name in name_map:
-                # Merge with existing name record
-                existing = name_map[compare_name]
-                existing['count'] = existing.get('count', 0) + 1
-                
-                # Merge countries
-                if author.get('countries'):
-                    existing['countries'] = list(set(existing.get('countries', []) + author.get('countries', [])))
-                elif author.get('country') and author['country']:
-                    existing['countries'] = list(set(existing.get('countries', []) + [author['country']]))
-                
-                # Merge institutions
-                if author.get('institutions'):
-                    existing['institutions'] = list(set(existing.get('institutions', []) + author.get('institutions', [])))
-                if author.get('affiliations'):
-                    existing['affiliations'] = list(set(existing.get('affiliations', []) + author.get('affiliations', [])))
-                
-                # Keep best display_name
-                if author.get('display_name') and len(author['display_name']) > len(existing.get('display_name', '')):
-                    existing['display_name'] = author['display_name']
-                
-                # Update institution if empty
-                if not existing.get('institution') and author.get('institution'):
-                    existing['institution'] = author['institution']
-                
-                # Preserve ORCID if found in any record
-                if author.get('orcid') and not existing.get('orcid'):
-                    existing['orcid'] = author['orcid']
-            else:
-                # New name record
-                new_author = author.copy()
-                new_author['count'] = 1
-                new_author['countries'] = author.get('countries', [])
-                if author.get('country') and author['country']:
-                    if author['country'] not in new_author['countries']:
-                        new_author['countries'].append(author['country'])
-                new_author['institutions'] = author.get('institutions', [])
-                new_author['affiliations'] = author.get('affiliations', [])
-                name_map[compare_name] = new_author
-    
-    # Combine ORCID and name maps (ORCID takes precedence)
-    all_authors = list(orcid_map.values())
-    
-    for name_key, author in name_map.items():
-        # Check if this author is already in ORCID map (by comparing names)
-        found = False
-        for existing in all_authors:
-            if existing.get('compare_name') == author.get('compare_name'):
-                # Merge
-                existing['count'] = existing.get('count', 0) + author.get('count', 1)
-                existing['countries'] = list(set(existing.get('countries', []) + author.get('countries', [])))
-                existing['institutions'] = list(set(existing.get('institutions', []) + author.get('institutions', [])))
-                if author.get('display_name') and len(author['display_name']) > len(existing.get('display_name', '')):
-                    existing['display_name'] = author['display_name']
-                if author.get('orcid') and not existing.get('orcid'):
-                    existing['orcid'] = author['orcid']
-                found = True
-                break
-        if not found:
-            all_authors.append(author)
+        # Get primary institution
+        institutions_list = sorted(list(author['institutions']))
+        primary_institution = institutions_list[0] if institutions_list else ''
+        
+        result.append({
+            'display_name': author['display_name'],
+            'compare_name': author['compare_name'],
+            'orcid': author.get('orcid', ''),
+            'count': author['count'],
+            'country': primary_country,
+            'countries': countries_list,
+            'institution': primary_institution,
+            'institutions': list(author['institutions']),
+            'affiliations': sorted(list(author['affiliations']))[:10]
+        })
     
     # Sort by count descending
-    all_authors.sort(key=lambda x: x.get('count', 0), reverse=True)
+    result.sort(key=lambda x: x['count'], reverse=True)
     
-    return all_authors
+    return result
 
 # ======================== DUPLICATE DETECTION ========================
 def find_duplicate_references(references: List[str], threshold: float = 0.85) -> List[Dict]:
@@ -1940,44 +1937,36 @@ def analyze_journal_frequency_all(results: List[Dict]) -> Dict:
 
 def analyze_author_frequency_all(results: List[Dict]) -> Dict:
     """
-    Analyze author frequency with PROPER merging using ORCID as primary key.
-    Uses corrected author merging logic for reference list analysis.
+    Analyze author frequency with PROPER merging using NORMALIZED NAME as primary key.
+    This matches the logic from the working reference code.
     """
     
     # Step 1: Collect all author occurrences
-    author_occurrences = []  # List of author dicts, each occurrence is separate
+    author_occurrences = []
     
     for result in results:
         for author in result.get('authors', []):
-            # Ensure we have normalized name
             if not author.get('compare_name') and author.get('display_name'):
                 compare_name, display_name = normalize_author_name(author['display_name'])
                 author['compare_name'] = compare_name
                 author['display_name'] = display_name
             
-            author_occurrences.append(author)
+            if author.get('compare_name'):
+                author_occurrences.append(author)
     
-    # Step 2: Merge using ORCID as primary key
-    merged_authors = {}  # key -> merged author
+    # Step 2: Merge by compare_name (normalized name) - NOT by ORCID
+    merged_authors = {}
     
     for author in author_occurrences:
-        orcid = author.get('orcid')
         compare_name = author.get('compare_name', '')
+        if not compare_name:
+            continue
         
-        # Determine merge key (ORCID has highest priority)
-        if orcid:
-            merge_key = f"orcid:{orcid}"
-        elif compare_name:
-            merge_key = f"name:{compare_name}"
-        else:
-            continue  # Skip authors without identifier
-        
-        if merge_key not in merged_authors:
-            # Create new merged author
-            merged_authors[merge_key] = {
+        if compare_name not in merged_authors:
+            merged_authors[compare_name] = {
                 'display_name': author.get('display_name', 'Unknown'),
                 'compare_name': compare_name,
-                'orcid': orcid,
+                'orcid': author.get('orcid', ''),
                 'count': 1,
                 'countries': set(),
                 'institutions': set(),
@@ -1989,20 +1978,19 @@ def analyze_author_frequency_all(results: List[Dict]) -> Dict:
             if isinstance(countries, list):
                 for c in countries:
                     if c:
-                        merged_authors[merge_key]['countries'].add(c)
+                        merged_authors[compare_name]['countries'].add(c)
             elif author.get('country'):
-                merged_authors[merge_key]['countries'].add(author['country'])
+                merged_authors[compare_name]['countries'].add(author['country'])
             
-            # Add institutions
+            # Add institutions (cleaned)
             institutions = author.get('institutions', [])
             if isinstance(institutions, list):
                 for inst in institutions:
                     if inst:
-                        # Clean institution name
                         clean_inst = clean_affiliation(inst)
                         if clean_inst:
-                            merged_authors[merge_key]['institutions'].add(clean_inst)
-                            merged_authors[merge_key]['affiliations'].add(clean_inst)
+                            merged_authors[compare_name]['institutions'].add(clean_inst)
+                            merged_authors[compare_name]['affiliations'].add(clean_inst)
             
             affiliations = author.get('affiliations', [])
             if isinstance(affiliations, list):
@@ -2010,11 +1998,9 @@ def analyze_author_frequency_all(results: List[Dict]) -> Dict:
                     if aff:
                         clean_aff = clean_affiliation(aff)
                         if clean_aff:
-                            merged_authors[merge_key]['affiliations'].add(clean_aff)
-        
+                            merged_authors[compare_name]['affiliations'].add(clean_aff)
         else:
-            # Merge into existing author
-            existing = merged_authors[merge_key]
+            existing = merged_authors[compare_name]
             existing['count'] += 1
             
             # Merge countries
@@ -2044,31 +2030,29 @@ def analyze_author_frequency_all(results: List[Dict]) -> Dict:
                         if clean_aff:
                             existing['affiliations'].add(clean_aff)
             
-            # Update ORCID if missing
-            if not existing.get('orcid') and orcid:
-                existing['orcid'] = orcid
+            # Update ORCID if missing (but don't split into separate entry)
+            if not existing.get('orcid') and author.get('orcid'):
+                existing['orcid'] = author['orcid']
     
     # Step 3: Convert to final list format
     author_list = []
-    for key, author in merged_authors.items():
-        # Get primary country (most common or first)
+    for compare_name, author in merged_authors.items():
         countries_list = sorted(list(author['countries']))
         primary_country = countries_list[0] if countries_list else ''
         
-        # Get primary institution
         institutions_list = sorted(list(author['institutions']))
         primary_institution = institutions_list[0] if institutions_list else ''
         
         author_list.append({
             'display_name': author['display_name'],
             'compare_name': author['compare_name'],
-            'orcid': author.get('orcid'),
+            'orcid': author.get('orcid', ''),
             'count': author['count'],
             'country': primary_country,
             'countries': countries_list,
             'institution': primary_institution,
-            'institutions': institutions_list,
-            'affiliations': sorted(list(author['affiliations']))[:10]  # Limit for display
+            'institutions': list(author['institutions']),
+            'affiliations': sorted(list(author['affiliations']))[:10]
         })
     
     # Step 4: Sort by count descending
