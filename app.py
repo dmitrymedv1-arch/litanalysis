@@ -5623,7 +5623,7 @@ def main():
                 if special_class:
                     expander_label = f"{status_icon} <span class='{special_class}' style='display: inline-block; padding: 2px 8px; border-radius: 12px;'>{result['original_text'][:130]}...</span>"
                 
-                with st.expander(expander_label, unsafe_allow_html=True):
+                with st.expander(expander_label):
                     st.markdown(f"**DOI:** {doi_display}", unsafe_allow_html=True)
                     identifiers = result.get('identifiers', {})
                     if identifiers.get('url'):
