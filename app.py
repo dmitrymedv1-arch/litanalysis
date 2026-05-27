@@ -1278,8 +1278,8 @@ def extract_authors_from_crossref(data: Dict) -> List[Dict]:
 def extract_authors_from_openalex(data: Dict) -> List[Dict]:
     """
     Extract authors from OpenAlex with PROPER institution and country extraction.
-    Uses structured fields from API - NO PARSING OF RAW STRINGS.
-    Uses country_code field directly from API for reliability.
+    Uses structured fields from API - country_code is the PRIMARY source.
+    This exactly matches the working reference code logic.
     """
     authors = []
     
@@ -1310,7 +1310,8 @@ def extract_authors_from_openalex(data: Dict) -> List[Dict]:
                 if clean_inst_name:
                     clean_institution_names.append(clean_inst_name)
             
-            # Get country code from structured field (MOST RELIABLE SOURCE)
+            # PRIMARY SOURCE: Get country code from structured field
+            # This is the MOST RELIABLE SOURCE - directly from OpenAlex API
             country_code = inst.get('country_code', '')
             if country_code and country_code != 'XX':  # 'XX' means unknown
                 country_codes.append(country_code)
@@ -1336,7 +1337,7 @@ def extract_authors_from_openalex(data: Dict) -> List[Dict]:
             'display_name': display_name,
             'raw_name': display_name_raw,
             'orcid': formatted_orcid,
-            # Country information
+            # Country information - directly from API
             'country': primary_country,
             'countries': country_codes,  # All countries this author is affiliated with
             # Institution information
@@ -1532,7 +1533,8 @@ def extract_concepts_from_references(results: List[Dict]) -> Dict:
 def analyze_geographic_distribution(results: List[Dict]) -> Dict:
     """
     Geographic analysis with THREE types using CORRECT country extraction.
-    Uses structured country_code data from OpenAlex API.
+    Uses structured country_code data from OpenAlex API as the PRIMARY source.
+    This exactly matches the working reference code logic.
     """
     
     # Type 1: Unique countries per reference (collaboration level)
@@ -1542,12 +1544,8 @@ def analyze_geographic_distribution(results: List[Dict]) -> Dict:
     # Type 2: Authors per country (individual distribution)
     author_country_counter = Counter()
     
-    # Type 3: Author-country mapping for individual distribution
-    author_country_map = defaultdict(set)
-    
     # Track per-reference data
     reference_countries = []  # List of country sets per reference
-    total_authors_with_country = 0
     
     for result in results:
         # Collect all countries from authors in this reference
@@ -1555,9 +1553,10 @@ def analyze_geographic_distribution(results: List[Dict]) -> Dict:
         
         for author in result.get('authors', []):
             # PRIMARY SOURCE: Use the 'countries' field from OpenAlex
+            # This field contains country codes directly from API
             countries = author.get('countries', [])
             
-            # SECONDARY: Use 'country' field if available
+            # SECONDARY: Use 'country' field if available (fallback)
             if not countries and author.get('country'):
                 countries = [author['country']]
             
@@ -1570,12 +1569,6 @@ def analyze_geographic_distribution(results: List[Dict]) -> Dict:
                 
                 # Type 2: Count each author by their primary country
                 author_country_counter[primary_country] += 1
-                total_authors_with_country += 1
-                
-                # Track author-country mapping for potential future use
-                author_name = author.get('compare_name', '')
-                if author_name:
-                    author_country_map[author_name].add(primary_country)
                 
                 # Type 1: Add to reference-level set (unique countries per reference)
                 for country in set(countries):
@@ -1642,7 +1635,7 @@ def analyze_geographic_distribution(results: List[Dict]) -> Dict:
         })
     
     return {
-        'geographic_data': type1_data + type3_data,  # Combined for compatibility
+        'geographic_data': type1_data + type3_data,
         'type1_unique_countries_per_reference': dict(country_single_counter.most_common()),
         'type2_authors_per_country': dict(author_country_counter.most_common()),
         'type3_collaboration_patterns': dict(country_combined_counter.most_common()),
@@ -1651,9 +1644,9 @@ def analyze_geographic_distribution(results: List[Dict]) -> Dict:
         'collaboration_matrix': collaboration_matrix,
         'total_references_with_country': len([rc for rc in reference_countries if rc]),
         'total_references': len(results),
-        'total_authors_with_country': total_authors_with_country
+        'total_authors_with_country': sum(author_country_counter.values())
     }
-
+    
 def analyze_collaboration_network(results: List[Dict]) -> Dict:
     """Co-authorship network analysis"""
     author_pairs = Counter()
@@ -3389,25 +3382,29 @@ def display_geography_section(stats: Dict):
     
     st.markdown(f"### {get_text('geographic_distribution')}")
     
-    # Display Type 1: Unique countries per reference
+    # Type 1: Unique countries per reference
     st.markdown(f"#### {get_text('geography_type_1')}")
     st.caption(get_text('geography_type_1_desc'))
     
     if stats['geography'].get('type1_unique_countries_per_reference'):
-        type1_df = pd.DataFrame(list(stats['geography']['type1_unique_countries_per_reference'].items()), 
-                                columns=["Country", "References count"])
+        type1_df = pd.DataFrame(
+            list(stats['geography']['type1_unique_countries_per_reference'].items()),
+            columns=["Country", "References count"]
+        )
         st.dataframe(type1_df, use_container_width=True)
     
-    # Display Type 2: Authors per country
+    # Type 2: Authors per country
     st.markdown(f"#### {get_text('geography_type_2')}")
     st.caption(get_text('geography_type_2_desc'))
     
     if stats['geography'].get('type2_authors_per_country'):
-        type2_df = pd.DataFrame(list(stats['geography']['type2_authors_per_country'].items()), 
-                                columns=["Country", "Authors count"])
+        type2_df = pd.DataFrame(
+            list(stats['geography']['type2_authors_per_country'].items()),
+            columns=["Country", "Authors count"]
+        )
         st.dataframe(type2_df, use_container_width=True)
     
-    # Display Type 3: Collaboration patterns
+    # Type 3: Collaboration patterns
     st.markdown(f"#### {get_text('geography_type_3')}")
     st.caption(get_text('geography_type_3_desc'))
     
@@ -3417,9 +3414,12 @@ def display_geography_section(stats: Dict):
     with col2:
         st.metric(get_text('international_collab'), stats['geography'].get('international_count', 0))
     with col3:
-        st.metric(get_text('total_references_with_country'), stats['geography'].get('total_references_with_country', 0))
+        st.metric(
+            get_text('total_references_with_country'),
+            stats['geography'].get('total_references_with_country', 0)
+        )
     
-    # Display collaboration matrix if available
+    # Collaboration matrix
     if stats['geography'].get('collaboration_matrix'):
         st.markdown(f"#### {get_text('collaboration_matrix')}")
         collab_df = pd.DataFrame(stats['geography']['collaboration_matrix'][:15])
