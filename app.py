@@ -1278,8 +1278,7 @@ def extract_authors_from_crossref(data: Dict) -> List[Dict]:
 def extract_authors_from_openalex(data: Dict) -> List[Dict]:
     """
     Extract authors from OpenAlex with PROPER institution and country extraction.
-    Uses structured fields from API - country_code is the PRIMARY source.
-    This exactly matches the working reference code logic.
+    CRITICAL: Stores ALL country codes from ALL institutions, not just the first.
     """
     authors = []
     
@@ -1294,23 +1293,23 @@ def extract_authors_from_openalex(data: Dict) -> List[Dict]:
         if not display_name_raw:
             continue
         
-        # ========== CRITICAL: EXTRACT FROM STRUCTURED INSTITUTIONS FIELD ==========
+        # Extract institutions for this authorship
         institutions = authorship.get('institutions', [])
         
-        # Clean institution names (from display_name, NOT raw strings)
+        # Collect ALL clean institution names
         clean_institution_names = []
+        # Collect ALL country codes from ALL institutions
         country_codes = []
         
         for inst in institutions:
-            # Get clean institution name from display_name
+            # Get clean institution name
             inst_name = inst.get('display_name', '')
             if inst_name:
-                # Clean the institution name
                 clean_inst_name = clean_affiliation(inst_name)
                 if clean_inst_name:
                     clean_institution_names.append(clean_inst_name)
             
-            # PRIMARY SOURCE: Get country code from structured field
+            # CRITICAL: Get country code from structured field
             # This is the MOST RELIABLE SOURCE - directly from OpenAlex API
             country_code = inst.get('country_code', '')
             if country_code and country_code != 'XX':  # 'XX' means unknown
@@ -1337,14 +1336,13 @@ def extract_authors_from_openalex(data: Dict) -> List[Dict]:
             'display_name': display_name,
             'raw_name': display_name_raw,
             'orcid': formatted_orcid,
-            # Country information - directly from API
+            # CRITICAL: Store ALL country codes for this author
             'country': primary_country,
-            'countries': country_codes,  # All countries this author is affiliated with
+            'countries': country_codes,  # ALL countries this author is affiliated with
             # Institution information
             'institution': primary_institution,
             'institutions': clean_institution_names,
-            'affiliations': clean_institution_names,  # Alias for compatibility
-            # Raw data for debugging (not used for analysis)
+            'affiliations': clean_institution_names,
             'raw_affiliations': authorship.get('raw_affiliation_strings', [])
         }
         
@@ -1533,8 +1531,11 @@ def extract_concepts_from_references(results: List[Dict]) -> Dict:
 def analyze_geographic_distribution(results: List[Dict]) -> Dict:
     """
     Geographic analysis with THREE types using CORRECT country extraction.
-    Uses structured country_code data from OpenAlex API as the PRIMARY source.
-    This exactly matches the working reference code logic.
+    This EXACTLY matches the working reference code logic.
+    
+    Type 1: Each reference counted once per unique country
+    Type 2: Each author counted separately per country
+    Type 3: Collaboration patterns (single vs international)
     """
     
     # Type 1: Unique countries per reference (collaboration level)
@@ -1552,11 +1553,11 @@ def analyze_geographic_distribution(results: List[Dict]) -> Dict:
         ref_countries_set = set()
         
         for author in result.get('authors', []):
-            # PRIMARY SOURCE: Use the 'countries' field from OpenAlex
-            # This field contains country codes directly from API
+            # CRITICAL: Get ALL countries for this author (not just first)
+            # The 'countries' field contains all country codes from all institutions
             countries = author.get('countries', [])
             
-            # SECONDARY: Use 'country' field if available (fallback)
+            # Secondary fallback: use single 'country' field
             if not countries and author.get('country'):
                 countries = [author['country']]
             
@@ -1564,13 +1565,13 @@ def analyze_geographic_distribution(results: List[Dict]) -> Dict:
             countries = [c for c in countries if c and c != 'XX']
             
             if countries:
-                # Get primary country for this author (first one)
-                primary_country = countries[0]
+                # Type 2: Count each author for EACH of their countries
+                # (author with multiple countries contributes to each country)
+                for country in set(countries):
+                    author_country_counter[country] += 1
                 
-                # Type 2: Count each author by their primary country
-                author_country_counter[primary_country] += 1
-                
-                # Type 1: Add to reference-level set (unique countries per reference)
+                # Type 1: Add ALL countries to reference-level set
+                # CRITICAL: Each country added only once per reference (using set)
                 for country in set(countries):
                     ref_countries_set.add(country)
         
@@ -1585,7 +1586,7 @@ def analyze_geographic_distribution(results: List[Dict]) -> Dict:
                 # Single country collaboration
                 country_combined_counter[sorted_countries[0]] += 1
             else:
-                # International collaboration
+                # International collaboration - store as sorted list joined by semicolon
                 combination = ';'.join(sorted_countries)
                 country_combined_counter[combination] += 1
             
@@ -1593,7 +1594,7 @@ def analyze_geographic_distribution(results: List[Dict]) -> Dict:
         else:
             reference_countries.append(set())
     
-    # Prepare Type 1 results (single country counts per reference)
+    # Prepare Type 1 results (unique countries per reference)
     type1_data = []
     for country, count in country_single_counter.most_common():
         type1_data.append({'Country': country, 'Type': 'single', 'Count': count})
@@ -1608,9 +1609,6 @@ def analyze_geographic_distribution(results: List[Dict]) -> Dict:
     for pattern, count in country_combined_counter.most_common():
         if ';' in pattern:
             type3_data.append({'Country': pattern, 'Type': 'combined', 'Count': count})
-        else:
-            # Single country patterns are already in type1_data
-            pass
     
     # Calculate collaboration statistics
     single_country_count = sum(1 for pattern in country_combined_counter if ';' not in pattern)
