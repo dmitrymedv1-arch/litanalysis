@@ -133,6 +133,10 @@ TEXTS = {
         'only_openalex': "Only OpenAlex",
         'problematic_only': "⚠️ Problematic only",
         'self_cited_only': "🔄 Self-cited only",
+        'only_preprint_repository': "📚 Preprint/Repository only",
+        'only_books': "📖 Books only",
+        'only_proceedings': "📊 Proceedings only",
+        'only_retracted': "⚠️ Retracted only",
         'search_in_text': "Search in text",
         'search_placeholder': "Enter keyword...",
         
@@ -147,6 +151,9 @@ TEXTS = {
         'full_text': "Full text",
         'retracted': "Retracted",
         'preprint': "Preprint",
+        'repository': "Repository",
+        'ebook': "Electronic book",
+        'proceedings': "Conference proceedings",
         'self_citation': "Self-citation",
         'suspicious_doi_badge': "⚠️ Suspicious DOI",
         
@@ -176,6 +183,12 @@ TEXTS = {
         'no_url_only': "✅ No URL-only references found",
         'no_problematic': "✅ No problematic references detected",
         'none_detected': "None detected",
+        
+        # New identifier coverage strings
+        'preprint_repository_count': "📚 Preprint/Repository",
+        'books_count': "📖 Books",
+        'proceedings_count': "📊 Proceedings",
+        'retracted_count': "⚠️ Retracted",
         
         # Export
         'export_report': "📄 Export Enhanced Report",
@@ -224,6 +237,9 @@ TEXTS = {
         'html_journal_label': "Journal",
         'html_article_number_label': "Article number",
         'html_self_citation_authors_label': "Paper authors for self-citation analysis",
+        'html_repository_note': "📚 Repository source (not invalid)",
+        'html_proceedings_note': "📊 Conference proceedings (not invalid)",
+        'html_ebook_note': "📖 Electronic book",
         
         # Geography section strings
         'geography_type_1': "Type 1: Unique Countries per Reference (Collaboration Level)",
@@ -360,6 +376,10 @@ TEXTS = {
         'only_openalex': "Только OpenAlex",
         'problematic_only': "⚠️ Только проблемные",
         'self_cited_only': "🔄 Только самоцитирования",
+        'only_preprint_repository': "📚 Только препринты/репозитории",
+        'only_books': "📖 Только книги",
+        'only_proceedings': "📊 Только материалы конференций",
+        'only_retracted': "⚠️ Только отозванные",
         'search_in_text': "Поиск в тексте",
         'search_placeholder': "Введите ключевое слово...",
         
@@ -374,6 +394,9 @@ TEXTS = {
         'full_text': "Полный текст",
         'retracted': "Отозвана",
         'preprint': "Препринт",
+        'repository': "Репозиторий",
+        'ebook': "Электронная книга",
+        'proceedings': "Материалы конференций",
         'self_citation': "Самоцитирование",
         'suspicious_doi_badge': "⚠️ Подозрительный DOI",
         
@@ -403,6 +426,12 @@ TEXTS = {
         'no_url_only': "✅ Ссылок только с URL не найдено",
         'no_problematic': "✅ Проблемных ссылок не обнаружено",
         'none_detected': "Не обнаружено",
+        
+        # New identifier coverage strings
+        'preprint_repository_count': "📚 Препринты/Репозитории",
+        'books_count': "📖 Книги",
+        'proceedings_count': "📊 Материалы конференций",
+        'retracted_count': "⚠️ Отозванные",
         
         # Export
         'export_report': "📄 Экспорт расширенного отчета",
@@ -451,6 +480,9 @@ TEXTS = {
         'html_journal_label': "Журнал",
         'html_article_number_label': "Номер статьи",
         'html_self_citation_authors_label': "Авторы статьи для анализа самоцитирований",
+        'html_repository_note': "📚 Источник из репозитория (не невалидный)",
+        'html_proceedings_note': "📊 Материалы конференции (не невалидные)",
+        'html_ebook_note': "📖 Электронная книга",
         
         # Geography section strings
         'geography_type_1': "Тип 1: Уникальные страны по ссылке (уровень коллаборации)",
@@ -855,6 +887,30 @@ st.markdown("""
         font-size: 12px;
         font-weight: 600;
     }
+    .badge-repository {
+        background: #e2d5f8;
+        color: #5e2a9e;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .badge-book {
+        background: #d4f1e9;
+        color: #0e6b5e;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .badge-proceedings {
+        background: #fff2c9;
+        color: #b26b00;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+    }
     
     /* Section headers */
     .section-header {
@@ -992,6 +1048,24 @@ st.markdown("""
         background-color: #f8d7da;
         padding: 2px 4px;
         border-radius: 3px;
+    }
+    
+    /* Ebook highlight (non-gray background) */
+    .ebook-reference {
+        background: #d4f1e9 !important;
+        border-left: 3px solid #0e6b5e !important;
+    }
+    
+    /* Repository reference styling */
+    .repository-reference {
+        background: #e2d5f8 !important;
+        border-left: 3px solid #5e2a9e !important;
+    }
+    
+    /* Proceedings reference styling */
+    .proceedings-reference {
+        background: #fff2c9 !important;
+        border-left: 3px solid #b26b00 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -1898,7 +1972,12 @@ def analyze_identifier_coverage(results: List[Dict]) -> Dict:
         'has_pmid': 0,
         'has_isbn': 0,
         'has_none': 0,
-        'multiple': 0
+        'multiple': 0,
+        # NEW COUNTERS
+        'is_preprint_repository': 0,
+        'is_book': 0,
+        'is_proceedings': 0,
+        'is_retracted': 0
     }
     
     references_without_any = []
@@ -1911,6 +1990,24 @@ def analyze_identifier_coverage(results: List[Dict]) -> Dict:
         
         has_any = False
         count = 0
+        
+        # Count preprint/repository
+        if result.get('is_repository', False) or result.get('type') == 'posted_content':
+            identifier_stats['is_preprint_repository'] += 1
+        
+        # Count books (ebook platform OR has ISBN without DOI)
+        if result.get('is_ebook', False):
+            identifier_stats['is_book'] += 1
+        elif identifiers.get('isbn') and not identifiers.get('doi'):
+            identifier_stats['is_book'] += 1
+        
+        # Count proceedings
+        if result.get('is_proceedings', False):
+            identifier_stats['is_proceedings'] += 1
+        
+        # Count retracted
+        if result.get('is_retracted', False):
+            identifier_stats['is_retracted'] += 1
         
         if identifiers['doi']:
             identifier_stats['has_doi'] += 1
@@ -2501,18 +2598,25 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
             'journal_from': None,  # Track source: 'crossref', 'openalex', or None
             'year': None,
             'type': None,
+            'raw_type': None,  # NEW: for proceedings detection
             'publisher': None,
             'publisher_from': None,  # Track source: 'crossref', 'openalex', or None
             'crossmark_issues': [],
             'is_preprint': False,
             'has_erratum': False,
-            'is_retracted': False,
+            'is_retracted': False,  # NEW: retraction detection
             'is_self_citation': False,
             'issn': None,
             'license': None,
             'references_count': 0,
             'citations_count': 0,
-            'is_suspicious_doi': False
+            'is_suspicious_doi': False,
+            # NEW FIELDS FOR OPENALEX TYPE DETECTION
+            'is_repository': False,      # type == "repository"
+            'is_ebook': False,           # type == "ebook platform"
+            'is_proceedings': False,     # raw_type == "proceedings-article"
+            'openalex_type': None,       # store the original type
+            'openalex_raw_type': None    # store the original raw_type
         }
         
         if doi:
@@ -2580,6 +2684,27 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                 result['openalex_data'] = openalex_data
                 result['openalex_status'] = True
                 
+                # NEW: Extract OpenAlex type and raw_type
+                result['openalex_type'] = openalex_data.get('type', '')
+                result['openalex_raw_type'] = openalex_data.get('raw_type', '')
+                result['type'] = result['openalex_type']
+                result['raw_type'] = result['openalex_raw_type']
+                
+                # NEW: Detect repository type
+                if openalex_data.get('type') == 'repository':
+                    result['is_repository'] = True
+                    result['crossmark_issues'].append('📚 Repository source')
+                
+                # NEW: Detect ebook platform
+                if openalex_data.get('type') == 'ebook platform':
+                    result['is_ebook'] = True
+                    result['crossmark_issues'].append('📖 Electronic book')
+                
+                # NEW: Detect proceedings article
+                if openalex_data.get('raw_type') == 'proceedings-article':
+                    result['is_proceedings'] = True
+                    result['crossmark_issues'].append('📊 Conference proceedings')
+                
                 # Extract authors from OpenAlex using updated function (add only unique ones)
                 authors_data = extract_authors_from_openalex(openalex_data)
                 existing_compare = {a['compare_name'] for a in result['authors']}
@@ -2593,9 +2718,10 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                 if openalex_data.get('type') == 'posted_content':
                     result['is_preprint'] = True
                 
-                # Check if retracted
-                if openalex_data.get('is_retracted'):
+                # NEW: Check if retracted (primary source for retraction detection)
+                if openalex_data.get('is_retracted', False):
                     result['is_retracted'] = True
+                    result['crossmark_issues'].append('⚠️ This article has been RETRACTED')
                 
                 # Extract year from OpenAlex (if not already set by Crossref)
                 if not result['year'] and 'publication_year' in openalex_data:
@@ -3161,6 +3287,61 @@ def extract_doi_from_text(text: str) -> Optional[str]:
     identifiers = extract_identifiers(text)
     return identifiers['doi']
 
+def parse_paper_authors(authors_text: str) -> Set[str]:
+    """Parse paper authors from text input into normalized format"""
+    # Split by common separators: newline, comma, tab
+    authors = set()
+    
+    # Replace common separators with newline for uniform processing
+    text = authors_text.replace('\t', '\n').replace(',', '\n')
+    lines = text.split('\n')
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        
+        # Try to parse as "FirstInitial LastName" or "FirstInitial LastName, MI"
+        # Format: "N. Fukatsu", "N Fukatsu", "Z. Wei", "Danil E. Matkin" etc.
+        
+        # Pattern 1: "I. Lastname" or "I Lastname"
+        match = re.match(r'^([A-Z]\.?)\s+([A-Za-z\-]+)', line)
+        if match:
+            initial = match.group(1).rstrip('.')
+            lastname = match.group(2)
+            authors.add(f"{initial}. {lastname}")
+            continue
+        
+        # Pattern 2: "Firstname Lastname" (full first name) - convert to initial format
+        match = re.match(r'^([A-Z][a-z]+)\s+([A-Za-z\-]+)', line)
+        if match:
+            firstname = match.group(1)
+            lastname = match.group(2)
+            initial = firstname[0]
+            authors.add(f"{initial}. {lastname}")
+            continue
+        
+        # Pattern 3: "Lastname, I." or "Lastname, I"
+        match = re.match(r'^([A-Za-z\-]+),\s*([A-Z]\.?)', line)
+        if match:
+            lastname = match.group(1)
+            initial = match.group(2).rstrip('.')
+            authors.add(f"{initial}. {lastname}")
+            continue
+        
+        # Pattern 4: "Lastname I." or "Lastname I"
+        match = re.match(r'^([A-Za-z\-]+)\s+([A-Z]\.?)', line)
+        if match:
+            lastname = match.group(1)
+            initial = match.group(2).rstrip('.')
+            authors.add(f"{initial}. {lastname}")
+            continue
+        
+        # If no pattern matches, show warning but don't add
+        st.warning(get_text('authors_warning_text').format(line))
+    
+    return authors
+
 # ======================== ENHANCED STATISTICS ========================
 def generate_advanced_statistics(results: List[Dict]) -> Dict:
     """Generate enhanced statistics with new metrics - WITH PERCENTAGES FOR ALL METRICS"""
@@ -3178,10 +3359,55 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
     openalex_only_refs = []
     suspicious_doi_refs = []
     
+    # NEW: Collections for new types
+    repository_refs = []
+    ebook_refs = []
+    proceedings_refs = []
+    retracted_refs = []
+    books_with_isbn_no_doi = []  # Books with ISBN but no DOI (go to Non-DOI Sources)
+    ebook_with_doi_refs = []      # Ebooks with DOI (colored background in full list)
+    
     # For debugging - publisher source counters
     publisher_sources = {'crossref': 0, 'openalex': 0, 'both': 0}
     
     for result in results:
+        # NEW: Detect repository references
+        if result.get('is_repository', False):
+            repository_refs.append({
+                'text': result['original_text'],
+                'doi': result.get('doi', ''),
+                'note': get_text('repository')
+            })
+        
+        # NEW: Detect ebook platform references
+        if result.get('is_ebook', False):
+            ebook_refs.append({
+                'text': result['original_text'],
+                'doi': result.get('doi', ''),
+                'note': get_text('ebook')
+            })
+            ebook_with_doi_refs.append(result)
+        
+        # NEW: Detect proceedings references
+        if result.get('is_proceedings', False):
+            proceedings_refs.append({
+                'text': result['original_text'],
+                'doi': result.get('doi', ''),
+                'note': get_text('proceedings')
+            })
+        
+        # NEW: Detect retracted references
+        if result.get('is_retracted', False):
+            retracted_refs.append({
+                'text': result['original_text'],
+                'doi': result.get('doi', ''),
+                'note': get_text('retracted')
+            })
+        
+        # NEW: Books with ISBN but no DOI (go to Non-DOI Sources)
+        if result.get('identifiers', {}).get('isbn') and not result.get('doi'):
+            books_with_isbn_no_doi.append(result['original_text'])
+        
         # DOI Status analysis
         if result['doi']:
             if result['crossref_status'] and result['openalex_status']:
@@ -3319,7 +3545,7 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         if result.get('year') and isinstance(result['year'], (int, float)) and 1900 < result['year'] <= datetime.now().year:
             year_counter[int(result['year'])] += 1
         
-        # Problematic references detection
+        # Problematic references detection (retractions go here)
         has_problem = False
         problems = []
         if result.get('is_retracted'):
@@ -3329,11 +3555,11 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
             problems.append(get_text('preprint'))
             has_problem = True
         if result.get('crossmark_issues'):
-            problems.extend(result['crossmark_issues'])
-            has_problem = True
-        if result.get('is_suspicious_doi'):
-            problems.append('⚠️ ' + get_text('suspicious_doi_badge'))
-            has_problem = True
+            # Filter out notes that are not actual problems
+            for issue in result['crossmark_issues']:
+                if not any(note in issue for note in ['Repository source', 'Electronic book', 'Conference proceedings']):
+                    problems.append(issue)
+                    has_problem = True
         
         if has_problem:
             problematic_refs.append({'text': result['original_text'], 'problems': ', '.join(problems)})
@@ -3424,6 +3650,14 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         'self_citations_percent': calc_percent(len([r for r in results if r.get('is_self_citation', False)])),
         'self_citation_refs': self_citation_refs,
         
+        # NEW: Collections for new types
+        'repository_refs': repository_refs[:20],
+        'ebook_refs': ebook_refs[:20],
+        'ebook_with_doi_refs': ebook_with_doi_refs[:20],
+        'proceedings_refs': proceedings_refs[:20],
+        'retracted_refs': retracted_refs[:20],
+        'books_with_isbn_no_doi': books_with_isbn_no_doi[:20],
+        
         # Enhanced data
         'concepts': concepts_data,
         'geography': geo_data,
@@ -3438,7 +3672,12 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
             'has_pmid': calc_percent(identifier_data['stats']['has_pmid']),
             'has_isbn': calc_percent(identifier_data['stats']['has_isbn']),
             'has_none': calc_percent(identifier_data['stats']['has_none']),
-            'multiple': calc_percent(identifier_data['stats']['multiple'])
+            'multiple': calc_percent(identifier_data['stats']['multiple']),
+            # NEW percentages
+            'preprint_repository': calc_percent(identifier_data['stats']['is_preprint_repository']),
+            'books': calc_percent(identifier_data['stats']['is_book']),
+            'proceedings': calc_percent(identifier_data['stats']['is_proceedings']),
+            'retracted': calc_percent(identifier_data['stats']['is_retracted'])
         },
         'publisher_frequency': publisher_freq,
         'journal_frequency_all': journal_freq_all,
@@ -3580,7 +3819,7 @@ def get_color_for_author(index: int) -> str:
     ]
     return colors[index % len(colors)]
 
-# ======================== HTML REPORT (ENGLISH, UPDATED) ========================
+# ======================== HTML REPORT (ENGLISH, UPDATED WITH NEW TYPES) ========================
 def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_authors: Set[str] = None, lang: str = 'en', journal_name: str = '', article_number: str = '', duplicates: List[Dict] = None) -> str:
     """Generate enhanced HTML report with PNG icons (no emojis) and professional design"""
     
@@ -3719,8 +3958,17 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
                 journal_info = f'<div style="font-size: 13px; margin-top: 5px;"><strong>{get_text_local("journal")}:</strong> {html.escape(ref.get("journal", get_text_local("not_found")))}</div>' if ref.get('journal') else ''
                 year_info = f'<div style="font-size: 13px; margin-top: 5px;"><strong>{get_text_local("year")}:</strong> {ref.get("year", get_text_local("not_found"))}</div>' if ref.get('year') else ''
                 
+                # Check if this is an ebook, repository, or proceedings for special styling
+                special_class = ""
+                if ref.get('is_ebook', False):
+                    special_class = "ebook-reference"
+                elif ref.get('is_repository', False):
+                    special_class = "repository-reference"
+                elif ref.get('is_proceedings', False):
+                    special_class = "proceedings-reference"
+                
                 self_citations_html += f"""
-                <div class="rank-item" style="margin-bottom: 15px;">
+                <div class="rank-item {special_class}" style="margin-bottom: 15px;">
                     <div><strong>{get_text_local("reference")}:</strong></div>
                     <div class="full-text-container">{original_text_full}</div>
                     <div style="font-size: 13px; margin-top: 8px;"><strong>{get_text_local("authors")}:</strong> {formatted_authors}</div>
@@ -3753,7 +4001,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             """
         duplicates_html += "</div>"
     
-    # Generate full reference list
+    # Generate full reference list with special styling for ebooks, repositories, proceedings
     full_references_html = ""
     for idx, result in enumerate(results[:300]):
         authors_full_list = result.get('authors_display', [])
@@ -3762,16 +4010,29 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         doi_info = f'<div style="font-size: 13px; margin-top: 5px;"><strong>{get_text_local("doi_found")}:</strong> {make_clickable_doi(result.get("doi"))}</div>' if result.get('doi') else ''
         status_icon = "⚠" if result.get('is_suspicious_doi') else ("✓" if result.get('doi') else "✗")
         
+        # Determine special styling class for this reference
+        special_class = ""
+        special_badge = ""
+        if result.get('is_ebook', False):
+            special_class = "ebook-reference"
+            special_badge = f'<span class="badge-book" style="margin-left: 10px;">{get_text_local("ebook")}</span>'
+        elif result.get('is_repository', False):
+            special_class = "repository-reference"
+            special_badge = f'<span class="badge-repository" style="margin-left: 10px;">{get_text_local("repository")}</span>'
+        elif result.get('is_proceedings', False):
+            special_class = "proceedings-reference"
+            special_badge = f'<span class="badge-proceedings" style="margin-left: 10px;">{get_text_local("proceedings")}</span>'
+        
         full_references_html += f"""
-        <div class="rank-item" style="margin-bottom: 15px;">
-            <div><strong>{status_icon} {get_text_local("reference")} {idx + 1}:</strong></div>
+        <div class="rank-item {special_class}" style="margin-bottom: 15px;">
+            <div><strong>{status_icon} {get_text_local("reference")} {idx + 1}:</strong>{special_badge}</div>
             <div class="full-text-container">{original_text_full}</div>
             <div style="font-size: 13px; margin-top: 5px;"><strong>{get_text_local("authors")}:</strong> {formatted_authors}</div>
             {doi_info}
         </div>
         """
     
-    # Build sidebar navigation with PNG icons
+    # Build sidebar navigation with PNG icons (updated with new sections)
     sidebar_items = [
         ("overview", "html_overview", icons["overview"]),
         ("identifiers", "html_identifier_coverage", icons["identifier"]),
@@ -3831,6 +4092,10 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     self_citations_percent = stats['self_citations_percent']
     total_citations_sum = stats.get('total_citations_sum', 0)
     avg_citations = stats.get('avg_citations', 0)
+    
+    # NEW: Format identifier coverage with new types (Preprint/Repository, Books, Proceedings, Retracted)
+    identifier_stats = stats['identifier_coverage']['stats']
+    identifier_percents = stats['identifier_coverage_percents']
     
     # Build HTML content
     html_content = f"""<!DOCTYPE html>
@@ -4044,6 +4309,9 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         .badge-warning {{ background: #fff3cd; color: #856404; }}
         .badge-danger {{ background: #f8d7da; color: #721c24; }}
         .badge-info {{ background: #d1ecf1; color: #0c5460; }}
+        .badge-repository {{ background: #e2d5f8; color: #5e2a9e; }}
+        .badge-book {{ background: #d4f1e9; color: #0e6b5e; }}
+        .badge-proceedings {{ background: #fff2c9; color: #b26b00; }}
         .footer {{
             text-align: center;
             padding: 20px;
@@ -4088,6 +4356,19 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             padding: 8px;
             border-radius: 5px;
             margin-top: 5px;
+        }}
+        /* Special styling for different reference types */
+        .ebook-reference {{
+            background: #d4f1e9 !important;
+            border-left: 3px solid #0e6b5e !important;
+        }}
+        .repository-reference {{
+            background: #e2d5f8 !important;
+            border-left: 3px solid #5e2a9e !important;
+        }}
+        .proceedings-reference {{
+            background: #fff2c9 !important;
+            border-left: 3px solid #b26b00 !important;
         }}
         @media print {{
             .sidebar {{ display: none; }}
@@ -4152,39 +4433,59 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             </div>
         </div>
         
-        <!-- IDENTIFIER COVERAGE SECTION -->
+        <!-- IDENTIFIER COVERAGE SECTION (UPDATED WITH NEW TYPES) -->
         <div id="identifiers" class="section">
             {make_section_title("identifier", "html_identifier_coverage")}
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-number">{stats['identifier_coverage']['stats']['has_doi']}</div>
-                    <div class="stat-percent">({stats['identifier_coverage_percents']['has_doi']:.1f}%)</div>
+                    <div class="stat-number">{identifier_stats['has_doi']}</div>
+                    <div class="stat-percent">({identifier_percents['has_doi']:.1f}%)</div>
                     <div class="stat-label">{get_text_local('doi_found')}</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">{stats['identifier_coverage']['stats']['has_url']}</div>
-                    <div class="stat-percent">({stats['identifier_coverage_percents']['has_url']:.1f}%)</div>
+                    <div class="stat-number">{identifier_stats['has_url']}</div>
+                    <div class="stat-percent">({identifier_percents['has_url']:.1f}%)</div>
                     <div class="stat-label">URL</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">{stats['identifier_coverage']['stats']['has_arxiv']}</div>
-                    <div class="stat-percent">({stats['identifier_coverage_percents']['has_arxiv']:.1f}%)</div>
-                    <div class="stat-label">arXiv</div>
+                    <div class="stat-number">{identifier_stats['has_arxiv']}</div>
+                    <div class="stat-percent">({identifier_percents['has_arxiv']:.1f}%)</div>
+                    <div class="stat-label">{get_text_local('preprint_repository_count')}</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">{stats['identifier_coverage']['stats']['has_pmid']}</div>
-                    <div class="stat-percent">({stats['identifier_coverage_percents']['has_pmid']:.1f}%)</div>
+                    <div class="stat-number">{identifier_stats['has_pmid']}</div>
+                    <div class="stat-percent">({identifier_percents['has_pmid']:.1f}%)</div>
                     <div class="stat-label">PMID</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">{stats['identifier_coverage']['stats']['has_isbn']}</div>
-                    <div class="stat-percent">({stats['identifier_coverage_percents']['has_isbn']:.1f}%)</div>
-                    <div class="stat-label">ISBN</div>
+                    <div class="stat-number">{identifier_stats['is_book']}</div>
+                    <div class="stat-percent">({identifier_percents['books']:.1f}%)</div>
+                    <div class="stat-label">{get_text_local('books_count')}</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">{stats['identifier_coverage']['stats']['has_none']}</div>
-                    <div class="stat-percent">({stats['identifier_coverage_percents']['has_none']:.1f}%)</div>
+                    <div class="stat-number">{identifier_stats['is_preprint_repository']}</div>
+                    <div class="stat-percent">({identifier_percents['preprint_repository']:.1f}%)</div>
+                    <div class="stat-label">{get_text_local('preprint_repository_count')}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{identifier_stats['is_proceedings']}</div>
+                    <div class="stat-percent">({identifier_percents['proceedings']:.1f}%)</div>
+                    <div class="stat-label">{get_text_local('proceedings_count')}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{identifier_stats['is_retracted']}</div>
+                    <div class="stat-percent">({identifier_percents['retracted']:.1f}%)</div>
+                    <div class="stat-label">{get_text_local('retracted_count')}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{identifier_stats['has_none']}</div>
+                    <div class="stat-percent">({identifier_percents['has_none']:.1f}%)</div>
                     <div class="stat-label">{get_text_local('no_identifier')}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{identifier_stats['multiple']}</div>
+                    <div class="stat-percent">({identifier_percents['multiple']:.1f}%)</div>
+                    <div class="stat-label">Multiple identifiers</div>
                 </div>
             </div>
             <div class="stats-grid">
@@ -4358,7 +4659,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         <div id="collaboration" class="section">
             {make_section_title("collaborations", "html_collaborations")}
             <div>
-                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(collab["author1"])} + {html.escape(collab["author2"])}</span><span class="rank-count">{collab["count"]} {get_text_local("html_joint_works")}</span></div>' for i, collab in enumerate(stats["collaboration"]["top_collaborations"][:8])])}
+                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(collab["author1"])} + {html.escape(collab["author2"])}</span><span class="rank-count">{collab["count"]} {get_text_local("html_joint_works")}</span></div>' for i, collab in enumerate(stats["collaboration"]["top_collaborations"][:8]])])}
             </div>
             <div style="margin-top: 15px;">
                 <span class="badge badge-info">{get_text_local('core_authors_label')}: {', '.join([f"{html.escape(author[0])} ({author[1]} {get_text_local('html_connections')})" for author in stats['collaboration']['core_authors'][:5]])}</span>
@@ -4417,17 +4718,53 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             {''.join([f'<div class="rank-item"><div>{html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('openalex_only_refs', [])[:20]]) if stats.get('openalex_only_refs') else f'<p>{get_text_local("no_openalex_only")}</p>'}
         </div>
         
-        <!-- SUSPICIOUS DOIS SECTION -->
+        <!-- SUSPICIOUS DOIS SECTION (UPDATED WITH REPOSITORY AND PROCEEDINGS NOTES) -->
         <div id="suspicious_doi" class="section">
             {make_section_title("suspicious", "html_suspicious_doi")}
             <div style="margin-bottom: 15px; font-size: 13px; color: #666;">{get_text_local('suspicious_dois_hint')}</div>
-            {''.join([f'<div class="rank-item"><div class="badge badge-danger">{get_text_local("html_attention")}</div><div>{html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('suspicious_doi_refs', [])[:20]]) if stats.get('suspicious_doi_refs') else f'<p>{get_text_local("no_suspicious_dois")}</p>'}
+            
+            <!-- Repository sources (not invalid) -->
+            {f'''
+            <div style="margin-top: 10px; margin-bottom: 15px;">
+                <h4>{get_text_local("repository")} {get_text_local("references")}:</h4>
+                <div style="font-size: 12px; color: #5e2a9e; margin-bottom: 10px;">{get_text_local("html_repository_note")}</div>
+                {''.join([f'<div class="rank-item repository-reference"><span class="badge-repository">{get_text_local("repository")}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div>' if ref.get("doi") else '') + '</div>' for ref in stats.get('repository_refs', [])[:20]])}
+            </div>
+            ''' if stats.get('repository_refs') else ''}
+            
+            <!-- Proceedings sources (not invalid) -->
+            {f'''
+            <div style="margin-top: 10px; margin-bottom: 15px;">
+                <h4>{get_text_local("proceedings")} {get_text_local("references")}:</h4>
+                <div style="font-size: 12px; color: #b26b00; margin-bottom: 10px;">{get_text_local("html_proceedings_note")}</div>
+                {''.join([f'<div class="rank-item proceedings-reference"><span class="badge-proceedings">{get_text_local("proceedings")}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div>' if ref.get("doi") else '') + '</div>' for ref in stats.get('proceedings_refs', [])[:20]])}
+            </div>
+            ''' if stats.get('proceedings_refs') else ''}
+            
+            <!-- Truly suspicious DOIs -->
+            <div style="margin-top: 10px;">
+                <h4>{get_text_local("suspicious_dois")}:</h4>
+                {''.join([f'<div class="rank-item"><div class="badge badge-danger">{get_text_local("html_attention")}</div><div>{html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('suspicious_doi_refs', [])[:20]]) if stats.get('suspicious_doi_refs') else f'<p>{get_text_local("no_suspicious_dois")}</p>'}
+            </div>
         </div>
         
-        <!-- NON-DOI SOURCES SECTION -->
+        <!-- NON-DOI SOURCES SECTION (UPDATED with books with ISBN no DOI) -->
         <div id="non_doi" class="section">
             {make_section_title("nondoi", "html_non_doi")}
-            {''.join([f'<div class="rank-item">{html.escape(ref)}</div>' for ref in stats['identifier_coverage']['references_without_doi'][:20]]) if stats['identifier_coverage']['references_without_doi'] else f'<p>{get_text_local("all_have_doi")}</p>'}
+            
+            <!-- Books with ISBN but no DOI -->
+            {f'''
+            <div style="margin-bottom: 15px;">
+                <h4>{get_text_local("books_count")} (ISBN without DOI):</h4>
+                {''.join([f'<div class="rank-item book-reference"><span class="badge-book">{get_text_local("ebook")}</span><div style="margin-top: 8px;">{html.escape(ref)}</div></div>' for ref in stats.get('books_with_isbn_no_doi', [])[:20]])}
+            </div>
+            ''' if stats.get('books_with_isbn_no_doi') else ''}
+            
+            <!-- Other non-DOI sources -->
+            <div>
+                <h4>{get_text_local("other")} {get_text_local("non_doi_sources")}:</h4>
+                {''.join([f'<div class="rank-item">{html.escape(ref)}</div>' for ref in stats['identifier_coverage']['references_without_doi'][:20]]) if stats['identifier_coverage']['references_without_doi'] else f'<p>{get_text_local("all_have_doi")}</p>'}
+            </div>
         </div>
         
         <!-- URL SOURCES SECTION -->
@@ -4436,10 +4773,24 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             {''.join([f'<div class="rank-item">{html.escape(ref)}</div>' for ref in stats['identifier_coverage']['references_with_only_url'][:20]]) if stats['identifier_coverage']['references_with_only_url'] else f'<p>{get_text_local("no_url_only")}</p>'}
         </div>
         
-        <!-- PROBLEMS SECTION -->
+        <!-- PROBLEMS SECTION (includes retractions) -->
         <div id="problems" class="section">
             {make_section_title("problems", "html_problems")}
-            {''.join([f'<div class="rank-item"><span class="badge badge-danger">{html.escape(ref["problems"])}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div></div>' for ref in stats['problematic_refs'][:10]]) if stats['problematic_refs'] else f'<p>{get_text_local("no_problematic")}</p>'}
+            
+            <!-- Retracted articles -->
+            {f'''
+            <div style="margin-bottom: 20px;">
+                <h4>{get_text_local("retracted_count")}:</h4>
+                {''.join([f'<div class="rank-item"><span class="badge-danger" style="background: #f8d7da; color: #721c24;">{get_text_local("retracted")}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div>' if ref.get("doi") else '') + '</div>' for ref in stats.get('retracted_refs', [])[:20]]) if stats.get('retracted_refs') else f'<p>{get_text_local("none_detected")}</p>'}
+            </div>
+            ''' if stats.get('retracted_refs') else ''}
+            
+            <!-- Other problematic references -->
+            <div>
+                <h4>{get_text_local("other")} {get_text_local("problematic_refs")}:</h4>
+                {''.join([f'<div class="rank-item"><span class="badge badge-warning">{html.escape(ref["problems"])}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div></div>' for ref in stats['problematic_refs'][:10]]) if stats['problematic_refs'] else f'<p>{get_text_local("no_problematic")}</p>'}
+            </div>
+            
             {f'<div style="margin-top: 15px;"><h4>{get_text_local("predatory_journals")}:</h4>{"".join([f"<div class=rank-item>{html.escape(pred['journal'])}<br><span style=font-size:12px;color:#666;>{', '.join([html.escape(s) for s in pred['signs']])}</span></div>" for pred in stats['predatory_journals'][:5]])}</div>' if stats['predatory_journals'] else ''}
         </div>
         
@@ -4460,7 +4811,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     
     return html_content
 
-# ======================== UI INTERFACE (ENGLISH, UPDATED) ========================
+# ======================== UI INTERFACE (ENGLISH, UPDATED WITH NEW FILTERS) ========================
 def main():
     # Language selector in sidebar (before anything else)
     with st.sidebar:
@@ -4752,10 +5103,13 @@ def main():
                 id_df = pd.DataFrame([
                     {"Identifier type": "DOI", "Count": stats['identifier_coverage']['stats']['has_doi'], "Percentage": f"{stats['identifier_coverage_percents']['has_doi']:.1f}%"},
                     {"Identifier type": "URL", "Count": stats['identifier_coverage']['stats']['has_url'], "Percentage": f"{stats['identifier_coverage_percents']['has_url']:.1f}%"},
-                    {"Identifier type": "arXiv", "Count": stats['identifier_coverage']['stats']['has_arxiv'], "Percentage": f"{stats['identifier_coverage_percents']['has_arxiv']:.1f}%"},
+                    {"Identifier type": get_text('preprint_repository_count'), "Count": stats['identifier_coverage']['stats']['has_arxiv'], "Percentage": f"{stats['identifier_coverage_percents']['has_arxiv']:.1f}%"},
                     {"Identifier type": "PMID", "Count": stats['identifier_coverage']['stats']['has_pmid'], "Percentage": f"{stats['identifier_coverage_percents']['has_pmid']:.1f}%"},
-                    {"Identifier type": "ISBN", "Count": stats['identifier_coverage']['stats']['has_isbn'], "Percentage": f"{stats['identifier_coverage_percents']['has_isbn']:.1f}%"},
-                    {"Identifier type": "No identifier", "Count": stats['identifier_coverage']['stats']['has_none'], "Percentage": f"{stats['identifier_coverage_percents']['has_none']:.1f}%"},
+                    {"Identifier type": get_text('books_count'), "Count": stats['identifier_coverage']['stats']['is_book'], "Percentage": f"{stats['identifier_coverage_percents']['books']:.1f}%"},
+                    {"Identifier type": get_text('preprint_repository_count') + " (from API)", "Count": stats['identifier_coverage']['stats']['is_preprint_repository'], "Percentage": f"{stats['identifier_coverage_percents']['preprint_repository']:.1f}%"},
+                    {"Identifier type": get_text('proceedings_count'), "Count": stats['identifier_coverage']['stats']['is_proceedings'], "Percentage": f"{stats['identifier_coverage_percents']['proceedings']:.1f}%"},
+                    {"Identifier type": get_text('retracted_count'), "Count": stats['identifier_coverage']['stats']['is_retracted'], "Percentage": f"{stats['identifier_coverage_percents']['retracted']:.1f}%"},
+                    {"Identifier type": get_text('no_identifier'), "Count": stats['identifier_coverage']['stats']['has_none'], "Percentage": f"{stats['identifier_coverage_percents']['has_none']:.1f}%"},
                     {"Identifier type": "Multiple identifiers", "Count": stats['identifier_coverage']['stats']['multiple'], "Percentage": f"{stats['identifier_coverage_percents']['multiple']:.1f}%"}
                 ])
                 st.dataframe(id_df, use_container_width=True)
@@ -4951,20 +5305,49 @@ def main():
             elif active_tab == "suspicious":
                 st.markdown(f"### {get_text('suspicious_dois')}")
                 st.markdown(get_text('suspicious_dois_hint'))
+                
+                # Show repository sources if any
+                if stats.get('repository_refs'):
+                    st.markdown(f"#### {get_text('repository')} {get_text('references')}")
+                    st.caption(get_text('html_repository_note'))
+                    for ref in stats['repository_refs'][:20]:
+                        doi_link = f"<a href='https://doi.org/{ref['doi']}' target='_blank' style='color: #667eea; text-decoration: none;'>{ref['doi']}</a>" if ref.get('doi') else get_text('not_found')
+                        st.info(f"📚 {ref['text']}\n\nDOI: {doi_link}", unsafe_allow_html=True)
+                
+                # Show proceedings sources if any
+                if stats.get('proceedings_refs'):
+                    st.markdown(f"#### {get_text('proceedings')} {get_text('references')}")
+                    st.caption(get_text('html_proceedings_note'))
+                    for ref in stats['proceedings_refs'][:20]:
+                        doi_link = f"<a href='https://doi.org/{ref['doi']}' target='_blank' style='color: #667eea; text-decoration: none;'>{ref['doi']}</a>" if ref.get('doi') else get_text('not_found')
+                        st.warning(f"📊 {ref['text']}\n\nDOI: {doi_link}", unsafe_allow_html=True)
+                
+                # Show truly suspicious DOIs
                 if stats.get('suspicious_doi_refs'):
+                    st.markdown(f"#### {get_text('suspicious_dois')}")
                     for ref in stats['suspicious_doi_refs'][:20]:
-                        # Make DOI clickable (even if suspicious, still can try to link)
                         doi_link = f"<a href='https://doi.org/{ref['doi']}' target='_blank' style='color: #667eea; text-decoration: none;'>{ref['doi']}</a>"
                         st.error(f"⚠️ {ref['text']}\n\nDOI: {doi_link}", unsafe_allow_html=True)
-                else:
+                elif not stats.get('repository_refs') and not stats.get('proceedings_refs'):
                     st.success(get_text('no_suspicious_dois'))
             
             elif active_tab == "non_doi":
                 st.markdown(f"### {get_text('non_doi_sources')}")
+                
+                # Show books with ISBN but no DOI
+                if stats.get('books_with_isbn_no_doi'):
+                    st.markdown(f"#### {get_text('books_count')} (ISBN without DOI)")
+                    for ref in stats['books_with_isbn_no_doi'][:20]:
+                        st.markdown(f"<div class='rank-item book-reference'><span class='badge-book'>{get_text('ebook')}</span><div style='margin-top: 8px;'>{html.escape(ref)}</div></div>", unsafe_allow_html=True)
+                
+                # Show other non-DOI sources
                 if stats['identifier_coverage']['references_without_doi']:
+                    st.markdown(f"#### {get_text('other')} {get_text('non_doi_sources')}")
                     for ref in stats['identifier_coverage']['references_without_doi'][:20]:
-                        st.text(ref)
-                else:
+                        # Skip books with ISBN no DOI as they are already shown
+                        if not any(book_ref == ref for book_ref in stats.get('books_with_isbn_no_doi', [])):
+                            st.text(ref)
+                elif not stats.get('books_with_isbn_no_doi'):
                     st.success(get_text('all_have_doi'))
             
             elif active_tab == "url_sources":
@@ -4977,10 +5360,21 @@ def main():
             
             elif active_tab == "problems":
                 st.markdown(f"### {get_text('problematic_refs')}")
+                
+                # Show retracted articles
+                if stats.get('retracted_refs'):
+                    st.markdown(f"#### {get_text('retracted_count')}")
+                    for ref in stats['retracted_refs'][:20]:
+                        doi_link = f"<a href='https://doi.org/{ref['doi']}' target='_blank' style='color: #667eea; text-decoration: none;'>{ref['doi']}</a>" if ref.get('doi') else get_text('not_found')
+                        st.error(f"⚠️ {get_text('retracted')}: {ref['text']}\n\nDOI: {doi_link}", unsafe_allow_html=True)
+                
+                # Show other problematic references
                 if stats['problematic_refs']:
+                    st.markdown(f"#### {get_text('other')} {get_text('problematic_refs')}")
                     for ref in stats['problematic_refs'][:15]:
                         st.warning(f"**{ref['problems']}**\n\n{ref['text']}")
-                else:
+                
+                if not stats['problematic_refs'] and not stats.get('retracted_refs'):
                     st.success(get_text('no_problematic'))
                 
                 if stats['predatory_journals']:
@@ -5002,7 +5396,11 @@ def main():
                     'crossref_only': False,
                     'openalex_only': False,
                     'problematic_only': False,
-                    'self_cited_only': False
+                    'self_cited_only': False,
+                    'preprint_repository_only': False,
+                    'books_only': False,
+                    'proceedings_only': False,
+                    'retracted_only': False
                 }
             
             # Function to handle filter changes
@@ -5015,6 +5413,13 @@ def main():
                 else:
                     st.session_state.filter_states[filter_name] = False
             
+            # Check if we have any references of each type to show dynamic filters
+            has_preprint_repository = any(r.get('is_repository', False) for r in results)
+            has_books = any(r.get('is_ebook', False) or (r.get('identifiers', {}).get('isbn') and not r.get('doi')) for r in results)
+            has_proceedings = any(r.get('is_proceedings', False) for r in results)
+            has_retracted = any(r.get('is_retracted', False) for r in results)
+            
+            # Display dynamic filters (only show if there are relevant references)
             col_filter1, col_filter2, col_filter3, col_filter4 = st.columns(4)
             with col_filter1:
                 doi_only = st.checkbox(
@@ -5070,6 +5475,41 @@ def main():
             with col_filter8:
                 search_term = st.text_input(get_text('search_in_text'), placeholder=get_text('search_placeholder'))
             
+            # NEW: Second row of dynamic filters (only show if there are references of that type)
+            col_filter9, col_filter10, col_filter11, col_filter12 = st.columns(4)
+            with col_filter9:
+                if has_preprint_repository:
+                    preprint_repo_only = st.checkbox(
+                        get_text('only_preprint_repository'),
+                        value=st.session_state.filter_states['preprint_repository_only'],
+                        key="filter_preprint_repo_only",
+                        on_change=lambda: toggle_filter('preprint_repository_only', st.session_state.filter_preprint_repo_only)
+                    )
+            with col_filter10:
+                if has_books:
+                    books_only = st.checkbox(
+                        get_text('only_books'),
+                        value=st.session_state.filter_states['books_only'],
+                        key="filter_books_only",
+                        on_change=lambda: toggle_filter('books_only', st.session_state.filter_books_only)
+                    )
+            with col_filter11:
+                if has_proceedings:
+                    proceedings_only = st.checkbox(
+                        get_text('only_proceedings'),
+                        value=st.session_state.filter_states['proceedings_only'],
+                        key="filter_proceedings_only",
+                        on_change=lambda: toggle_filter('proceedings_only', st.session_state.filter_proceedings_only)
+                    )
+            with col_filter12:
+                if has_retracted:
+                    retracted_only = st.checkbox(
+                        get_text('only_retracted'),
+                        value=st.session_state.filter_states['retracted_only'],
+                        key="filter_retracted_only",
+                        on_change=lambda: toggle_filter('retracted_only', st.session_state.filter_retracted_only)
+                    )
+            
             filtered_results = results
             
             # Apply filters based on session state
@@ -5087,6 +5527,15 @@ def main():
                 filtered_results = [r for r in filtered_results if r['is_retracted'] or r['is_preprint'] or r['crossmark_issues'] or r.get('is_suspicious_doi')]
             if st.session_state.filter_states['self_cited_only']:
                 filtered_results = [r for r in filtered_results if r['is_self_citation']]
+            # NEW filters
+            if st.session_state.filter_states['preprint_repository_only']:
+                filtered_results = [r for r in filtered_results if r.get('is_repository', False) or r.get('type') == 'posted_content']
+            if st.session_state.filter_states['books_only']:
+                filtered_results = [r for r in filtered_results if r.get('is_ebook', False) or (r.get('identifiers', {}).get('isbn') and not r.get('doi'))]
+            if st.session_state.filter_states['proceedings_only']:
+                filtered_results = [r for r in filtered_results if r.get('is_proceedings', False)]
+            if st.session_state.filter_states['retracted_only']:
+                filtered_results = [r for r in filtered_results if r.get('is_retracted', False)]
             if search_term:
                 filtered_results = [r for r in filtered_results if search_term.lower() in r['original_text'].lower()]
             
@@ -5116,7 +5565,7 @@ def main():
                 
                 return ', '.join(formatted_authors)
             
-            # Display filtered results
+            # Display filtered results with special styling for ebooks, repositories, proceedings
             for i, result in enumerate(filtered_results[:50]):
                 if result.get('is_suspicious_doi'):
                     status_icon = "⚠️"
@@ -5126,16 +5575,31 @@ def main():
                     status_icon = "❌"
                 
                 problems_badges = []
-                if result['is_retracted']:
+                if result.get('is_retracted'):
                     problems_badges.append(f'<span class="badge-danger">{get_text("retracted")}</span>')
-                if result['is_preprint']:
+                if result.get('is_preprint'):
                     problems_badges.append(f'<span class="badge-warning">{get_text("preprint")}</span>')
-                if result['is_self_citation']:
+                if result.get('is_repository'):
+                    problems_badges.append(f'<span class="badge-repository">{get_text("repository")}</span>')
+                if result.get('is_ebook'):
+                    problems_badges.append(f'<span class="badge-book">{get_text("ebook")}</span>')
+                if result.get('is_proceedings'):
+                    problems_badges.append(f'<span class="badge-proceedings">{get_text("proceedings")}</span>')
+                if result.get('is_self_citation'):
                     problems_badges.append(f'<span class="badge-info">{get_text("self_citation")}</span>')
                 if result.get('is_suspicious_doi'):
                     problems_badges.append(f'<span class="badge-danger">{get_text("suspicious_doi_badge")}</span>')
                 
                 badges_html = ' '.join(problems_badges)
+                
+                # Determine special class for expander styling
+                special_class = ""
+                if result.get('is_ebook', False):
+                    special_class = "ebook-reference"
+                elif result.get('is_repository', False):
+                    special_class = "repository-reference"
+                elif result.get('is_proceedings', False):
+                    special_class = "proceedings-reference"
                 
                 # Format authors with highlighting if this is a self-citation
                 if result['is_self_citation'] and normalized_paper_authors:
@@ -5154,14 +5618,23 @@ def main():
                 else:
                     doi_display = get_text('not_found')
                 
-                with st.expander(f"{status_icon} {result['original_text'][:150]}..."):
+                # Use custom CSS class for expander if needed (via markdown wrapper)
+                expander_label = f"{status_icon} {result['original_text'][:150]}..."
+                if special_class:
+                    expander_label = f"{status_icon} <span class='{special_class}' style='display: inline-block; padding: 2px 8px; border-radius: 12px;'>{result['original_text'][:130]}...</span>"
+                
+                with st.expander(expander_label, unsafe_allow_html=True):
                     st.markdown(f"**DOI:** {doi_display}", unsafe_allow_html=True)
                     identifiers = result.get('identifiers', {})
                     if identifiers.get('url'):
                         st.markdown(f"**URL:** {identifiers['url']}")
                     if identifiers.get('arxiv'):
                         st.markdown(f"**arXiv:** {identifiers['arxiv']}")
+                    if identifiers.get('isbn'):
+                        st.markdown(f"**ISBN:** {identifiers['isbn']}")
                     st.markdown(f"**{get_text('status')}:** Crossref: {'✅' if result['crossref_status'] else '❌'} | OpenAlex: {'✅' if result['openalex_status'] else '❌'}")
+                    if result.get('openalex_type'):
+                        st.markdown(f"**OpenAlex type:** {result['openalex_type']}")
                     if result['journal']:
                         st.markdown(f"**{get_text('journal')}:** {result['journal']}")
                     if result['year']:
@@ -5195,7 +5668,7 @@ def main():
             st.markdown(f"### {get_text('export_report')}")
             st.markdown(get_text('download_html'))
             
-            # Generate HTML report with duplicates
+            # Generate HTML report with duplicates and new types
             html_report = generate_html_report_advanced(
                 results, 
                 stats, 
@@ -5257,7 +5730,7 @@ def main():
             st.markdown("---")
             st.markdown(f"### {get_text('text_export')}")
             
-            # Prepare text export with comprehensive data
+            # Prepare text export with comprehensive data (updated with new types)
             copy_text = f"""
     === COMPREHENSIVE REFERENCE LIST ANALYSIS ===
     Journal: {journal_name if journal_name else 'Chimica Techno Acta'}
@@ -5275,9 +5748,12 @@ def main():
     === IDENTIFIER COVERAGE ===
     DOI: {stats['identifier_coverage']['stats']['has_doi']} ({stats['identifier_coverage_percents']['has_doi']:.1f}%)
     URL: {stats['identifier_coverage']['stats']['has_url']} ({stats['identifier_coverage_percents']['has_url']:.1f}%)
-    arXiv: {stats['identifier_coverage']['stats']['has_arxiv']} ({stats['identifier_coverage_percents']['has_arxiv']:.1f}%)
+    Preprint/Repository: {stats['identifier_coverage']['stats']['has_arxiv']} ({stats['identifier_coverage_percents']['has_arxiv']:.1f}%)
     PMID: {stats['identifier_coverage']['stats']['has_pmid']} ({stats['identifier_coverage_percents']['has_pmid']:.1f}%)
-    ISBN: {stats['identifier_coverage']['stats']['has_isbn']} ({stats['identifier_coverage_percents']['has_isbn']:.1f}%)
+    Books: {stats['identifier_coverage']['stats']['is_book']} ({stats['identifier_coverage_percents']['books']:.1f}%)
+    Preprint/Repository (API): {stats['identifier_coverage']['stats']['is_preprint_repository']} ({stats['identifier_coverage_percents']['preprint_repository']:.1f}%)
+    Proceedings: {stats['identifier_coverage']['stats']['is_proceedings']} ({stats['identifier_coverage_percents']['proceedings']:.1f}%)
+    Retracted: {stats['identifier_coverage']['stats']['is_retracted']} ({stats['identifier_coverage_percents']['retracted']:.1f}%)
     No identifier: {stats['identifier_coverage']['stats']['has_none']} ({stats['identifier_coverage_percents']['has_none']:.1f}%)
     Multiple identifiers: {stats['identifier_coverage']['stats']['multiple']} ({stats['identifier_coverage_percents']['multiple']:.1f}%)
     
@@ -5287,6 +5763,8 @@ def main():
     Only OpenAlex: {stats['doi_status']['openalex_only']} ({stats['doi_status_percents']['openalex_only']:.1f}%)
     No data: {stats['doi_status']['none']} ({stats['doi_status_percents']['none']:.1f}%)
     Suspicious DOIs: {len(stats.get('suspicious_doi_refs', []))}
+    Repository sources: {len(stats.get('repository_refs', []))}
+    Proceedings sources: {len(stats.get('proceedings_refs', []))}
     
     === DUPLICATES ===
     Full DOI matches found: {len(duplicates) if duplicates else 0}
@@ -5325,6 +5803,18 @@ def main():
     
     === CITATION CLASSICS ===
     {chr(10).join([f"{i+1}. {c['title'][:100] if c['title'] else 'Unknown'}: {c['citations']} citations" for i, c in enumerate(stats['citation_classics'][:5])]) if stats['citation_classics'] else "No citation classics detected (threshold: >300 citations)"}
+    
+    === RETRACTED ARTICLES ===
+    {chr(10).join([f"- {ref['text'][:100]}... DOI: {ref.get('doi', 'N/A')}" for ref in stats.get('retracted_refs', [])[:5]]) if stats.get('retracted_refs') else "No retracted articles detected"}
+    
+    === REPOSITORY SOURCES ===
+    {chr(10).join([f"- {ref['text'][:100]}... DOI: {ref.get('doi', 'N/A')}" for ref in stats.get('repository_refs', [])[:5]]) if stats.get('repository_refs') else "No repository sources detected"}
+    
+    === PROCEEDINGS SOURCES ===
+    {chr(10).join([f"- {ref['text'][:100]}... DOI: {ref.get('doi', 'N/A')}" for ref in stats.get('proceedings_refs', [])[:5]]) if stats.get('proceedings_refs') else "No proceedings sources detected"}
+    
+    === BOOKS (ISBN without DOI) ===
+    {chr(10).join([f"- {ref[:100]}..." for ref in stats.get('books_with_isbn_no_doi', [])[:5]]) if stats.get('books_with_isbn_no_doi') else "No books with ISBN without DOI detected"}
     
     === PROBLEMATIC REFERENCES ===
     {chr(10).join([f"- {ref['problems']}: {ref['text'][:100]}..." for ref in stats['problematic_refs'][:5]]) if stats['problematic_refs'] else "No problematic references detected"}
