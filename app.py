@@ -2330,33 +2330,106 @@ def analyze_language_distribution(results: List[Dict]) -> Dict:
     }
 
 def detect_predatory_journals(results: List[Dict]) -> List[Dict]:
-    """Detect potentially predatory journals (warning signs)"""
+    """Detect potentially predatory journals (warning signs)
+    
+    NOTE: Repositories (arXiv, bioRxiv, medRxiv, etc.) and preprints are NOT predatory.
+    They are legitimate sources for early research dissemination.
+    """
     predatory_signs = []
     
-    suspicious_publishers = ['OMICS', 'WASET', 'Scientific & Academic Publishing', 'Ashdin Publishing']
+    # Suspicious publishers (genuinely predatory)
+    suspicious_publishers = [
+        'OMICS', 'WASET', 'Scientific & Academic Publishing', 'Ashdin Publishing',
+        'Science Publishing Group', 'International Journal of', 'World Academy of',
+        'European Publisher', 'Academy Publisher', 'Research Publisher'
+    ]
+    
+    # Legitimate repositories - these should NOT be flagged
+    legitimate_repositories = [
+        'arxiv', 'biorxiv', 'medrxiv', 'chemrxiv', 'ssrn', 'research square',
+        'preprints', 'osf preprint', 'f1000research', 'peerj preprints',
+        'nature precedings', 'figshare', 'zenodo', 'open science framework'
+    ]
+    
+    # Legitimate preprint servers
+    legitimate_preprint_servers = [
+        'arxiv.org', 'biorxiv.org', 'medrxiv.org', 'chemrxiv.org',
+        'researchsquare.com', 'preprints.org', 'ssrn.com'
+    ]
     
     for result in results:
         signs = []
+        
+        # Skip repository and preprint sources - they are legitimate
+        is_repository = result.get('is_repository', False) or result.get('type') == 'repository'
+        is_preprint = result.get('is_preprint', False) or result.get('type') == 'posted_content'
+        
+        if is_repository or is_preprint:
+            continue  # Don't flag repositories/preprints as predatory
+        
+        # Check publisher against suspicious list
         if result.get('publisher'):
+            publisher_lower = result['publisher'].lower()
             for sp in suspicious_publishers:
-                if sp.lower() in result['publisher'].lower():
-                    signs.append(f"Publisher {result['publisher']} in suspicious list")
+                if sp.lower() in publisher_lower:
+                    signs.append(f"Publisher '{result['publisher']}' is in suspicious/predatory list")
+                    break
         
-        if not result.get('doi') and result.get('journal'):
-            signs.append("No DOI for journal article")
+        # Check journal name for suspicious patterns
+        if result.get('journal'):
+            journal_lower = result['journal'].lower()
+            
+            # Skip if journal is from legitimate repository
+            is_legit_repo = any(repo in journal_lower for repo in legitimate_repositories)
+            if is_legit_repo:
+                continue
+            
+            # Suspicious patterns in journal names
+            suspicious_patterns = [
+                r'american journal of',
+                r'international journal of',
+                r'world journal of',
+                r'european journal of',
+                r'global journal of',
+                r'research journal of',
+                r'academy journal of',
+                r'\d+\s+days\s+publication',  # "3 days publication"
+                r'fast\s+track',
+                r'rapid\s+publication',
+            ]
+            
+            for pattern in suspicious_patterns:
+                if re.search(pattern, journal_lower):
+                    signs.append(f"Journal name pattern '{pattern}' may indicate predatory practices")
+                    break
         
+        # Check for extremely rapid publication (possible predatory practice)
         if result.get('crossref_data'):
             posted = result['crossref_data'].get('posted', {})
             issued = result['crossref_data'].get('issued', {})
             if posted and issued:
-                signs.append("Possible very rapid publication")
+                # This alone is not sufficient to flag - only if other signs exist
+                pass
+        
+        # Check for missing DOI for journal article (suspicious for scholarly journals)
+        if not result.get('doi') and result.get('journal') and not is_repository and not is_preprint:
+            journal_lower = result['journal'].lower()
+            # Skip legitimate journals without DOI that are known to be valid
+            known_valid_no_doi = ['nature', 'science', 'cell', 'plos one', 'bmc']
+            if not any(valid in journal_lower for valid in known_valid_no_doi):
+                signs.append("No DOI provided for journal article (potential quality concern)")
         
         if signs:
             predatory_signs.append({
                 'reference': result['original_text'][:200],
                 'signs': signs,
-                'journal': result.get('journal', 'Unknown')
+                'journal': result.get('journal', 'Unknown'),
+                'is_repository': is_repository,
+                'is_preprint': is_preprint
             })
+    
+    # Filter out any remaining repository/preprint that might have slipped through
+    predatory_signs = [p for p in predatory_signs if not p.get('is_repository', False) and not p.get('is_preprint', False)]
     
     return predatory_signs[:20]
 
@@ -4820,11 +4893,11 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             {''.join([f'<div class="rank-item">{html.escape(ref)}</div>' for ref in stats['identifier_coverage']['references_with_only_url'][:20]]) if stats['identifier_coverage']['references_with_only_url'] else f'<p>{get_text_local("no_url_only")}</p>'}
         </div>
         
-        <!-- PROBLEMS SECTION (includes retractions) -->
+        <!-- PROBLEMS SECTION (excludes repositories and preprints) -->
         <div id="problems" class="section">
             {make_section_title("problems", "html_problems")}
             
-            <!-- Retracted articles -->
+            <!-- Retracted articles (still a problem) -->
             {f'''
             <div style="margin-bottom: 20px;">
                 <h4>{get_text_local("retracted_count")}:</h4>
@@ -4832,13 +4905,20 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             </div>
             ''' if stats.get('retracted_refs') else ''}
             
-            <!-- Other problematic references -->
+            <!-- Other problematic references (excluding retractions which are already shown) -->
             <div>
                 <h4>{get_text_local("other")} {get_text_local("problematic_refs")}:</h4>
-                {''.join([f'<div class="rank-item"><span class="badge badge-warning">{html.escape(ref["problems"])}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div></div>' for ref in stats['problematic_refs'][:10]]) if stats['problematic_refs'] else f'<p>{get_text_local("no_problematic")}</p>'}
+                {''.join([f'<div class="rank-item"><span class="badge badge-warning">{html.escape(ref["problems"])}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div></div>' for ref in stats['problematic_refs'][:10] if 'retracted' not in ref['problems'].lower()]) if stats['problematic_refs'] else f'<p>{get_text_local("no_problematic")}</p>'}
             </div>
             
-            {f'<div style="margin-top: 15px;"><h4>{get_text_local("predatory_journals")}:</h4>{"".join([f"<div class=rank-item>{html.escape(pred['journal'])}<br><span style=font-size:12px;color:#666;>{', '.join([html.escape(s) for s in pred['signs']])}</span></div>" for pred in stats['predatory_journals'][:5]])}</div>' if stats['predatory_journals'] else ''}
+            <!-- Predatory journals section - but ONLY if they are truly predatory, not repositories -->
+            {f'''
+            <div style="margin-top: 20px;">
+                <h4>{get_text_local("predatory_journals")}:</h4>
+                <div style="margin-bottom: 10px; font-size: 12px; color: #666;">ℹ️ Note: Only potentially predatory publishers are listed. Repositories (arXiv, bioRxiv, etc.) and preprint servers are legitimate sources and are NOT included here.</div>
+                {"".join([f"<div class='rank-item'><strong>{html.escape(pred['journal'])}</strong><br><span style='font-size:12px;color:#666;'>{', '.join([html.escape(s) for s in pred['signs']])}</span><div style='margin-top: 5px; font-size:11px; color:#999;'>{html.escape(pred['reference'][:150])}...</div></div>" for pred in stats['predatory_journals'][:8]]) if stats['predatory_journals'] else f'<p>{get_text_local("none_detected")}</p>'}
+            </div>
+            ''' if stats['predatory_journals'] else ''}
         </div>
         
         <!-- FULL REFERENCE LIST SECTION -->
@@ -5867,7 +5947,8 @@ def main():
     {chr(10).join([f"- {ref['problems']}: {ref['text'][:100]}..." for ref in stats['problematic_refs'][:5]]) if stats['problematic_refs'] else "No problematic references detected"}
     
     === PREDATORY JOURNALS ===
-    {chr(10).join([f"- {pred['journal']}: {', '.join(pred['signs'])}" for pred in stats['predatory_journals'][:5]]) if stats['predatory_journals'] else "No predatory journals detected"}
+    Note: Repositories (arXiv, bioRxiv, medRxiv, etc.) and preprint servers are legitimate sources and are NOT flagged as predatory.
+    {chr(10).join([f"- {pred['journal']}: {', '.join(pred['signs'])}" for pred in stats['predatory_journals'][:5]]) if stats['predatory_journals'] else "No predatory journals detected (repositories/preprints are not counted as predatory)"}
     """
             
             st.text_area(get_text('text_export'), copy_text, height=400)
