@@ -43,9 +43,9 @@ TEXTS = {
         'language': "🌐 Language",
         'language_english': "English",
         'language_russian': "Russian",
-        'journal_name_label': "📝 Journal name (optional)",
+        'journal_name_label': "📝 Journal name",
         'journal_name_help': "If not specified, 'Chimica Techno Acta' will be used",
-        'article_number_label': "🔢 Article number (optional)",
+        'article_number_label': "🔢 Article number",
         'article_number_help': "Example: 1224, CTA-1234, CTA/1224",
         'duplicate_references_title': "Duplicate References (Full DOI Match)",
         'full_doi_match': "Full DOI Match",
@@ -118,9 +118,10 @@ TEXTS = {
         'suspicious_dois': "🔍 Suspicious DOIs (Not found in any database)",
         'suspicious_dois_hint': "These DOIs were extracted from references but returned no data from Crossref or OpenAlex. May be invalid, typo, or AI-generated.",
         'non_doi_sources': "📄 Non-DOI Sources (Books, Theses, Conference Papers, etc.)",
+        'non_journal_sources_with_doi': "📚 Non-journal Sources with DOI",
+        'non_journal_sources_with_doi_desc': "Preprints, repositories, conference proceedings, and e-books that have valid DOIs",
         'url_sources': "🔗 URL Sources (Web links without DOI)",
         'problematic_refs': "⚠️ Problematic References",
-        'predatory_journals': "🚨 Potentially Predatory Journals",
         'full_reference_list': "📋 Full Reference List with Filters",
         'showing': "Showing {} of {} references",
         'showing_first': "Showing first {} of {} references",
@@ -216,6 +217,7 @@ TEXTS = {
         'html_openalex_only': "Only OpenAlex",
         'html_suspicious_doi': "Suspicious DOIs",
         'html_non_doi': "Non-DOI Sources",
+        'html_non_journal_sources_with_doi': "Non-journal Sources with DOI",
         'html_url_sources': "URL Sources",
         'html_problems': "Problems",
         'html_generated': "Generated",
@@ -286,9 +288,9 @@ TEXTS = {
         'language': "🌐 Язык",
         'language_english': "Английский",
         'language_russian': "Русский",
-        'journal_name_label': "📝 Название журнала (опционально)",
+        'journal_name_label': "📝 Название журнала",
         'journal_name_help': "Если не указано, будет использовано 'Chimica Techno Acta'",
-        'article_number_label': "🔢 Номер статьи (опционально)",
+        'article_number_label': "🔢 Номер статьи",
         'article_number_help': "Пример: 1224, CTA-1234, CTA/1224",
         'duplicate_references_title': "Дублирующиеся ссылки (полное совпадение DOI)",
         'full_doi_match': "Полное совпадение DOI",
@@ -361,9 +363,10 @@ TEXTS = {
         'suspicious_dois': "🔍 Подозрительные DOI (не найдены ни в одной базе)",
         'suspicious_dois_hint': "Эти DOI были извлечены из ссылок, но не вернули данных из Crossref или OpenAlex. Возможно, недействительны, содержат опечатку или сгенерированы ИИ.",
         'non_doi_sources': "📄 Источники без DOI (книги, диссертации, материалы конференций и т.д.)",
+        'non_journal_sources_with_doi': "📚 Источники не из журналов с DOI",
+        'non_journal_sources_with_doi_desc': "Препринты, репозитории, материалы конференций и электронные книги, имеющие валидные DOI",
         'url_sources': "🔗 Источники с URL (веб-ссылки без DOI)",
         'problematic_refs': "⚠️ Проблемные ссылки",
-        'predatory_journals': "🚨 Потенциально хищнические журналы",
         'full_reference_list': "📋 Полный список литературы с фильтрами",
         'showing': "Показано {} из {} ссылок",
         'showing_first': "Показаны первые {} из {} ссылок",
@@ -459,6 +462,7 @@ TEXTS = {
         'html_openalex_only': "Только OpenAlex",
         'html_suspicious_doi': "Подозрительные DOI",
         'html_non_doi': "Источники без DOI",
+        'html_non_journal_sources_with_doi': "Источники не из журналов с DOI",
         'html_url_sources': "URL-источники",
         'html_problems': "Проблемы",
         'html_generated': "Сгенерирован",
@@ -2329,37 +2333,6 @@ def analyze_language_distribution(results: List[Dict]) -> Dict:
                                     if lang != 'en') / sum(language_counter.values()) * 100) if language_counter else 0
     }
 
-def detect_predatory_journals(results: List[Dict]) -> List[Dict]:
-    """Detect potentially predatory journals (warning signs)"""
-    predatory_signs = []
-    
-    suspicious_publishers = ['OMICS', 'WASET', 'Scientific & Academic Publishing', 'Ashdin Publishing']
-    
-    for result in results:
-        signs = []
-        if result.get('publisher'):
-            for sp in suspicious_publishers:
-                if sp.lower() in result['publisher'].lower():
-                    signs.append(f"Publisher {result['publisher']} in suspicious list")
-        
-        if not result.get('doi') and result.get('journal'):
-            signs.append("No DOI for journal article")
-        
-        if result.get('crossref_data'):
-            posted = result['crossref_data'].get('posted', {})
-            issued = result['crossref_data'].get('issued', {})
-            if posted and issued:
-                signs.append("Possible very rapid publication")
-        
-        if signs:
-            predatory_signs.append({
-                'reference': result['original_text'][:200],
-                'signs': signs,
-                'journal': result.get('journal', 'Unknown')
-            })
-    
-    return predatory_signs[:20]
-
 def calculate_shannon_diversity(results: List[Dict], field: str = 'authors') -> float:
     """Shannon diversity index for authors, journals, or publishers"""
     counter = Counter()
@@ -2382,7 +2355,7 @@ def calculate_shannon_diversity(results: List[Dict], field: str = 'authors') -> 
     return round(shannon, 3)
 
 def identify_citation_classics(results: List[Dict]) -> List[Dict]:
-    """Identify citation classics (articles with > 300 citations)"""
+    """Identify citation classics (articles with > 300 citations) - NO LIMIT"""
     citation_counts = []
     
     for result in results:
@@ -2418,7 +2391,7 @@ def identify_citation_classics(results: List[Dict]) -> List[Dict]:
                 'doi': doi
             })
     
-    return sorted(classics, key=lambda x: x['citations'], reverse=True)[:10]
+    return sorted(classics, key=lambda x: x['citations'], reverse=True)
 
 # ======================== MAIN ANALYSIS LOGIC ========================
 def parse_reference_list(references_text: str) -> List[str]:
@@ -3366,6 +3339,7 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
     retracted_refs = []
     books_with_isbn_no_doi = []  # Books with ISBN but no DOI (go to Non-DOI Sources)
     ebook_with_doi_refs = []      # Ebooks with DOI (colored background in full list)
+    non_journal_sources_with_doi = []  # NEW: Combined list for HTML report
     
     # For debugging - publisher source counters
     publisher_sources = {'crossref': 0, 'openalex': 0, 'both': 0}
@@ -3378,6 +3352,14 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
                 'doi': result.get('doi', ''),
                 'note': get_text('repository')
             })
+            # Add to combined list for Non-journal Sources with DOI
+            if result.get('doi'):
+                non_journal_sources_with_doi.append({
+                    'text': result['original_text'],
+                    'doi': result.get('doi', ''),
+                    'type': 'repository',
+                    'note': get_text('repository')
+                })
         
         # NEW: Detect ebook platform references
         if result.get('is_ebook', False):
@@ -3387,6 +3369,14 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
                 'note': get_text('ebook')
             })
             ebook_with_doi_refs.append(result)
+            # Add to combined list for Non-journal Sources with DOI
+            if result.get('doi'):
+                non_journal_sources_with_doi.append({
+                    'text': result['original_text'],
+                    'doi': result.get('doi', ''),
+                    'type': 'ebook',
+                    'note': get_text('ebook')
+                })
         
         # NEW: Detect proceedings references
         if result.get('is_proceedings', False):
@@ -3395,6 +3385,14 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
                 'doi': result.get('doi', ''),
                 'note': get_text('proceedings')
             })
+            # Add to combined list for Non-journal Sources with DOI
+            if result.get('doi'):
+                non_journal_sources_with_doi.append({
+                    'text': result['original_text'],
+                    'doi': result.get('doi', ''),
+                    'type': 'proceedings',
+                    'note': get_text('proceedings')
+                })
         
         # NEW: Detect retracted references
         if result.get('is_retracted', False):
@@ -3609,7 +3607,6 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
     author_freq_all = author_data
     orcid_data = analyze_orcid_coverage(results)
     language_data = analyze_language_distribution(results)
-    predatory = detect_predatory_journals(results)
     shannon_authors = calculate_shannon_diversity(results, 'authors')
     shannon_journals = calculate_shannon_diversity(results, 'journals')
     shannon_publishers = calculate_shannon_diversity(results, 'publishers')
@@ -3657,6 +3654,7 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         'proceedings_refs': proceedings_refs[:20],
         'retracted_refs': retracted_refs[:20],
         'books_with_isbn_no_doi': books_with_isbn_no_doi[:20],
+        'non_journal_sources_with_doi': non_journal_sources_with_doi[:50],  # NEW: Combined list
         
         # Enhanced data
         'concepts': concepts_data,
@@ -3684,7 +3682,6 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         'author_frequency_all': author_freq_all,
         'orcid_coverage': orcid_data,
         'language': language_data,
-        'predatory_journals': predatory,
         'shannon_index': {
             'authors': shannon_authors,
             'journals': shannon_journals,
@@ -3864,6 +3861,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         ("openalex", "icon_openalex.png"),
         ("suspicious", "icon_suspicious.png"),
         ("nondoi", "icon_nondoi.png"),
+        ("nonjournal", "icon_nonjournal.png"),
         ("url", "icon_url.png"),
         ("problems", "icon_problems.png"),
         ("list", "icon_list.png"),
@@ -4001,6 +3999,39 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             """
         duplicates_html += "</div>"
     
+    # Generate Non-journal Sources with DOI section (NEW)
+    non_journal_sources_html = ""
+    if stats.get('non_journal_sources_with_doi'):
+        non_journal_sources_html = f"""
+        <div id="nonjournal" class="section">
+            {make_section_title("nonjournal", "html_non_journal_sources_with_doi")}
+            <div style="margin-bottom: 15px; font-size: 13px; color: #666;">{get_text_local("non_journal_sources_with_doi_desc")}</div>
+        """
+        for source in stats.get('non_journal_sources_with_doi', []):
+            badge_class = ""
+            badge_text = ""
+            if source.get('type') == 'repository':
+                badge_class = "badge-repository"
+                badge_text = get_text_local("repository")
+            elif source.get('type') == 'ebook':
+                badge_class = "badge-book"
+                badge_text = get_text_local("ebook")
+            elif source.get('type') == 'proceedings':
+                badge_class = "badge-proceedings"
+                badge_text = get_text_local("proceedings")
+            else:
+                badge_class = "badge-info"
+                badge_text = source.get('type', get_text_local("reference"))
+            
+            non_journal_sources_html += f"""
+            <div class="rank-item">
+                <span class="{badge_class}">{badge_text}</span>
+                <div style="margin-top: 8px;">{html.escape(source['text'])}</div>
+                <div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(source.get('doi'))}</div>
+            </div>
+            """
+        non_journal_sources_html += "</div>"
+    
     # Generate full reference list with special styling for ebooks, repositories, proceedings
     full_references_html = ""
     for idx, result in enumerate(results[:300]):
@@ -4058,6 +4089,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         ("openalex_only", "html_openalex_only", icons["openalex"]),
         ("suspicious_doi", "html_suspicious_doi", icons["suspicious"]),
         ("non_doi", "html_non_doi", icons["nondoi"]),
+        ("nonjournal", "html_non_journal_sources_with_doi", icons.get("nonjournal", "")),
         ("url_sources", "html_url_sources", icons["url"]),
         ("problems", "html_problems", icons["problems"]),
         ("full_reference_list", "full_reference_list_title", icons["list"]),
@@ -4096,6 +4128,22 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     # NEW: Format identifier coverage with new types (Preprint/Repository, Books, Proceedings, Retracted)
     identifier_stats = stats['identifier_coverage']['stats']
     identifier_percents = stats['identifier_coverage_percents']
+    
+    # Format citation classics - NO LIMIT, full list
+    citation_classics_html = ""
+    if stats['citation_classics']:
+        for i, classic in enumerate(stats['citation_classics']):
+            citation_classics_html += f"""
+            <div class="rank-item">
+                <span class="rank-number">{i+1}.</span>
+                <span class="rank-name">{html.escape(classic["title"] if classic["title"] else get_text_local("not_found"))}</span>
+                <span class="rank-count">{get_text_local("html_citations_count")}: {classic["citations"]}</span>
+                <div style="font-size: 12px; color: #666; margin-top: 5px;">{html.escape(classic["journal"] if classic["journal"] else get_text_local("not_found"))} ({classic["year"] if classic["year"] else get_text_local("not_found")})</div>
+                {f'<div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(classic["doi"])}</div>' if classic.get("doi") else ''}
+            </div>
+            """
+    else:
+        citation_classics_html = f'<p>{get_text_local("no_citation_classics")}</p>'
     
     # Build HTML content
     html_content = f"""<!DOCTYPE html>
@@ -4685,10 +4733,10 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             </div>
         </div>
         
-        <!-- CITATION CLASSICS SECTION -->
+        <!-- CITATION CLASSICS SECTION - NO LIMIT -->
         <div id="classics" class="section">
             {make_section_title("classics", "html_classics")}
-            {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(classic["title"] if classic["title"] else get_text_local("not_found"))}</span><span class="rank-count">{get_text_local("html_citations_count")}: {classic["citations"]}</span><div style="font-size: 12px; color: #666; margin-top: 5px;">{html.escape(classic["journal"] if classic["journal"] else get_text_local("not_found"))} ({classic["year"] if classic["year"] else get_text_local("not_found")})</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(classic["doi"])}</div>' if classic.get("doi") else '') + '</div>' for i, classic in enumerate(stats['citation_classics'][:8])]) if stats['citation_classics'] else f'<p>{get_text_local("no_citation_classics")}</p>'}
+            {citation_classics_html}
         </div>
         
         <!-- SELF-CITATIONS SECTION -->
@@ -4767,6 +4815,9 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             </div>
         </div>
         
+        <!-- NON-JOURNAL SOURCES WITH DOI SECTION (NEW) -->
+        {non_journal_sources_html}
+        
         <!-- URL SOURCES SECTION -->
         <div id="url_sources" class="section">
             {make_section_title("url", "html_url_sources")}
@@ -4790,8 +4841,6 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
                 <h4>{get_text_local("other")} {get_text_local("problematic_refs")}:</h4>
                 {''.join([f'<div class="rank-item"><span class="badge badge-warning">{html.escape(ref["problems"])}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div></div>' for ref in stats['problematic_refs'][:10]]) if stats['problematic_refs'] else f'<p>{get_text_local("no_problematic")}</p>'}
             </div>
-            
-            {f'<div style="margin-top: 15px;"><h4>{get_text_local("predatory_journals")}:</h4>{"".join([f"<div class=rank-item>{html.escape(pred['journal'])}<br><span style=font-size:12px;color:#666;>{', '.join([html.escape(s) for s in pred['signs']])}</span></div>" for pred in stats['predatory_journals'][:5]])}</div>' if stats['predatory_journals'] else ''}
         </div>
         
         <!-- FULL REFERENCE LIST SECTION -->
@@ -5271,7 +5320,7 @@ def main():
             elif active_tab == "classics":
                 st.markdown(f"### {get_text('citation_classics')}")
                 if stats['citation_classics']:
-                    for classic in stats['citation_classics'][:10]:
+                    for classic in stats['citation_classics']:
                         with st.expander(f"{classic['title'][:100]}..."):
                             st.markdown(f"**{get_text('citations')}:** {classic['citations']}")
                             st.markdown(f"**{get_text('journal')}:** {classic['journal']}")
@@ -5376,13 +5425,6 @@ def main():
                 
                 if not stats['problematic_refs'] and not stats.get('retracted_refs'):
                     st.success(get_text('no_problematic'))
-                
-                if stats['predatory_journals']:
-                    st.markdown(f"### {get_text('predatory_journals')}")
-                    for pred in stats['predatory_journals'][:10]:
-                        with st.expander(f"📕 {pred['journal']}"):
-                            st.markdown(f"**{get_text('issues')}:** {', '.join(pred['signs'])}")
-                            st.markdown(f"**{get_text('reference')}:** {pred['reference']}")
             
             st.markdown("---")
             st.markdown(f"### {get_text('full_reference_list')}")
@@ -5802,7 +5844,7 @@ def main():
     Publishers (Shannon): {stats['shannon_index']['publishers']}
     
     === CITATION CLASSICS ===
-    {chr(10).join([f"{i+1}. {c['title'][:100] if c['title'] else 'Unknown'}: {c['citations']} citations" for i, c in enumerate(stats['citation_classics'][:5])]) if stats['citation_classics'] else "No citation classics detected (threshold: >300 citations)"}
+    {chr(10).join([f"{i+1}. {c['title'][:100] if c['title'] else 'Unknown'}: {c['citations']} citations" for i, c in enumerate(stats['citation_classics'])]) if stats['citation_classics'] else "No citation classics detected (threshold: >300 citations)"}
     
     === RETRACTED ARTICLES ===
     {chr(10).join([f"- {ref['text'][:100]}... DOI: {ref.get('doi', 'N/A')}" for ref in stats.get('retracted_refs', [])[:5]]) if stats.get('retracted_refs') else "No retracted articles detected"}
@@ -5818,9 +5860,6 @@ def main():
     
     === PROBLEMATIC REFERENCES ===
     {chr(10).join([f"- {ref['problems']}: {ref['text'][:100]}..." for ref in stats['problematic_refs'][:5]]) if stats['problematic_refs'] else "No problematic references detected"}
-    
-    === PREDATORY JOURNALS ===
-    {chr(10).join([f"- {pred['journal']}: {', '.join(pred['signs'])}" for pred in stats['predatory_journals'][:5]]) if stats['predatory_journals'] else "No predatory journals detected"}
     """
             
             st.text_area(get_text('text_export'), copy_text, height=400)
