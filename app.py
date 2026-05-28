@@ -2428,7 +2428,7 @@ def parse_reference_list(references_text: str) -> List[str]:
     - Numbered references: "1. Reference text"
     - Bracketed: "[1] Reference text"
     - Parenthesized: "(1) Reference text"
-    - Plain DOI list: one DOI per line
+    - Plain DOI list: one DOI per line (10.xxx/xxx)
     - Mixed formats
     """
     lines = references_text.strip().split('\n')
@@ -2445,7 +2445,7 @@ def parse_reference_list(references_text: str) -> List[str]:
     ]
     
     # Pattern for detecting if a line looks like a standalone DOI or URL
-    doi_url_pattern = r'^(https?://doi\.org/|https?://dx\.doi\.org/|10\.\d{4,9}/)'
+    doi_url_pattern = r'^(https?://doi\.org/|https?://dx\.doi\.org/|10\.\d{4,9}/|doi:\s*10\.\d{4,9}/)'
     
     for line in lines:
         line = line.strip()
@@ -2460,21 +2460,40 @@ def parse_reference_list(references_text: str) -> List[str]:
                 is_new_ref = True
                 break
         
-        # SPECIAL CASE: If line starts with DOI/URL pattern AND previous line
-        # was also a DOI/URL, treat as separate reference even without marker
-        if not is_new_ref and re.match(doi_url_pattern, line):
+        # SPECIAL CASE: If line starts with DOI/URL pattern (including plain DOI)
+        if not is_new_ref and re.match(doi_url_pattern, line, re.IGNORECASE):
             # Check if current_ref is not empty and contains a DOI/URL pattern
             if current_ref:
                 # Join current_ref to see if it looks like it contains DOIs
                 current_text = ' '.join(current_ref)
                 # If current_text already has a DOI and this is another DOI on new line,
                 # it should be a separate reference
-                if re.search(doi_url_pattern, current_text):
+                if re.search(doi_url_pattern, current_text, re.IGNORECASE):
                     # Save current reference and start new one
                     if current_ref:
                         references.append(' '.join(current_ref))
                         current_ref = []
                     is_new_ref = True
+        
+        # NEW: Check if line is a standalone DOI (plain DOI without any prefix)
+        # This handles cases where line contains ONLY a DOI like "10.3390/cryst14020143"
+        if not is_new_ref and re.match(r'^10\.\d{4,9}/[^\s]+$', line):
+            if current_ref:
+                # Check if current_ref already contains a DOI
+                current_text = ' '.join(current_ref)
+                if re.search(r'10\.\d{4,9}/', current_text):
+                    # Save current reference and start new one with this DOI
+                    references.append(' '.join(current_ref))
+                    current_ref = [line]
+                    continue
+                else:
+                    # This is likely a continuation of previous reference
+                    current_ref.append(line)
+                    continue
+            else:
+                # Start new reference with this DOI
+                current_ref = [line]
+                continue
         
         if is_new_ref:
             if current_ref:
@@ -2501,14 +2520,26 @@ def parse_reference_list(references_text: str) -> List[str]:
     for ref in references:
         # Check if this reference contains multiple DOI patterns separated by spaces or newlines
         # Find all DOIs/URLs in this reference
-        doi_matches = re.findall(r'(https?://doi\.org/10\.\d{4,9}/[^\s]+|10\.\d{4,9}/[^\s]+)', ref)
+        doi_matches = re.findall(r'(https?://doi\.org/10\.\d{4,9}/[^\s]+|https?://dx\.doi\.org/10\.\d{4,9}/[^\s]+|doi:\s*10\.\d{4,9}/[^\s]+|10\.\d{4,9}/[^\s]+)', ref, re.IGNORECASE)
         
         if len(doi_matches) > 1:
             # Split into separate references, one per DOI
             for doi_match in doi_matches:
-                final_references.append(doi_match.strip())
+                # Clean the DOI
+                doi_clean = doi_match.strip()
+                # Remove "doi:" prefix if present
+                doi_clean = re.sub(r'^doi:\s*', '', doi_clean, flags=re.IGNORECASE)
+                final_references.append(doi_clean)
         else:
             final_references.append(ref)
+    
+    # NEW: Additional pass - if any reference is exactly a DOI pattern and there are multiple such references
+    # This handles case where input is a comma-separated list of DOIs
+    all_refs_combined = '\n'.join(final_references)
+    comma_separated_dois = re.findall(r'(10\.\d{4,9}/[^\s,]+)', all_refs_combined)
+    if len(comma_separated_dois) > len(final_references):
+        # Likely the input was comma-separated DOIs
+        return comma_separated_dois
     
     return final_references
 
@@ -3176,14 +3207,17 @@ def extract_identifiers(text: str) -> Dict[str, Optional[str]]:
         'isbn': None
     }
     
-    # Extract DOI - IMPROVED: handle parentheses, brackets, and special characters
+    # ========== IMPROVED DOI EXTRACTION ==========
+    
+    # Pattern 1: Full URL with https://doi.org/
     doi_patterns = [
         r'https?://doi\.org/(10\.\d{4,9}/[^\s<>"\'()\[\]{}]+(?:\([^)]*\))?(?:[^\s<>"\'()\[\]{}]*)?)',
         r'https?://dx\.doi\.org/(10\.\d{4,9}/[^\s<>"\'()\[\]{}]+(?:\([^)]*\))?(?:[^\s<>"\'()\[\]{}]*)?)',
         r'doi[:]\s*(10\.\d{4,9}/[^\s<>"\'()\[\]{}]+(?:\([^)]*\))?(?:[^\s<>"\'()\[\]{}]*)?)',
         r'DOI[:]\s*(10\.\d{4,9}/[^\s<>"\'()\[\]{}]+(?:\([^)]*\))?(?:[^\s<>"\'()\[\]{}]*)?)',
         r'doi\s*=\s*(10\.\d{4,9}/[^\s<>"\'()\[\]{}]+(?:\([^)]*\))?(?:[^\s<>"\'()\[\]{}]*)?)',
-        r'(10\.\d{4,9}/[^\s<>"\'()\[\]{}]+(?:\([^)]*\))?(?:[^\s<>"\'()\[\]{}]*)?)'
+        # NEW: Plain DOI without any prefix (standalone)
+        r'(?<!\w)(10\.\d{4,9}/[^\s<>"\'()\[\]{}]+(?:\([^)]*\))?(?:[^\s<>"\'()\[\]{}]*)?)(?!\w)',
     ]
     
     for pattern in doi_patterns:
@@ -3193,6 +3227,8 @@ def extract_identifiers(text: str) -> Dict[str, Optional[str]]:
                 doi_raw = match.strip()
                 # Remove trailing punctuation that might be part of sentence
                 doi_raw = re.sub(r'[.,;:!?)]+$', '', doi_raw)
+                # Remove "doi:" prefix if present
+                doi_raw = re.sub(r'^doi:\s*', '', doi_raw, flags=re.IGNORECASE)
                 # Ensure closing parenthesis is preserved if it's part of DOI
                 if '(' in doi_raw and doi_raw.count('(') > doi_raw.count(')'):
                     # Try to find matching closing parenthesis
@@ -3217,13 +3253,16 @@ def extract_identifiers(text: str) -> Dict[str, Optional[str]]:
             if result['doi']:
                 break
     
-    # If DOI still not found with complex pattern, try simpler but more robust pattern
+    # If DOI still not found, try simpler pattern for edge cases
     if not result['doi']:
+        # This pattern is less strict but catches more cases
         simple_pattern = r'(10\.\d{4,9}/[^\s]+)'
         matches = re.findall(simple_pattern, text)
         for match in matches:
             # Clean up the match
             doi_clean = re.sub(r'[.,;:!?)]+$', '', match)
+            # Remove "doi:" prefix if present
+            doi_clean = re.sub(r'^doi:\s*', '', doi_clean, flags=re.IGNORECASE)
             # Ensure parentheses are properly matched
             if '(' in doi_clean and ')' not in doi_clean:
                 # Try to find closing parenthesis
@@ -3234,6 +3273,14 @@ def extract_identifiers(text: str) -> Dict[str, Optional[str]]:
             if re.match(r'10\.\d{4,9}/', doi_clean):
                 result['doi'] = doi_clean
                 break
+    
+    # NEW: Special handling for comma-separated DOIs in a single line
+    if not result['doi'] and ',' in text:
+        # Try to find DOIs separated by commas
+        comma_separated = re.findall(r'(10\.\d{4,9}/[^\s,]+)', text)
+        if comma_separated:
+            # Return the first one found, the rest will be handled by parse_reference_list
+            result['doi'] = comma_separated[0].strip()
     
     # Extract URL (general web links)
     url_pattern = r'https?://[^\s<>"\'()\[\]]+'
