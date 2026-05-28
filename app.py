@@ -2330,106 +2330,33 @@ def analyze_language_distribution(results: List[Dict]) -> Dict:
     }
 
 def detect_predatory_journals(results: List[Dict]) -> List[Dict]:
-    """Detect potentially predatory journals (warning signs)
-    
-    NOTE: Repositories (arXiv, bioRxiv, medRxiv, etc.) and preprints are NOT predatory.
-    They are legitimate sources for early research dissemination.
-    """
+    """Detect potentially predatory journals (warning signs)"""
     predatory_signs = []
     
-    # Suspicious publishers (genuinely predatory)
-    suspicious_publishers = [
-        'OMICS', 'WASET', 'Scientific & Academic Publishing', 'Ashdin Publishing',
-        'Science Publishing Group', 'International Journal of', 'World Academy of',
-        'European Publisher', 'Academy Publisher', 'Research Publisher'
-    ]
-    
-    # Legitimate repositories - these should NOT be flagged
-    legitimate_repositories = [
-        'arxiv', 'biorxiv', 'medrxiv', 'chemrxiv', 'ssrn', 'research square',
-        'preprints', 'osf preprint', 'f1000research', 'peerj preprints',
-        'nature precedings', 'figshare', 'zenodo', 'open science framework'
-    ]
-    
-    # Legitimate preprint servers
-    legitimate_preprint_servers = [
-        'arxiv.org', 'biorxiv.org', 'medrxiv.org', 'chemrxiv.org',
-        'researchsquare.com', 'preprints.org', 'ssrn.com'
-    ]
+    suspicious_publishers = ['OMICS', 'WASET', 'Scientific & Academic Publishing', 'Ashdin Publishing']
     
     for result in results:
         signs = []
-        
-        # Skip repository and preprint sources - they are legitimate
-        is_repository = result.get('is_repository', False) or result.get('type') == 'repository'
-        is_preprint = result.get('is_preprint', False) or result.get('type') == 'posted_content'
-        
-        if is_repository or is_preprint:
-            continue  # Don't flag repositories/preprints as predatory
-        
-        # Check publisher against suspicious list
         if result.get('publisher'):
-            publisher_lower = result['publisher'].lower()
             for sp in suspicious_publishers:
-                if sp.lower() in publisher_lower:
-                    signs.append(f"Publisher '{result['publisher']}' is in suspicious/predatory list")
-                    break
+                if sp.lower() in result['publisher'].lower():
+                    signs.append(f"Publisher {result['publisher']} in suspicious list")
         
-        # Check journal name for suspicious patterns
-        if result.get('journal'):
-            journal_lower = result['journal'].lower()
-            
-            # Skip if journal is from legitimate repository
-            is_legit_repo = any(repo in journal_lower for repo in legitimate_repositories)
-            if is_legit_repo:
-                continue
-            
-            # Suspicious patterns in journal names
-            suspicious_patterns = [
-                r'american journal of',
-                r'international journal of',
-                r'world journal of',
-                r'european journal of',
-                r'global journal of',
-                r'research journal of',
-                r'academy journal of',
-                r'\d+\s+days\s+publication',  # "3 days publication"
-                r'fast\s+track',
-                r'rapid\s+publication',
-            ]
-            
-            for pattern in suspicious_patterns:
-                if re.search(pattern, journal_lower):
-                    signs.append(f"Journal name pattern '{pattern}' may indicate predatory practices")
-                    break
+        if not result.get('doi') and result.get('journal'):
+            signs.append("No DOI for journal article")
         
-        # Check for extremely rapid publication (possible predatory practice)
         if result.get('crossref_data'):
             posted = result['crossref_data'].get('posted', {})
             issued = result['crossref_data'].get('issued', {})
             if posted and issued:
-                # This alone is not sufficient to flag - only if other signs exist
-                pass
-        
-        # Check for missing DOI for journal article (suspicious for scholarly journals)
-        if not result.get('doi') and result.get('journal') and not is_repository and not is_preprint:
-            journal_lower = result['journal'].lower()
-            # Skip legitimate journals without DOI that are known to be valid
-            known_valid_no_doi = ['nature', 'science', 'cell', 'plos one', 'bmc']
-            if not any(valid in journal_lower for valid in known_valid_no_doi):
-                signs.append("No DOI provided for journal article (potential quality concern)")
+                signs.append("Possible very rapid publication")
         
         if signs:
             predatory_signs.append({
                 'reference': result['original_text'][:200],
                 'signs': signs,
-                'journal': result.get('journal', 'Unknown'),
-                'is_repository': is_repository,
-                'is_preprint': is_preprint
+                'journal': result.get('journal', 'Unknown')
             })
-    
-    # Filter out any remaining repository/preprint that might have slipped through
-    predatory_signs = [p for p in predatory_signs if not p.get('is_repository', False) and not p.get('is_preprint', False)]
     
     return predatory_signs[:20]
 
@@ -2501,7 +2428,7 @@ def parse_reference_list(references_text: str) -> List[str]:
     - Numbered references: "1. Reference text"
     - Bracketed: "[1] Reference text"
     - Parenthesized: "(1) Reference text"
-    - Plain DOI list: one DOI per line (10.xxx/xxx)
+    - Plain DOI list: one DOI per line
     - Mixed formats
     """
     lines = references_text.strip().split('\n')
@@ -2518,7 +2445,7 @@ def parse_reference_list(references_text: str) -> List[str]:
     ]
     
     # Pattern for detecting if a line looks like a standalone DOI or URL
-    doi_url_pattern = r'^(https?://doi\.org/|https?://dx\.doi\.org/|10\.\d{4,9}/|doi:\s*10\.\d{4,9}/)'
+    doi_url_pattern = r'^(https?://doi\.org/|https?://dx\.doi\.org/|10\.\d{4,9}/)'
     
     for line in lines:
         line = line.strip()
@@ -2533,40 +2460,21 @@ def parse_reference_list(references_text: str) -> List[str]:
                 is_new_ref = True
                 break
         
-        # SPECIAL CASE: If line starts with DOI/URL pattern (including plain DOI)
-        if not is_new_ref and re.match(doi_url_pattern, line, re.IGNORECASE):
+        # SPECIAL CASE: If line starts with DOI/URL pattern AND previous line
+        # was also a DOI/URL, treat as separate reference even without marker
+        if not is_new_ref and re.match(doi_url_pattern, line):
             # Check if current_ref is not empty and contains a DOI/URL pattern
             if current_ref:
                 # Join current_ref to see if it looks like it contains DOIs
                 current_text = ' '.join(current_ref)
                 # If current_text already has a DOI and this is another DOI on new line,
                 # it should be a separate reference
-                if re.search(doi_url_pattern, current_text, re.IGNORECASE):
+                if re.search(doi_url_pattern, current_text):
                     # Save current reference and start new one
                     if current_ref:
                         references.append(' '.join(current_ref))
                         current_ref = []
                     is_new_ref = True
-        
-        # NEW: Check if line is a standalone DOI (plain DOI without any prefix)
-        # This handles cases where line contains ONLY a DOI like "10.3390/cryst14020143"
-        if not is_new_ref and re.match(r'^10\.\d{4,9}/[^\s]+$', line):
-            if current_ref:
-                # Check if current_ref already contains a DOI
-                current_text = ' '.join(current_ref)
-                if re.search(r'10\.\d{4,9}/', current_text):
-                    # Save current reference and start new one with this DOI
-                    references.append(' '.join(current_ref))
-                    current_ref = [line]
-                    continue
-                else:
-                    # This is likely a continuation of previous reference
-                    current_ref.append(line)
-                    continue
-            else:
-                # Start new reference with this DOI
-                current_ref = [line]
-                continue
         
         if is_new_ref:
             if current_ref:
@@ -2593,26 +2501,14 @@ def parse_reference_list(references_text: str) -> List[str]:
     for ref in references:
         # Check if this reference contains multiple DOI patterns separated by spaces or newlines
         # Find all DOIs/URLs in this reference
-        doi_matches = re.findall(r'(https?://doi\.org/10\.\d{4,9}/[^\s]+|https?://dx\.doi\.org/10\.\d{4,9}/[^\s]+|doi:\s*10\.\d{4,9}/[^\s]+|10\.\d{4,9}/[^\s]+)', ref, re.IGNORECASE)
+        doi_matches = re.findall(r'(https?://doi\.org/10\.\d{4,9}/[^\s]+|10\.\d{4,9}/[^\s]+)', ref)
         
         if len(doi_matches) > 1:
             # Split into separate references, one per DOI
             for doi_match in doi_matches:
-                # Clean the DOI
-                doi_clean = doi_match.strip()
-                # Remove "doi:" prefix if present
-                doi_clean = re.sub(r'^doi:\s*', '', doi_clean, flags=re.IGNORECASE)
-                final_references.append(doi_clean)
+                final_references.append(doi_match.strip())
         else:
             final_references.append(ref)
-    
-    # NEW: Additional pass - if any reference is exactly a DOI pattern and there are multiple such references
-    # This handles case where input is a comma-separated list of DOIs
-    all_refs_combined = '\n'.join(final_references)
-    comma_separated_dois = re.findall(r'(10\.\d{4,9}/[^\s,]+)', all_refs_combined)
-    if len(comma_separated_dois) > len(final_references):
-        # Likely the input was comma-separated DOIs
-        return comma_separated_dois
     
     return final_references
 
@@ -3280,17 +3176,14 @@ def extract_identifiers(text: str) -> Dict[str, Optional[str]]:
         'isbn': None
     }
     
-    # ========== IMPROVED DOI EXTRACTION ==========
-    
-    # Pattern 1: Full URL with https://doi.org/
+    # Extract DOI - IMPROVED: handle parentheses, brackets, and special characters
     doi_patterns = [
         r'https?://doi\.org/(10\.\d{4,9}/[^\s<>"\'()\[\]{}]+(?:\([^)]*\))?(?:[^\s<>"\'()\[\]{}]*)?)',
         r'https?://dx\.doi\.org/(10\.\d{4,9}/[^\s<>"\'()\[\]{}]+(?:\([^)]*\))?(?:[^\s<>"\'()\[\]{}]*)?)',
         r'doi[:]\s*(10\.\d{4,9}/[^\s<>"\'()\[\]{}]+(?:\([^)]*\))?(?:[^\s<>"\'()\[\]{}]*)?)',
         r'DOI[:]\s*(10\.\d{4,9}/[^\s<>"\'()\[\]{}]+(?:\([^)]*\))?(?:[^\s<>"\'()\[\]{}]*)?)',
         r'doi\s*=\s*(10\.\d{4,9}/[^\s<>"\'()\[\]{}]+(?:\([^)]*\))?(?:[^\s<>"\'()\[\]{}]*)?)',
-        # NEW: Plain DOI without any prefix (standalone)
-        r'(?<!\w)(10\.\d{4,9}/[^\s<>"\'()\[\]{}]+(?:\([^)]*\))?(?:[^\s<>"\'()\[\]{}]*)?)(?!\w)',
+        r'(10\.\d{4,9}/[^\s<>"\'()\[\]{}]+(?:\([^)]*\))?(?:[^\s<>"\'()\[\]{}]*)?)'
     ]
     
     for pattern in doi_patterns:
@@ -3300,8 +3193,6 @@ def extract_identifiers(text: str) -> Dict[str, Optional[str]]:
                 doi_raw = match.strip()
                 # Remove trailing punctuation that might be part of sentence
                 doi_raw = re.sub(r'[.,;:!?)]+$', '', doi_raw)
-                # Remove "doi:" prefix if present
-                doi_raw = re.sub(r'^doi:\s*', '', doi_raw, flags=re.IGNORECASE)
                 # Ensure closing parenthesis is preserved if it's part of DOI
                 if '(' in doi_raw and doi_raw.count('(') > doi_raw.count(')'):
                     # Try to find matching closing parenthesis
@@ -3326,16 +3217,13 @@ def extract_identifiers(text: str) -> Dict[str, Optional[str]]:
             if result['doi']:
                 break
     
-    # If DOI still not found, try simpler pattern for edge cases
+    # If DOI still not found with complex pattern, try simpler but more robust pattern
     if not result['doi']:
-        # This pattern is less strict but catches more cases
         simple_pattern = r'(10\.\d{4,9}/[^\s]+)'
         matches = re.findall(simple_pattern, text)
         for match in matches:
             # Clean up the match
             doi_clean = re.sub(r'[.,;:!?)]+$', '', match)
-            # Remove "doi:" prefix if present
-            doi_clean = re.sub(r'^doi:\s*', '', doi_clean, flags=re.IGNORECASE)
             # Ensure parentheses are properly matched
             if '(' in doi_clean and ')' not in doi_clean:
                 # Try to find closing parenthesis
@@ -3346,14 +3234,6 @@ def extract_identifiers(text: str) -> Dict[str, Optional[str]]:
             if re.match(r'10\.\d{4,9}/', doi_clean):
                 result['doi'] = doi_clean
                 break
-    
-    # NEW: Special handling for comma-separated DOIs in a single line
-    if not result['doi'] and ',' in text:
-        # Try to find DOIs separated by commas
-        comma_separated = re.findall(r'(10\.\d{4,9}/[^\s,]+)', text)
-        if comma_separated:
-            # Return the first one found, the rest will be handled by parse_reference_list
-            result['doi'] = comma_separated[0].strip()
     
     # Extract URL (general web links)
     url_pattern = r'https?://[^\s<>"\'()\[\]]+'
@@ -4893,11 +4773,11 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             {''.join([f'<div class="rank-item">{html.escape(ref)}</div>' for ref in stats['identifier_coverage']['references_with_only_url'][:20]]) if stats['identifier_coverage']['references_with_only_url'] else f'<p>{get_text_local("no_url_only")}</p>'}
         </div>
         
-        <!-- PROBLEMS SECTION (excludes repositories and preprints) -->
+        <!-- PROBLEMS SECTION (includes retractions) -->
         <div id="problems" class="section">
             {make_section_title("problems", "html_problems")}
             
-            <!-- Retracted articles (still a problem) -->
+            <!-- Retracted articles -->
             {f'''
             <div style="margin-bottom: 20px;">
                 <h4>{get_text_local("retracted_count")}:</h4>
@@ -4905,20 +4785,13 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             </div>
             ''' if stats.get('retracted_refs') else ''}
             
-            <!-- Other problematic references (excluding retractions which are already shown) -->
+            <!-- Other problematic references -->
             <div>
                 <h4>{get_text_local("other")} {get_text_local("problematic_refs")}:</h4>
-                {''.join([f'<div class="rank-item"><span class="badge badge-warning">{html.escape(ref["problems"])}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div></div>' for ref in stats['problematic_refs'][:10] if 'retracted' not in ref['problems'].lower()]) if stats['problematic_refs'] else f'<p>{get_text_local("no_problematic")}</p>'}
+                {''.join([f'<div class="rank-item"><span class="badge badge-warning">{html.escape(ref["problems"])}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div></div>' for ref in stats['problematic_refs'][:10]]) if stats['problematic_refs'] else f'<p>{get_text_local("no_problematic")}</p>'}
             </div>
             
-            <!-- Predatory journals section - but ONLY if they are truly predatory, not repositories -->
-            {f'''
-            <div style="margin-top: 20px;">
-                <h4>{get_text_local("predatory_journals")}:</h4>
-                <div style="margin-bottom: 10px; font-size: 12px; color: #666;">ℹ️ Note: Only potentially predatory publishers are listed. Repositories (arXiv, bioRxiv, etc.) and preprint servers are legitimate sources and are NOT included here.</div>
-                {"".join([f"<div class='rank-item'><strong>{html.escape(pred['journal'])}</strong><br><span style='font-size:12px;color:#666;'>{', '.join([html.escape(s) for s in pred['signs']])}</span><div style='margin-top: 5px; font-size:11px; color:#999;'>{html.escape(pred['reference'][:150])}...</div></div>" for pred in stats['predatory_journals'][:8]]) if stats['predatory_journals'] else f'<p>{get_text_local("none_detected")}</p>'}
-            </div>
-            ''' if stats['predatory_journals'] else ''}
+            {f'<div style="margin-top: 15px;"><h4>{get_text_local("predatory_journals")}:</h4>{"".join([f"<div class=rank-item>{html.escape(pred['journal'])}<br><span style=font-size:12px;color:#666;>{', '.join([html.escape(s) for s in pred['signs']])}</span></div>" for pred in stats['predatory_journals'][:5]])}</div>' if stats['predatory_journals'] else ''}
         </div>
         
         <!-- FULL REFERENCE LIST SECTION -->
@@ -5947,8 +5820,7 @@ def main():
     {chr(10).join([f"- {ref['problems']}: {ref['text'][:100]}..." for ref in stats['problematic_refs'][:5]]) if stats['problematic_refs'] else "No problematic references detected"}
     
     === PREDATORY JOURNALS ===
-    Note: Repositories (arXiv, bioRxiv, medRxiv, etc.) and preprint servers are legitimate sources and are NOT flagged as predatory.
-    {chr(10).join([f"- {pred['journal']}: {', '.join(pred['signs'])}" for pred in stats['predatory_journals'][:5]]) if stats['predatory_journals'] else "No predatory journals detected (repositories/preprints are not counted as predatory)"}
+    {chr(10).join([f"- {pred['journal']}: {', '.join(pred['signs'])}" for pred in stats['predatory_journals'][:5]]) if stats['predatory_journals'] else "No predatory journals detected"}
     """
             
             st.text_area(get_text('text_export'), copy_text, height=400)
