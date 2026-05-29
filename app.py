@@ -3990,7 +3990,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             ref_num_2 = dup['index2'] + 1
             doi = dup.get('doi', get_text_local('not_found'))
             duplicates_html += f"""
-            <div class="rank-item" style="margin-bottom: 10px;">
+            <div class="rank-item duplicate-reference" style="margin-bottom: 10px;">
                 <span class="badge badge-warning">{get_text_local("full_doi_match")}</span>
                 <div style="margin-top: 8px;"><strong>{get_text_local("references")} {ref_num_1} {get_text_local("and")} {ref_num_2}</strong> — {get_text_local("doi_found")}: {make_clickable_doi(doi)}</div>
                 <div style="font-size: 12px; color: #666; margin-top: 5px;">{get_text_local("reference")} {ref_num_1}: {html.escape(dup['ref1'])}...</div>
@@ -4032,8 +4032,14 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             """
         non_journal_sources_html += "</div>"
     
-    # Generate full reference list with special styling for ebooks, repositories, proceedings
+    # Generate full reference list with color coding for different types
     full_references_html = ""
+    duplicate_indices = set()
+    if duplicates:
+        for dup in duplicates:
+            duplicate_indices.add(dup['index1'])
+            duplicate_indices.add(dup['index2'])
+    
     for idx, result in enumerate(results[:300]):
         authors_full_list = result.get('authors_display', [])
         formatted_authors = ', '.join([html.escape(a) for a in authors_full_list]) if authors_full_list else get_text_local("not_found")
@@ -4041,21 +4047,38 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         doi_info = f'<div style="font-size: 13px; margin-top: 5px;"><strong>{get_text_local("doi_found")}:</strong> {make_clickable_doi(result.get("doi"))}</div>' if result.get('doi') else ''
         status_icon = "⚠" if result.get('is_suspicious_doi') else ("✓" if result.get('doi') else "✗")
         
-        # Determine special styling class for this reference
-        special_class = ""
+        # Determine color class based on priority
+        color_class = ""
+        if idx in duplicate_indices:
+            color_class = "duplicate-reference"
+        elif result.get('is_ebook', False):
+            color_class = "ebook-reference"
+        elif result.get('is_proceedings', False):
+            color_class = "proceedings-reference"
+        elif result.get('is_repository', False):
+            color_class = "repository-reference"
+        elif result.get('is_suspicious_doi', False):
+            color_class = "suspicious-reference"
+        elif not result.get('doi') and not result.get('crossref_status') and not result.get('openalex_status'):
+            color_class = "notfound-reference"
+        else:
+            color_class = "normal-reference"
+        
+        # Badge for special types
         special_badge = ""
         if result.get('is_ebook', False):
-            special_class = "ebook-reference"
             special_badge = f'<span class="badge-book" style="margin-left: 10px;">{get_text_local("ebook")}</span>'
         elif result.get('is_repository', False):
-            special_class = "repository-reference"
             special_badge = f'<span class="badge-repository" style="margin-left: 10px;">{get_text_local("repository")}</span>'
         elif result.get('is_proceedings', False):
-            special_class = "proceedings-reference"
             special_badge = f'<span class="badge-proceedings" style="margin-left: 10px;">{get_text_local("proceedings")}</span>'
+        elif result.get('is_suspicious_doi', False):
+            special_badge = f'<span class="badge-danger" style="margin-left: 10px;">{get_text_local("suspicious_doi_badge")}</span>'
+        elif idx in duplicate_indices:
+            special_badge = f'<span class="badge-warning" style="margin-left: 10px;">{get_text_local("full_doi_match")}</span>'
         
         full_references_html += f"""
-        <div class="rank-item {special_class}" style="margin-bottom: 15px;">
+        <div class="rank-item {color_class}" style="margin-bottom: 15px;">
             <div><strong>{status_icon} {get_text_local("reference")} {idx + 1}:</strong>{special_badge}</div>
             <div class="full-text-container">{original_text_full}</div>
             <div style="font-size: 13px; margin-top: 5px;"><strong>{get_text_local("authors")}:</strong> {formatted_authors}</div>
@@ -4144,6 +4167,9 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             """
     else:
         citation_classics_html = f'<p>{get_text_local("no_citation_classics")}</p>'
+    
+    # Get current date only (without time)
+    current_date = datetime.now().strftime('%d.%m.%Y')
     
     # Build HTML content
     html_content = f"""<!DOCTYPE html>
@@ -4289,7 +4315,6 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             background: transparent;
         }}
         .rank-item {{
-            background: #f8f9fa;
             border-radius: 10px;
             padding: 12px;
             margin-bottom: 10px;
@@ -4360,6 +4385,37 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         .badge-repository {{ background: #e2d5f8; color: #5e2a9e; }}
         .badge-book {{ background: #d4f1e9; color: #0e6b5e; }}
         .badge-proceedings {{ background: #fff2c9; color: #b26b00; }}
+        
+        /* Color coding for different reference types in full list */
+        .normal-reference {{
+            background: #ffffff !important;
+            border-left: 3px solid #28a745 !important;
+        }}
+        .notfound-reference {{
+            background: #e9ecef !important;
+            border-left: 3px solid #6c757d !important;
+        }}
+        .suspicious-reference {{
+            background: #f8d7da !important;
+            border-left: 3px solid #dc3545 !important;
+        }}
+        .duplicate-reference {{
+            background: #ffe5cc !important;
+            border-left: 3px solid #fd7e14 !important;
+        }}
+        .ebook-reference {{
+            background: #d4f1e9 !important;
+            border-left: 3px solid #0e6b5e !important;
+        }}
+        .repository-reference {{
+            background: #e2d5f8 !important;
+            border-left: 3px solid #5e2a9e !important;
+        }}
+        .proceedings-reference {{
+            background: #fff2c9 !important;
+            border-left: 3px solid #b26b00 !important;
+        }}
+        
         .footer {{
             text-align: center;
             padding: 20px;
@@ -4406,17 +4462,13 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             margin-top: 5px;
         }}
         /* Special styling for different reference types */
-        .ebook-reference {{
-            background: #d4f1e9 !important;
-            border-left: 3px solid #0e6b5e !important;
-        }}
-        .repository-reference {{
-            background: #e2d5f8 !important;
-            border-left: 3px solid #5e2a9e !important;
-        }}
-        .proceedings-reference {{
-            background: #fff2c9 !important;
-            border-left: 3px solid #b26b00 !important;
+        .ebook-reference .full-text-container,
+        .repository-reference .full-text-container,
+        .proceedings-reference .full-text-container,
+        .suspicious-reference .full-text-container,
+        .duplicate-reference .full-text-container,
+        .notfound-reference .full-text-container {{
+            background: rgba(255,255,255,0.7);
         }}
         @media print {{
             .sidebar {{ display: none; }}
@@ -4439,7 +4491,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             </div>
             <div style="margin-top: 10px;">{journal_name_display}</div>
             {article_number_display}
-            <div class="date">{get_text_local('html_generated')}: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}</div>
+            <div class="date">{get_text_local('html_generated')}: {current_date}</div>
             <div style="margin-top: 15px;">
                 <span class="badge badge-success">{get_text_local('status_both')}</span>
                 <span class="badge badge-info">{get_text_local('total_references')}: {stats['total_references']}</span>
@@ -4707,7 +4759,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         <div id="collaboration" class="section">
             {make_section_title("collaborations", "html_collaborations")}
             <div>
-                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(collab["author1"])} + {html.escape(collab["author2"])}</span><span class="rank-count">{collab["count"]} {get_text_local("html_joint_works")}</span></div>' for i, collab in enumerate(stats["collaboration"]["top_collaborations"][:8])])}
+                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(collab["author1"])} + {html.escape(collab["author2"])}</span><span class="rank-count">{collab["count"]} {get_text_local("html_joint_works")}</span></div>' for i, collab in enumerate(stats["collaboration"]["top_collaborations"][:8]])])}
             </div>
             <div style="margin-top: 15px;">
                 <span class="badge badge-info">{get_text_local('core_authors_label')}: {', '.join([f"{html.escape(author[0])} ({author[1]} {get_text_local('html_connections')})" for author in stats['collaboration']['core_authors'][:5]])}</span>
@@ -4792,7 +4844,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             <!-- Truly suspicious DOIs -->
             <div style="margin-top: 10px;">
                 <h4>{get_text_local("suspicious_dois")}:</h4>
-                {''.join([f'<div class="rank-item"><div class="badge badge-danger">{get_text_local("html_attention")}</div><div>{html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('suspicious_doi_refs', [])[:20]]) if stats.get('suspicious_doi_refs') else f'<p>{get_text_local("no_suspicious_dois")}</p>'}
+                {''.join([f'<div class="rank-item suspicious-reference"><div class="badge badge-danger">{get_text_local("html_attention")}</div><div>{html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('suspicious_doi_refs', [])[:20]]) if stats.get('suspicious_doi_refs') else f'<p>{get_text_local("no_suspicious_dois")}</p>'}
             </div>
         </div>
         
@@ -4811,7 +4863,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             <!-- Other non-DOI sources -->
             <div>
                 <h4>{get_text_local("other")} {get_text_local("non_doi_sources")}:</h4>
-                {''.join([f'<div class="rank-item">{html.escape(ref)}</div>' for ref in stats['identifier_coverage']['references_without_doi'][:20]]) if stats['identifier_coverage']['references_without_doi'] else f'<p>{get_text_local("all_have_doi")}</p>'}
+                {''.join([f'<div class="rank-item notfound-reference">{html.escape(ref)}</div>' for ref in stats['identifier_coverage']['references_without_doi'][:20]]) if stats['identifier_coverage']['references_without_doi'] else f'<p>{get_text_local("all_have_doi")}</p>'}
             </div>
         </div>
         
@@ -4832,7 +4884,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             {f'''
             <div style="margin-bottom: 20px;">
                 <h4>{get_text_local("retracted_count")}:</h4>
-                {''.join([f'<div class="rank-item"><span class="badge-danger" style="background: #f8d7da; color: #721c24;">{get_text_local("retracted")}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div>' if ref.get("doi") else '') + '</div>' for ref in stats.get('retracted_refs', [])[:20]]) if stats.get('retracted_refs') else f'<p>{get_text_local("none_detected")}</p>'}
+                {''.join([f'<div class="rank-item suspicious-reference"><span class="badge-danger" style="background: #f8d7da; color: #721c24;">{get_text_local("retracted")}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div>' if ref.get("doi") else '') + '</div>' for ref in stats.get('retracted_refs', [])[:20]]) if stats.get('retracted_refs') else f'<p>{get_text_local("none_detected")}</p>'}
             </div>
             ''' if stats.get('retracted_refs') else ''}
             
