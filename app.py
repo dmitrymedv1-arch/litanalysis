@@ -4403,7 +4403,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         .badge-danger {{ background: #f8d7da; color: #721c24; }}
         .badge-info {{ background: #d1ecf1; color: #0c5460; }}
         .badge-repository {{ background: #e2d5f8; color: #5e2a9e; }}
-        .badge-book {{ background: #d4f1e9; color: #0e6b5e; }}
+        .badge-book {{ background: #bbecde; color: #0e6b5e; }}
         .badge-proceedings {{ background: #fff2c9; color: #b26b00; }}
         
         /* Color coding for different reference types in full list */
