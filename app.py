@@ -1968,7 +1968,7 @@ def analyze_yearly_statistics(results: List[Dict]) -> Dict:
     }
 
 def analyze_identifier_coverage(results: List[Dict]) -> Dict:
-    """Analyze what types of identifiers each reference has"""
+    """Analyze what types of identifiers each reference has - IMPROVED VERSION"""
     identifier_stats = {
         'has_doi': 0,
         'has_url': 0,
@@ -1977,11 +1977,13 @@ def analyze_identifier_coverage(results: List[Dict]) -> Dict:
         'has_isbn': 0,
         'has_none': 0,
         'multiple': 0,
-        # NEW COUNTERS
-        'is_preprint_repository': 0,
-        'is_book': 0,
-        'is_proceedings': 0,
-        'is_retracted': 0
+        
+        # NEW: Separate counters for different source types
+        'is_preprint_repository': 0,    # OpenAlex type 'repository' or 'posted_content' OR arXiv ID
+        'is_ebook_platform': 0,          # OpenAlex type 'ebook platform' OR raw_type 'book-chapter'
+        'is_proceedings': 0,              # OpenAlex raw_type 'proceedings-article'
+        'is_retracted': 0,               # OpenAlex is_retracted == True
+        'is_book_no_doi': 0               # ISBN present but no DOI
     }
     
     references_without_any = []
@@ -1995,24 +1997,32 @@ def analyze_identifier_coverage(results: List[Dict]) -> Dict:
         has_any = False
         count = 0
         
-        # Count preprint/repository
-        if result.get('is_repository', False) or result.get('type') == 'posted_content':
+        # ========== REPOSITORY / PREPRINT DETECTION ==========
+        # From OpenAlex type
+        if result.get('is_repository', False):
             identifier_stats['is_preprint_repository'] += 1
         
-        # Count books (ebook platform OR has ISBN without DOI)
-        if result.get('is_ebook', False):
-            identifier_stats['is_book'] += 1
-        elif identifiers.get('isbn') and not identifiers.get('doi'):
-            identifier_stats['is_book'] += 1
+        # From arXiv ID in text
+        elif identifiers.get('arxiv'):
+            identifier_stats['is_preprint_repository'] += 1
         
-        # Count proceedings
+        # ========== EBOOK PLATFORM DETECTION ==========
+        if result.get('is_ebook', False):
+            identifier_stats['is_ebook_platform'] += 1
+        
+        # ========== PROCEEDINGS DETECTION ==========
         if result.get('is_proceedings', False):
             identifier_stats['is_proceedings'] += 1
         
-        # Count retracted
+        # ========== RETRACTION DETECTION ==========
         if result.get('is_retracted', False):
             identifier_stats['is_retracted'] += 1
         
+        # ========== BOOK WITH ISBN BUT NO DOI ==========
+        if identifiers.get('isbn') and not identifiers.get('doi'):
+            identifier_stats['is_book_no_doi'] += 1
+        
+        # ========== STANDARD IDENTIFIERS ==========
         if identifiers['doi']:
             identifier_stats['has_doi'] += 1
             has_any = True
@@ -2026,14 +2036,17 @@ def analyze_identifier_coverage(results: List[Dict]) -> Dict:
             count += 1
             if not identifiers['doi']:
                 references_with_only_url.append(text[:200])
+        
         if identifiers['arxiv']:
             identifier_stats['has_arxiv'] += 1
             has_any = True
             count += 1
+        
         if identifiers['pmid']:
             identifier_stats['has_pmid'] += 1
             has_any = True
             count += 1
+        
         if identifiers['isbn']:
             identifier_stats['has_isbn'] += 1
             has_any = True
@@ -2041,6 +2054,7 @@ def analyze_identifier_coverage(results: List[Dict]) -> Dict:
         
         if not has_any:
             identifier_stats['has_none'] += 1
+            references_without_any.append(text[:200])
         
         if count > 1:
             identifier_stats['multiple'] += 1
@@ -2568,28 +2582,28 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
             'authors': [],
             'authors_display': [],
             'journal': None,
-            'journal_from': None,  # Track source: 'crossref', 'openalex', or None
+            'journal_from': None,
             'year': None,
             'type': None,
-            'raw_type': None,  # NEW: for proceedings detection
+            'raw_type': None,
             'publisher': None,
-            'publisher_from': None,  # Track source: 'crossref', 'openalex', or None
+            'publisher_from': None,
             'crossmark_issues': [],
             'is_preprint': False,
             'has_erratum': False,
-            'is_retracted': False,  # NEW: retraction detection
+            'is_retracted': False,
             'is_self_citation': False,
             'issn': None,
             'license': None,
             'references_count': 0,
             'citations_count': 0,
             'is_suspicious_doi': False,
-            # NEW FIELDS FOR OPENALEX TYPE DETECTION
-            'is_repository': False,      # type == "repository"
-            'is_ebook': False,           # type == "ebook platform"
+            # NEW FIELDS FOR TYPE DETECTION
+            'is_repository': False,      # type == "repository" OR "posted_content" OR has arXiv ID
+            'is_ebook': False,           # type == "ebook platform" OR raw_type == "book-chapter"
             'is_proceedings': False,     # raw_type == "proceedings-article"
-            'openalex_type': None,       # store the original type
-            'openalex_raw_type': None    # store the original raw_type
+            'openalex_type': None,
+            'openalex_raw_type': None
         }
         
         if doi:
@@ -2603,7 +2617,7 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                 result['crossref_data'] = crossref_data
                 result['crossref_status'] = True
                 
-                # Extract authors from Crossref using updated function
+                # Extract authors from Crossref
                 authors_data = extract_authors_from_crossref(crossref_data)
                 result['authors'].extend(authors_data)
                 
@@ -2657,28 +2671,46 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                 result['openalex_data'] = openalex_data
                 result['openalex_status'] = True
                 
-                # NEW: Extract OpenAlex type and raw_type
+                # Extract OpenAlex type and raw_type
                 result['openalex_type'] = openalex_data.get('type', '')
                 result['openalex_raw_type'] = openalex_data.get('raw_type', '')
                 result['type'] = result['openalex_type']
                 result['raw_type'] = result['openalex_raw_type']
                 
-                # NEW: Detect repository type
+                # ========== REPOSITORY / PREPRINT DETECTION ==========
+                # Case 1: OpenAlex type is 'repository'
                 if openalex_data.get('type') == 'repository':
                     result['is_repository'] = True
                     result['crossmark_issues'].append('📚 Repository source')
                 
-                # NEW: Detect ebook platform
+                # Case 2: OpenAlex type is 'posted_content' (preprint)
+                elif openalex_data.get('type') == 'posted_content':
+                    result['is_repository'] = True
+                    result['is_preprint'] = True
+                    result['crossmark_issues'].append('📚 Preprint (posted content)')
+                
+                # ========== EBOOK DETECTION (improved) ==========
+                # Case 1: OpenAlex type is 'ebook platform'
                 if openalex_data.get('type') == 'ebook platform':
                     result['is_ebook'] = True
-                    result['crossmark_issues'].append('📖 Electronic book')
+                    result['crossmark_issues'].append('📖 Electronic book (ebook platform)')
                 
-                # NEW: Detect proceedings article
+                # Case 2: OpenAlex raw_type is 'book-chapter'
+                elif openalex_data.get('raw_type') == 'book-chapter':
+                    result['is_ebook'] = True
+                    result['crossmark_issues'].append('📖 Electronic book (book chapter)')
+                
+                # ========== PROCEEDINGS DETECTION ==========
                 if openalex_data.get('raw_type') == 'proceedings-article':
                     result['is_proceedings'] = True
                     result['crossmark_issues'].append('📊 Conference proceedings')
                 
-                # Extract authors from OpenAlex using updated function (add only unique ones)
+                # ========== RETRACTION DETECTION ==========
+                if openalex_data.get('is_retracted', False):
+                    result['is_retracted'] = True
+                    result['crossmark_issues'].append('⚠️ This article has been RETRACTED')
+                
+                # Extract authors from OpenAlex
                 authors_data = extract_authors_from_openalex(openalex_data)
                 existing_compare = {a['compare_name'] for a in result['authors']}
                 for auth in authors_data:
@@ -2686,15 +2718,6 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                         result['authors'].append(auth)
                         result['authors_display'].append(auth['display_name'])
                         existing_compare.add(auth['compare_name'])
-                
-                # Check if preprint
-                if openalex_data.get('type') == 'posted_content':
-                    result['is_preprint'] = True
-                
-                # NEW: Check if retracted (primary source for retraction detection)
-                if openalex_data.get('is_retracted', False):
-                    result['is_retracted'] = True
-                    result['crossmark_issues'].append('⚠️ This article has been RETRACTED')
                 
                 # Extract year from OpenAlex (if not already set by Crossref)
                 if not result['year'] and 'publication_year' in openalex_data:
@@ -2704,10 +2727,9 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                 if not result['type'] and 'type' in openalex_data:
                     result['type'] = openalex_data['type']
                 
-                # ========== EXTRACT JOURNAL FROM OPENALEX (MULTIPLE SOURCES) ==========
+                # ========== EXTRACT JOURNAL FROM OPENALEX ==========
                 journal_from_openalex = None
                 
-                # Method 1: host_venue (most common for journal articles)
                 if openalex_data.get('host_venue'):
                     host_venue = openalex_data['host_venue']
                     if isinstance(host_venue, dict):
@@ -2716,7 +2738,6 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                         elif host_venue.get('name'):
                             journal_from_openalex = host_venue['name'].strip()
                 
-                # Method 2: primary_location (more reliable for some records)
                 if not journal_from_openalex and openalex_data.get('primary_location'):
                     primary = openalex_data['primary_location']
                     if isinstance(primary, dict):
@@ -2726,7 +2747,6 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                             elif primary['source'].get('name'):
                                 journal_from_openalex = primary['source']['name'].strip()
                 
-                # Method 3: locations array (iterate through all locations)
                 if not journal_from_openalex and openalex_data.get('locations'):
                     for loc in openalex_data['locations']:
                         if isinstance(loc, dict) and loc.get('source'):
@@ -2739,31 +2759,18 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                                     journal_from_openalex = source['name'].strip()
                                     break
                 
-                # Method 4: best_open_access (sometimes contains source info)
-                if not journal_from_openalex and openalex_data.get('best_open_access'):
-                    best_oa = openalex_data['best_open_access']
-                    if isinstance(best_oa, dict) and best_oa.get('host_venue'):
-                        host = best_oa['host_venue']
-                        if isinstance(host, dict):
-                            if host.get('display_name'):
-                                journal_from_openalex = host['display_name'].strip()
-                
-                # Set journal if found and not already set by Crossref
                 if journal_from_openalex and journal_from_openalex.strip():
                     if not result['journal']:
                         result['journal'] = journal_from_openalex
                         result['journal_from'] = 'openalex'
-                    # If both have data, keep Crossref as primary but log that OpenAlex also has it
                     elif result['journal'] and journal_from_openalex != result['journal']:
-                        # Optionally, you could prefer the longer/more complete name
                         if len(journal_from_openalex) > len(result['journal']):
                             result['journal'] = journal_from_openalex
                             result['journal_from'] = 'openalex_override'
                 
-                # ========== EXTRACT PUBLISHER FROM OPENALEX (MULTIPLE SOURCES) ==========
+                # ========== EXTRACT PUBLISHER FROM OPENALEX ==========
                 publisher_from_openalex = None
                 
-                # Method 1: host_venue publisher
                 if openalex_data.get('host_venue'):
                     host_venue = openalex_data['host_venue']
                     if isinstance(host_venue, dict):
@@ -2772,7 +2779,6 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                         elif host_venue.get('publisher_name'):
                             publisher_from_openalex = host_venue['publisher_name'].strip()
                 
-                # Method 2: primary_location source publisher
                 if not publisher_from_openalex and openalex_data.get('primary_location'):
                     primary = openalex_data['primary_location']
                     if isinstance(primary, dict) and primary.get('source'):
@@ -2783,7 +2789,6 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                             elif source.get('publisher_name'):
                                 publisher_from_openalex = source['publisher_name'].strip()
                 
-                # Method 3: locations array source publisher
                 if not publisher_from_openalex and openalex_data.get('locations'):
                     for loc in openalex_data['locations']:
                         if isinstance(loc, dict) and loc.get('source'):
@@ -2796,7 +2801,6 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                                     publisher_from_openalex = source['publisher_name'].strip()
                                     break
                 
-                # Method 4: host_organization (for preprints, repositories, institutional papers)
                 if not publisher_from_openalex and openalex_data.get('host_organization'):
                     host_org = openalex_data['host_organization']
                     if isinstance(host_org, dict):
@@ -2807,27 +2811,14 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                     elif isinstance(host_org, str):
                         publisher_from_openalex = host_org.strip()
                 
-                # Method 5: host_organization_name (alternative field)
                 if not publisher_from_openalex and openalex_data.get('host_organization_name'):
                     publisher_from_openalex = openalex_data['host_organization_name'].strip()
                 
-                # Method 6: best_open_access host_venue publisher
-                if not publisher_from_openalex and openalex_data.get('best_open_access'):
-                    best_oa = openalex_data['best_open_access']
-                    if isinstance(best_oa, dict) and best_oa.get('host_venue'):
-                        host = best_oa['host_venue']
-                        if isinstance(host, dict):
-                            if host.get('publisher'):
-                                publisher_from_openalex = host['publisher'].strip()
-                
-                # Set publisher if found and not already set by Crossref
                 if publisher_from_openalex and publisher_from_openalex.strip():
                     if not result['publisher']:
                         result['publisher'] = publisher_from_openalex
                         result['publisher_from'] = 'openalex'
-                    # If both have data, keep Crossref as primary but log that OpenAlex also has it
                     elif result['publisher'] and publisher_from_openalex != result['publisher']:
-                        # Optionally, you could prefer the longer/more complete name
                         if len(publisher_from_openalex) > len(result['publisher']):
                             result['publisher'] = publisher_from_openalex
                             result['publisher_from'] = 'openalex_override'
@@ -2840,7 +2831,13 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                 if 'cited_by_count' in openalex_data:
                     result['citations_count'] = max(result['citations_count'], openalex_data['cited_by_count'])
         
-        # ==================== SELF-CITATION DETECTION ====================
+        # ========== FALLBACK: arXiv ID AS REPOSITORY ==========
+        # If reference has arXiv ID but no repository flag set yet
+        if identifiers.get('arxiv') and not result['is_repository']:
+            result['is_repository'] = True
+            result['crossmark_issues'].append('📚 arXiv preprint')
+        
+        # ========== SELF-CITATION DETECTION ==========
         if paper_authors and result['authors']:
             for author in result['authors']:
                 for paper_author in paper_authors:
@@ -3337,15 +3334,13 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
     ebook_refs = []
     proceedings_refs = []
     retracted_refs = []
-    books_with_isbn_no_doi = []  # Books with ISBN but no DOI (go to Non-DOI Sources)
-    ebook_with_doi_refs = []      # Ebooks with DOI (colored background in full list)
-    non_journal_sources_with_doi = []  # NEW: Combined list for HTML report
+    books_with_isbn_no_doi = []
+    non_journal_sources_with_doi = []
     
-    # For debugging - publisher source counters
     publisher_sources = {'crossref': 0, 'openalex': 0, 'both': 0}
     
     for result in results:
-        # NEW: Detect repository references
+        # ========== REPOSITORY / PREPRINT REFERENCES ==========
         if result.get('is_repository', False):
             repository_refs.append({
                 'text': result['original_text'],
@@ -3361,14 +3356,13 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
                     'note': get_text('repository')
                 })
         
-        # NEW: Detect ebook platform references
+        # ========== EBOOK PLATFORM REFERENCES ==========
         if result.get('is_ebook', False):
             ebook_refs.append({
                 'text': result['original_text'],
                 'doi': result.get('doi', ''),
                 'note': get_text('ebook')
             })
-            ebook_with_doi_refs.append(result)
             # Add to combined list for Non-journal Sources with DOI
             if result.get('doi'):
                 non_journal_sources_with_doi.append({
@@ -3378,7 +3372,7 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
                     'note': get_text('ebook')
                 })
         
-        # NEW: Detect proceedings references
+        # ========== PROCEEDINGS REFERENCES ==========
         if result.get('is_proceedings', False):
             proceedings_refs.append({
                 'text': result['original_text'],
@@ -3394,7 +3388,7 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
                     'note': get_text('proceedings')
                 })
         
-        # NEW: Detect retracted references
+        # ========== RETRACTED REFERENCES ==========
         if result.get('is_retracted', False):
             retracted_refs.append({
                 'text': result['original_text'],
@@ -3402,7 +3396,7 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
                 'note': get_text('retracted')
             })
         
-        # NEW: Books with ISBN but no DOI (go to Non-DOI Sources)
+        # ========== BOOKS WITH ISBN BUT NO DOI ==========
         if result.get('identifiers', {}).get('isbn') and not result.get('doi'):
             books_with_isbn_no_doi.append(result['original_text'])
         
@@ -3436,7 +3430,7 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         if result.get('journal'):
             journal_counter[result['journal']] += 1
         
-        # Publisher collection from BOTH sources
+        # Publisher collection
         publisher = None
         publisher_source = None
         
@@ -3450,7 +3444,7 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
                 publisher_sources['openalex'] += 1
                 publisher_sources['both'] += 1 if result.get('crossref_status') else 0
         
-        # Fallback: try to extract publisher directly from OpenAlex data
+        # Fallback for publisher extraction (same as before)
         if not publisher and result.get('openalex_data'):
             openalex_data = result['openalex_data']
             
@@ -3507,21 +3501,11 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
                 publisher = openalex_data['host_organization_name'].strip()
                 publisher_source = 'openalex_host_organization_name'
             
-            if not publisher and openalex_data.get('best_open_access'):
-                best_oa = openalex_data['best_open_access']
-                if isinstance(best_oa, dict) and best_oa.get('host_venue'):
-                    host = best_oa['host_venue']
-                    if isinstance(host, dict):
-                        if host.get('publisher'):
-                            publisher = host['publisher'].strip()
-                            publisher_source = 'openalex_best_oa'
-            
             if publisher:
                 result['publisher'] = publisher
                 result['publisher_from'] = publisher_source
                 publisher_sources['openalex'] += 1
         
-        # Fallback: try to extract publisher from Crossref data
         if not publisher and result.get('crossref_data'):
             crossref_data = result['crossref_data']
             if 'publisher' in crossref_data and crossref_data['publisher']:
@@ -3543,7 +3527,7 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         if result.get('year') and isinstance(result['year'], (int, float)) and 1900 < result['year'] <= datetime.now().year:
             year_counter[int(result['year'])] += 1
         
-        # Problematic references detection (retractions go here)
+        # Problematic references detection
         has_problem = False
         problems = []
         if result.get('is_retracted'):
@@ -3553,7 +3537,6 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
             problems.append(get_text('preprint'))
             has_problem = True
         if result.get('crossmark_issues'):
-            # Filter out notes that are not actual problems
             for issue in result['crossmark_issues']:
                 if not any(note in issue for note in ['Repository source', 'Electronic book', 'Conference proceedings']):
                     problems.append(issue)
@@ -3562,11 +3545,11 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         if has_problem:
             problematic_refs.append({'text': result['original_text'], 'problems': ', '.join(problems)})
     
-    # Enhanced author analysis with new merging logic
+    # Enhanced author analysis
     author_data = analyze_author_frequency_all(results)
     sorted_authors = author_data['all_authors']
     
-    # Format top authors for display (without HTML in data)
+    # Format top authors for display
     top_authors_formatted = []
     for author in sorted_authors[:20]:
         orcid_str = f" 🔗 ORCID: {author['orcid']}" if author.get('orcid') else ""
@@ -3615,7 +3598,7 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
     # Collect self-citations
     self_citation_refs = [r for r in results if r.get('is_self_citation', False)]
     
-    # Calculate percentages for display (all percentages are from total_references)
+    # Calculate percentages
     def calc_percent(count):
         return (count / total_references * 100) if total_references > 0 else 0
     
@@ -3647,14 +3630,13 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         'self_citations_percent': calc_percent(len([r for r in results if r.get('is_self_citation', False)])),
         'self_citation_refs': self_citation_refs,
         
-        # NEW: Collections for new types
+        # Collections for new types
         'repository_refs': repository_refs[:20],
         'ebook_refs': ebook_refs[:20],
-        'ebook_with_doi_refs': ebook_with_doi_refs[:20],
         'proceedings_refs': proceedings_refs[:20],
         'retracted_refs': retracted_refs[:20],
         'books_with_isbn_no_doi': books_with_isbn_no_doi[:20],
-        'non_journal_sources_with_doi': non_journal_sources_with_doi[:50],  # NEW: Combined list
+        'non_journal_sources_with_doi': non_journal_sources_with_doi[:50],
         
         # Enhanced data
         'concepts': concepts_data,
@@ -3671,11 +3653,12 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
             'has_isbn': calc_percent(identifier_data['stats']['has_isbn']),
             'has_none': calc_percent(identifier_data['stats']['has_none']),
             'multiple': calc_percent(identifier_data['stats']['multiple']),
-            # NEW percentages
+            # New percentages
             'preprint_repository': calc_percent(identifier_data['stats']['is_preprint_repository']),
-            'books': calc_percent(identifier_data['stats']['is_book']),
+            'ebook_platform': calc_percent(identifier_data['stats']['is_ebook_platform']),
             'proceedings': calc_percent(identifier_data['stats']['is_proceedings']),
-            'retracted': calc_percent(identifier_data['stats']['is_retracted'])
+            'retracted': calc_percent(identifier_data['stats']['is_retracted']),
+            'book_no_doi': calc_percent(identifier_data['stats']['is_book_no_doi'])
         },
         'publisher_frequency': publisher_freq,
         'journal_frequency_all': journal_freq_all,
@@ -3690,8 +3673,6 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         'citation_classics': citation_classics,
         'total_citations_sum': sum(r.get('citations_count', 0) for r in results),
         'avg_citations': sum(r.get('citations_count', 0) for r in results) / total_references if total_references else 0,
-        
-        # Debug info
         'publisher_sources': publisher_sources
     }
 
@@ -3956,9 +3937,11 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
                 journal_info = f'<div style="font-size: 13px; margin-top: 5px;"><strong>{get_text_local("journal")}:</strong> {html.escape(ref.get("journal", get_text_local("not_found")))}</div>' if ref.get('journal') else ''
                 year_info = f'<div style="font-size: 13px; margin-top: 5px;"><strong>{get_text_local("year")}:</strong> {ref.get("year", get_text_local("not_found"))}</div>' if ref.get('year') else ''
                 
-                # Check if this is an ebook, repository, or proceedings for special styling
+                # Determine special class for reference type
                 special_class = ""
-                if ref.get('is_ebook', False):
+                if ref.get('is_retracted', False):
+                    special_class = "retracted-reference"
+                elif ref.get('is_ebook', False):
                     special_class = "ebook-reference"
                 elif ref.get('is_repository', False):
                     special_class = "repository-reference"
@@ -3999,7 +3982,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             """
         duplicates_html += "</div>"
     
-    # Generate Non-journal Sources with DOI section (NEW)
+    # Generate Non-journal Sources with DOI section
     non_journal_sources_html = ""
     if stats.get('non_journal_sources_with_doi'):
         non_journal_sources_html = f"""
@@ -4047,9 +4030,13 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         doi_info = f'<div style="font-size: 13px; margin-top: 5px;"><strong>{get_text_local("doi_found")}:</strong> {make_clickable_doi(result.get("doi"))}</div>' if result.get('doi') else ''
         status_icon = "⚠" if result.get('is_suspicious_doi') else ("✓" if result.get('doi') else "✗")
         
-        # Determine color class based on priority
+        # Determine color class based on priority (from highest to lowest priority)
         color_class = ""
-        if idx in duplicate_indices:
+        if result.get('is_retracted', False):
+            color_class = "retracted-reference"
+        elif result.get('is_suspicious_doi', False):
+            color_class = "suspicious-reference"
+        elif idx in duplicate_indices:
             color_class = "duplicate-reference"
         elif result.get('is_ebook', False):
             color_class = "ebook-reference"
@@ -4057,19 +4044,27 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             color_class = "proceedings-reference"
         elif result.get('is_repository', False):
             color_class = "repository-reference"
-        elif result.get('is_suspicious_doi', False):
-            color_class = "suspicious-reference"
+        elif result.get('is_preprint', False):
+            color_class = "preprint-reference"
         elif not result.get('doi') and not result.get('crossref_status') and not result.get('openalex_status'):
             color_class = "notfound-reference"
+        elif result.get('doi') and result.get('crossref_status') and result.get('openalex_status'):
+            color_class = "normal-article"
+        elif result.get('doi'):
+            color_class = "normal-article"
         else:
-            color_class = "normal-reference"
+            color_class = "notfound-reference"
         
         # Badge for special types
         special_badge = ""
-        if result.get('is_ebook', False):
+        if result.get('is_retracted', False):
+            special_badge = f'<span class="badge-danger" style="margin-left: 10px;">{get_text_local("retracted")}</span>'
+        elif result.get('is_ebook', False):
             special_badge = f'<span class="badge-book" style="margin-left: 10px;">{get_text_local("ebook")}</span>'
         elif result.get('is_repository', False):
             special_badge = f'<span class="badge-repository" style="margin-left: 10px;">{get_text_local("repository")}</span>'
+        elif result.get('is_preprint', False):
+            special_badge = f'<span class="badge-repository" style="margin-left: 10px;">{get_text_local("preprint")}</span>'
         elif result.get('is_proceedings', False):
             special_badge = f'<span class="badge-proceedings" style="margin-left: 10px;">{get_text_local("proceedings")}</span>'
         elif result.get('is_suspicious_doi', False):
@@ -4148,11 +4143,11 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     total_citations_sum = stats.get('total_citations_sum', 0)
     avg_citations = stats.get('avg_citations', 0)
     
-    # NEW: Format identifier coverage with new types (Preprint/Repository, Books, Proceedings, Retracted)
+    # Get identifier coverage stats
     identifier_stats = stats['identifier_coverage']['stats']
     identifier_percents = stats['identifier_coverage_percents']
     
-    # Format citation classics - NO LIMIT, full list
+    # Format citation classics
     citation_classics_html = ""
     if stats['citation_classics']:
         for i, classic in enumerate(stats['citation_classics']):
@@ -4387,9 +4382,9 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         .badge-proceedings {{ background: #fff2c9; color: #b26b00; }}
         
         /* Color coding for different reference types in full list */
-        .normal-reference {{
-            background: #ffffff !important;
-            border-left: 3px solid #28a745 !important;
+        .normal-article {{
+            background: #e8f5e9 !important;
+            border-left: 3px solid #4caf50 !important;
         }}
         .notfound-reference {{
             background: #e9ecef !important;
@@ -4411,9 +4406,17 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             background: #e2d5f8 !important;
             border-left: 3px solid #5e2a9e !important;
         }}
+        .preprint-reference {{
+            background: #e2d5f8 !important;
+            border-left: 3px solid #5e2a9e !important;
+        }}
         .proceedings-reference {{
             background: #fff2c9 !important;
             border-left: 3px solid #b26b00 !important;
+        }}
+        .retracted-reference {{
+            background: #f8d7da !important;
+            border-left: 3px solid #dc3545 !important;
         }}
         
         .footer {{
@@ -4461,15 +4464,19 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             border-radius: 5px;
             margin-top: 5px;
         }}
-        /* Special styling for different reference types */
+        
+        /* Special styling for expander content */
         .ebook-reference .full-text-container,
         .repository-reference .full-text-container,
+        .preprint-reference .full-text-container,
         .proceedings-reference .full-text-container,
         .suspicious-reference .full-text-container,
         .duplicate-reference .full-text-container,
-        .notfound-reference .full-text-container {{
+        .notfound-reference .full-text-container,
+        .retracted-reference .full-text-container {{
             background: rgba(255,255,255,0.7);
         }}
+        
         @media print {{
             .sidebar {{ display: none; }}
             .main-content {{ margin-left: 0; }}
@@ -4533,7 +4540,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             </div>
         </div>
         
-        <!-- IDENTIFIER COVERAGE SECTION (UPDATED WITH NEW TYPES) -->
+        <!-- IDENTIFIER COVERAGE SECTION (UPDATED - NO DUPLICATION) -->
         <div id="identifiers" class="section">
             {make_section_title("identifier", "html_identifier_coverage")}
             <div class="stats-grid">
@@ -4548,9 +4555,9 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
                     <div class="stat-label">URL</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">{identifier_stats['has_arxiv']}</div>
-                    <div class="stat-percent">({identifier_percents['has_arxiv']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('preprint_repository_count')}</div>
+                    <div class="stat-number">{identifier_stats['is_preprint_repository']}</div>
+                    <div class="stat-percent">({identifier_percents['preprint_repository']:.1f}%)</div>
+                    <div class="stat-label">{get_text_local('preprint_repository_count')} (arXiv + OpenAlex)</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{identifier_stats['has_pmid']}</div>
@@ -4558,14 +4565,14 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
                     <div class="stat-label">PMID</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">{identifier_stats['is_book']}</div>
-                    <div class="stat-percent">({identifier_percents['books']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('books_count')}</div>
+                    <div class="stat-number">{identifier_stats['is_ebook_platform']}</div>
+                    <div class="stat-percent">({identifier_percents['ebook_platform']:.1f}%)</div>
+                    <div class="stat-label">{get_text_local('ebook')} (with DOI)</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-number">{identifier_stats['is_preprint_repository']}</div>
-                    <div class="stat-percent">({identifier_percents['preprint_repository']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('preprint_repository_count')}</div>
+                    <div class="stat-number">{identifier_stats['is_book_no_doi']}</div>
+                    <div class="stat-percent">({identifier_percents['book_no_doi']:.1f}%)</div>
+                    <div class="stat-label">{get_text_local('books_count')} (ISBN only)</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-number">{identifier_stats['is_proceedings']}</div>
@@ -4785,7 +4792,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             </div>
         </div>
         
-        <!-- CITATION CLASSICS SECTION - NO LIMIT -->
+        <!-- CITATION CLASSICS SECTION -->
         <div id="classics" class="section">
             {make_section_title("classics", "html_classics")}
             {citation_classics_html}
@@ -4818,7 +4825,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             {''.join([f'<div class="rank-item"><div>{html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('openalex_only_refs', [])[:20]]) if stats.get('openalex_only_refs') else f'<p>{get_text_local("no_openalex_only")}</p>'}
         </div>
         
-        <!-- SUSPICIOUS DOIS SECTION (UPDATED WITH REPOSITORY AND PROCEEDINGS NOTES) -->
+        <!-- SUSPICIOUS DOIS SECTION -->
         <div id="suspicious_doi" class="section">
             {make_section_title("suspicious", "html_suspicious_doi")}
             <div style="margin-bottom: 15px; font-size: 13px; color: #666;">{get_text_local('suspicious_dois_hint')}</div>
@@ -4848,7 +4855,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             </div>
         </div>
         
-        <!-- NON-DOI SOURCES SECTION (UPDATED with books with ISBN no DOI) -->
+        <!-- NON-DOI SOURCES SECTION -->
         <div id="non_doi" class="section">
             {make_section_title("nondoi", "html_non_doi")}
             
@@ -4867,7 +4874,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             </div>
         </div>
         
-        <!-- NON-JOURNAL SOURCES WITH DOI SECTION (NEW) -->
+        <!-- NON-JOURNAL SOURCES WITH DOI SECTION -->
         {non_journal_sources_html}
         
         <!-- URL SOURCES SECTION -->
@@ -4884,7 +4891,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             {f'''
             <div style="margin-bottom: 20px;">
                 <h4>{get_text_local("retracted_count")}:</h4>
-                {''.join([f'<div class="rank-item suspicious-reference"><span class="badge-danger" style="background: #f8d7da; color: #721c24;">{get_text_local("retracted")}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div>' if ref.get("doi") else '') + '</div>' for ref in stats.get('retracted_refs', [])[:20]]) if stats.get('retracted_refs') else f'<p>{get_text_local("none_detected")}</p>'}
+                {''.join([f'<div class="rank-item retracted-reference"><span class="badge-danger" style="background: #f8d7da; color: #721c24;">{get_text_local("retracted")}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div>' if ref.get("doi") else '') + '</div>' for ref in stats.get('retracted_refs', [])[:20]]) if stats.get('retracted_refs') else f'<p>{get_text_local("none_detected")}</p>'}
             </div>
             ''' if stats.get('retracted_refs') else ''}
             
