@@ -3860,6 +3860,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         ("openalex", "icon_openalex.png"),
         ("suspicious", "icon_suspicious.png"),
         ("nondoi", "icon_nondoi.png"),
+        ("duplicates", "duplicates.png"),
         ("nonjournal", "icon_nonjournal.png"),
         ("url", "icon_url.png"),
         ("problems", "icon_problems.png"),
@@ -4118,7 +4119,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         sidebar_items.append(("selfcitations", "html_self_citations", icons["selfcitation"]))
     
     if duplicates and len(duplicates) > 0:
-        sidebar_items.append(("duplicates", "duplicate_references_title", icons["list"]))
+        sidebar_items.append(("duplicates", "duplicate_references_title", icons.get("duplicates", icons["list"])))
     
     sidebar_items.extend([
         ("crossref_only", "html_crossref_only", icons["crossref"]),
