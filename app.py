@@ -1968,7 +1968,7 @@ def analyze_yearly_statistics(results: List[Dict]) -> Dict:
     }
 
 def analyze_identifier_coverage(results: List[Dict]) -> Dict:
-    """Analyze what types of identifiers each reference has - IMPROVED VERSION"""
+    """Analyze what types of identifiers each reference has - IMPROVED VERSION with independent checks"""
     identifier_stats = {
         'has_doi': 0,
         'has_url': 0,
@@ -1983,7 +1983,7 @@ def analyze_identifier_coverage(results: List[Dict]) -> Dict:
         'is_ebook_platform': 0,          # OpenAlex type 'ebook platform' OR raw_type 'book-chapter'
         'is_proceedings': 0,              # OpenAlex raw_type 'proceedings-article'
         'is_retracted': 0,               # OpenAlex is_retracted == True
-        'is_book_no_doi': 0               # ISBN present but no DOI
+        'is_book_no_doi': 0              # ISBN present but no DOI
     }
     
     references_without_any = []
@@ -1997,28 +1997,24 @@ def analyze_identifier_coverage(results: List[Dict]) -> Dict:
         has_any = False
         count = 0
         
-        # ========== REPOSITORY / PREPRINT DETECTION ==========
-        # From OpenAlex type
-        if result.get('is_repository', False):
+        # ========== REPOSITORY / PREPRINT DETECTION - INDEPENDENT CHECK ==========
+        # Check is_repository flag OR arXiv ID in text
+        if result.get('is_repository', False) or identifiers.get('arxiv'):
             identifier_stats['is_preprint_repository'] += 1
         
-        # From arXiv ID in text
-        elif identifiers.get('arxiv'):
-            identifier_stats['is_preprint_repository'] += 1
-        
-        # ========== EBOOK PLATFORM DETECTION ==========
+        # ========== EBOOK PLATFORM DETECTION - INDEPENDENT CHECK ==========
         if result.get('is_ebook', False):
             identifier_stats['is_ebook_platform'] += 1
         
-        # ========== PROCEEDINGS DETECTION ==========
+        # ========== PROCEEDINGS DETECTION - INDEPENDENT CHECK ==========
         if result.get('is_proceedings', False):
             identifier_stats['is_proceedings'] += 1
         
-        # ========== RETRACTION DETECTION ==========
+        # ========== RETRACTION DETECTION - INDEPENDENT CHECK ==========
         if result.get('is_retracted', False):
             identifier_stats['is_retracted'] += 1
         
-        # ========== BOOK WITH ISBN BUT NO DOI ==========
+        # ========== BOOK WITH ISBN BUT NO DOI - INDEPENDENT CHECK ==========
         if identifiers.get('isbn') and not identifiers.get('doi'):
             identifier_stats['is_book_no_doi'] += 1
         
@@ -2671,46 +2667,79 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                 result['openalex_data'] = openalex_data
                 result['openalex_status'] = True
                 
-                # Extract OpenAlex type and raw_type
-                result['openalex_type'] = openalex_data.get('type', '')
-                result['openalex_raw_type'] = openalex_data.get('raw_type', '')
-                result['type'] = result['openalex_type']
-                result['raw_type'] = result['openalex_raw_type']
+                # Extract OpenAlex type and raw_type with proper handling
+                openalex_type = openalex_data.get('type', '') or ''
+                raw_type = openalex_data.get('raw_type', '') or ''
                 
-                # ========== REPOSITORY / PREPRINT DETECTION ==========
-                # Case 1: OpenAlex type is 'repository'
-                if openalex_data.get('type') == 'repository':
-                    result['is_repository'] = True
-                    result['crossmark_issues'].append('📚 Repository source')
+                result['openalex_type'] = openalex_type
+                result['openalex_raw_type'] = raw_type
+                result['type'] = openalex_type
+                result['raw_type'] = raw_type
                 
-                # Case 2: OpenAlex type is 'posted_content' (preprint)
-                elif openalex_data.get('type') == 'posted_content':
+                # ========== IMPROVED REPOSITORY / PREPRINT DETECTION ==========
+                # Handles: type="repository", type="posted_content", type="preprint", raw_type="posted-content"
+                # Also handles: type="article" with primary_location.version == "submittedVersion"
+                openalex_type_lower = openalex_type.lower()
+                raw_type_lower = raw_type.lower()
+                
+                if (openalex_type_lower == 'repository' or
+                    openalex_type_lower in ('posted_content', 'posted-content', 'preprint') or
+                    raw_type_lower in ('posted-content', 'posted_content', 'preprint')):
                     result['is_repository'] = True
                     result['is_preprint'] = True
-                    result['crossmark_issues'].append('📚 Preprint (posted content)')
+                    result['crossmark_issues'].append('📚 Repository / Preprint')
                 
-                # ========== EBOOK DETECTION (improved) ==========
-                # Case 1: OpenAlex type is 'ebook platform'
-                if openalex_data.get('type') == 'ebook platform':
+                # Additional check for preprint via version field
+                if not result['is_repository'] and openalex_type_lower == 'article':
+                    primary_location = openalex_data.get('primary_location', {})
+                    version = primary_location.get('version', '') if isinstance(primary_location, dict) else ''
+                    if version and version.lower() == 'submittedversion':
+                        result['is_repository'] = True
+                        result['is_preprint'] = True
+                        result['crossmark_issues'].append('📚 Preprint (submitted version)')
+                
+                # ========== IMPROVED EBOOK DETECTION ==========
+                # Handles: type="ebook platform", type="book", type="ebook", type="book-chapter"
+                # Handles: raw_type="book-chapter", raw_type="book"
+                if (openalex_type_lower in ('ebook platform', 'ebook', 'book', 'book-chapter') or
+                    raw_type_lower in ('book-chapter', 'book', 'ebook')):
                     result['is_ebook'] = True
-                    result['crossmark_issues'].append('📖 Electronic book (ebook platform)')
+                    result['crossmark_issues'].append('📖 Electronic book')
                 
-                # Case 2: OpenAlex raw_type is 'book-chapter'
-                elif openalex_data.get('raw_type') == 'book-chapter':
-                    result['is_ebook'] = True
-                    result['crossmark_issues'].append('📖 Electronic book (book chapter)')
+                # Check host_venue for book indicators
+                if not result['is_ebook'] and openalex_data.get('host_venue'):
+                    host_venue = openalex_data['host_venue']
+                    if isinstance(host_venue, dict):
+                        venue_type = host_venue.get('type', '').lower()
+                        if venue_type in ('book', 'ebook', 'book series'):
+                            result['is_ebook'] = True
+                            result['crossmark_issues'].append('📖 Electronic book (from series)')
                 
-                # ========== PROCEEDINGS DETECTION ==========
-                if openalex_data.get('raw_type') == 'proceedings-article':
+                # ========== IMPROVED PROCEEDINGS DETECTION ==========
+                # Handles: raw_type="proceedings-article", type="proceedings-article", type="proceedings"
+                # Also handles: primary_location.source.type == "conference"
+                if (raw_type_lower == 'proceedings-article' or
+                    openalex_type_lower in ('proceedings-article', 'proceedings', 'conference', 'conference-paper')):
                     result['is_proceedings'] = True
                     result['crossmark_issues'].append('📊 Conference proceedings')
                 
+                # Check primary_location source type for conference indicator
+                if not result['is_proceedings']:
+                    primary_location = openalex_data.get('primary_location', {})
+                    if isinstance(primary_location, dict):
+                        source = primary_location.get('source', {})
+                        if isinstance(source, dict):
+                            source_type = source.get('type', '').lower()
+                            if source_type == 'conference':
+                                result['is_proceedings'] = True
+                                result['crossmark_issues'].append('📊 Conference proceedings (source type)')
+                
                 # ========== RETRACTION DETECTION ==========
-                if openalex_data.get('is_retracted', False):
+                if openalex_data.get('is_retracted') is True:
                     result['is_retracted'] = True
                     result['crossmark_issues'].append('⚠️ This article has been RETRACTED')
                 
-                # Extract authors from OpenAlex
+                # ========== EXTRACT AUTHORS FROM OPENALEX ==========
                 authors_data = extract_authors_from_openalex(openalex_data)
                 existing_compare = {a['compare_name'] for a in result['authors']}
                 for auth in authors_data:
@@ -2722,10 +2751,6 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                 # Extract year from OpenAlex (if not already set by Crossref)
                 if not result['year'] and 'publication_year' in openalex_data:
                     result['year'] = openalex_data['publication_year']
-                
-                # Extract publication type from OpenAlex (if not set)
-                if not result['type'] and 'type' in openalex_data:
-                    result['type'] = openalex_data['type']
                 
                 # ========== EXTRACT JOURNAL FROM OPENALEX ==========
                 journal_from_openalex = None
