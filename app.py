@@ -2680,7 +2680,7 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                 # Get primary_location and source for accurate type detection
                 primary_location = openalex_data.get('primary_location', {})
                 source = primary_location.get('source', {})
-                source_type = source.get('type', '') or ''
+                source_type = source.get('type', '') or '' if source else ''
                 
                 # ========== 1. PROCEEDINGS DETECTION ==========
                 # Only raw_type == "proceedings-article" indicates conference proceedings
