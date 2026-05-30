@@ -2669,7 +2669,7 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                 
                 # Extract OpenAlex type and raw_type with proper handling
                 openalex_type = openalex_data.get('type', '') or ''
-                raw_type = openalex_data.get('raw_type', '') or ''
+                raw_type = openalex_data.get('raw_type', '') or openalex_data.get('primary_location', {}).get('raw_type', '') or ''
                 
                 result['openalex_type'] = openalex_type
                 result['openalex_raw_type'] = raw_type
