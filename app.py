@@ -3985,7 +3985,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     if duplicates and len(duplicates) > 0:
         duplicates_html = f"""
         <div id="duplicates" class="section">
-            {make_section_title("list", "duplicate_references_title")}
+            {make_section_title("duplicates", "duplicate_references_title")}
         """
         for dup in duplicates:
             ref_num_1 = dup['index1'] + 1
