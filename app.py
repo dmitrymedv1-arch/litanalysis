@@ -5849,10 +5849,10 @@ def main():
     === IDENTIFIER COVERAGE ===
     DOI: {stats['identifier_coverage']['stats']['has_doi']} ({stats['identifier_coverage_percents']['has_doi']:.1f}%)
     URL: {stats['identifier_coverage']['stats']['has_url']} ({stats['identifier_coverage_percents']['has_url']:.1f}%)
-    Preprint/Repository: {stats['identifier_coverage']['stats']['has_arxiv']} ({stats['identifier_coverage_percents']['has_arxiv']:.1f}%)
     PMID: {stats['identifier_coverage']['stats']['has_pmid']} ({stats['identifier_coverage_percents']['has_pmid']:.1f}%)
-    Books: {stats['identifier_coverage']['stats']['is_book']} ({stats['identifier_coverage_percents']['books']:.1f}%)
-    Preprint/Repository (API): {stats['identifier_coverage']['stats']['is_preprint_repository']} ({stats['identifier_coverage_percents']['preprint_repository']:.1f}%)
+    Preprint/Repository (arXiv + OpenAlex): {stats['identifier_coverage']['stats']['is_preprint_repository']} ({stats['identifier_coverage_percents']['preprint_repository']:.1f}%)
+    Ebook Platform (with DOI): {stats['identifier_coverage']['stats']['is_ebook_platform']} ({stats['identifier_coverage_percents']['ebook_platform']:.1f}%)
+    Books (ISBN only): {stats['identifier_coverage']['stats']['is_book_no_doi']} ({stats['identifier_coverage_percents']['book_no_doi']:.1f}%)
     Proceedings: {stats['identifier_coverage']['stats']['is_proceedings']} ({stats['identifier_coverage_percents']['proceedings']:.1f}%)
     Retracted: {stats['identifier_coverage']['stats']['is_retracted']} ({stats['identifier_coverage_percents']['retracted']:.1f}%)
     No identifier: {stats['identifier_coverage']['stats']['has_none']} ({stats['identifier_coverage_percents']['has_none']:.1f}%)
