@@ -5850,7 +5850,7 @@ def main():
     DOI: {stats['identifier_coverage']['stats']['has_doi']} ({stats['identifier_coverage_percents']['has_doi']:.1f}%)
     URL: {stats['identifier_coverage']['stats']['has_url']} ({stats['identifier_coverage_percents']['has_url']:.1f}%)
     PMID: {stats['identifier_coverage']['stats']['has_pmid']} ({stats['identifier_coverage_percents']['has_pmid']:.1f}%)
-    Preprint/Repository (arXiv + OpenAlex): {stats['identifier_coverage']['stats']['is_preprint_repository']} ({stats['identifier_coverage_percents']['preprint_repository']:.1f}%)
+    Preprint/Repository: {stats['identifier_coverage']['stats']['is_preprint_repository']} ({stats['identifier_coverage_percents']['preprint_repository']:.1f}%)
     Ebook Platform (with DOI): {stats['identifier_coverage']['stats']['is_ebook_platform']} ({stats['identifier_coverage_percents']['ebook_platform']:.1f}%)
     Books (ISBN only): {stats['identifier_coverage']['stats']['is_book_no_doi']} ({stats['identifier_coverage_percents']['book_no_doi']:.1f}%)
     Proceedings: {stats['identifier_coverage']['stats']['is_proceedings']} ({stats['identifier_coverage_percents']['proceedings']:.1f}%)
