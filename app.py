@@ -4058,6 +4058,9 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     
     css_vars = generate_css_variables(primary_color, secondary_color)
     
+    primary_rgb = hex_to_rgb(primary_color)
+    secondary_rgb = hex_to_rgb(secondary_color)
+    
     import base64
     import os
     
@@ -4423,7 +4426,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     
     # Get current date only (without time)
     current_date = datetime.now().strftime('%d.%m.%Y')
-    
+
     # Build HTML content
     html_content = f"""<!DOCTYPE html>
 <html lang="{lang}">
@@ -4451,7 +4454,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             top: 0;
             width: 260px;
             height: 100vh;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, {primary_color} 0%, {secondary_color} 100%);
             color: white;
             padding: 30px 20px;
             overflow-y: auto;
@@ -4489,7 +4492,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             padding: 30px 40px;
         }}
         .header {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, {primary_color} 0%, {secondary_color} 100%);
             color: white;
             padding: 40px;
             border-radius: 15px;
@@ -4524,7 +4527,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         .stat-number {{
             font-size: 32px;
             font-weight: bold;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, {primary_color} 0%, {secondary_color} 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -4555,7 +4558,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             font-weight: 600;
             margin-bottom: 20px;
             padding-bottom: 10px;
-            border-bottom: 3px solid #667eea;
+            border-bottom: 3px solid {primary_color};
             display: flex;
             align-items: center;
             gap: 12px;
@@ -4575,7 +4578,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         }}
         .rank-number {{
             font-weight: bold;
-            color: #667eea;
+            color: {primary_color};
             font-size: 18px;
             display: inline-block;
             width: 40px;
@@ -4597,7 +4600,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             overflow: hidden;
         }}
         .progress-fill {{
-            background: linear-gradient(90deg, #667eea, #764ba2);
+            background: linear-gradient(90deg, {primary_color}, {secondary_color});
             height: 100%;
             border-radius: 10px;
         }}
@@ -4608,15 +4611,15 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             margin-top: 20px;
         }}
         .concept-card {{
-            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            background: linear-gradient(135deg, {primary_color}15 0%, {secondary_color}15 100%);
             border-radius: 10px;
             padding: 15px;
             text-align: center;
-            border: 1px solid #667eea30;
+            border: 1px solid {primary_color}30;
         }}
         .concept-name {{
             font-weight: 600;
-            color: #667eea;
+            color: {primary_color};
         }}
         .concept-score {{
             font-size: 12px;
@@ -4696,19 +4699,19 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             border-bottom: 1px solid #e0e0e0;
         }}
         th {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, {primary_color} 0%, {secondary_color} 100%);
             color: white;
         }}
         tr:hover {{
             background: #f5f5f5;
         }}
         .clickable-link {{
-            color: #667eea;
+            color: {primary_color};
             text-decoration: none;
             transition: all 0.3s;
         }}
         .clickable-link:hover {{
-            color: #764ba2;
+            color: {secondary_color};
             text-decoration: underline;
         }}
         .full-text-container {{
@@ -6123,6 +6126,7 @@ def main():
                 journal_name, 
                 article_number, 
                 duplicates,
+                primary_color,
                 secondary_color
             )
             
