@@ -42,7 +42,7 @@ def get_complementary_color(hex_color: str) -> str:
 def show_color_preview():
     """Display interactive color preview in sidebar"""
     primary = st.session_state.get('primary_color', '#667eea')
-    secondary = get_complementary_color(primary)
+    secondary = st.session_state.get('secondary_color', get_complementary_color(primary))
     analogous = get_analogous_colors(primary, 2)
     
     st.markdown("### 🎨 Color Preview")
@@ -917,7 +917,7 @@ def update_colored_progress(progress_percent: float, success_rate: float = None,
     """Update progress bar with theme colors"""
     
     primary_color = st.session_state.get('primary_color', '#667eea')
-    secondary_color = get_complementary_color(primary_color)
+    secondary_color = st.session_state.get('secondary_color', get_complementary_color(primary_color))
     
     # Create custom HTML/CSS for colored progress bar
     progress_html = f"""
@@ -6118,7 +6118,7 @@ def main():
 
             # Get current theme colors
             primary_color = st.session_state.get('primary_color', '#667eea')
-            secondary_color = get_complementary_color(primary_color)
+            secondary_color = st.session_state.get('secondary_color', get_complementary_color(primary_color))
             
             # Generate HTML report with duplicates and new types
             html_report = generate_html_report_advanced(
