@@ -5204,14 +5204,14 @@ def main():
         
         # Predefined theme options
         preset_themes = {
-            "Default (Blue-Purple)": {"primary": "#667eea", "secondary": "#f39c12"},  # сине-фиолетовый + янтарный
-            "Emerald (Green-Teal)": {"primary": "#2ecc71", "secondary": "#e84393"},    # изумрудный + розовый
-            "Sunset (Orange-Coral)": {"primary": "#e74c3c", "secondary": "#3498db"},   # коралловый + синий
-            "Ocean (Deep Blue)": {"primary": "#3498db", "secondary": "#e74c3c"},       # глубокий синий + коралловый
-            "Royal (Purple-Pink)": {"primary": "#9b59b6", "secondary": "#f1c40f"},     # фиолетовый + золотой
-            "Forest (Dark Green)": {"primary": "#27ae60", "secondary": "#e67e22"},     # лесной зеленый + оранжевый
-            "Cherry (Red-Pink)": {"primary": "#e84393", "secondary": "#2ecc71"},       # вишневый + изумрудный
-            "Amber (Yellow-Orange)": {"primary": "#f39c12", "secondary": "#667eea"},   # янтарный + сине-фиолетовый
+            "Default (Blue-Purple)": {"primary": "#667eea", "secondary": "#9b59b6"},   # пурпурный/фиолетовый
+            "Emerald (Green-Teal)": {"primary": "#2ecc71", "secondary": "#27ae60"},     # темно-зеленый
+            "Sunset (Orange-Coral)": {"primary": "#e74c3c", "secondary": "#c0392b"},   # темно-красный
+            "Ocean (Deep Blue)": {"primary": "#3498db", "secondary": "#2980b9"},        # темно-синий
+            "Royal (Purple-Pink)": {"primary": "#9b59b6", "secondary": "#e84393"},     # розовый
+            "Forest (Dark Green)": {"primary": "#27ae60", "secondary": "#2ecc71"},     # светло-зеленый
+            "Cherry (Red-Pink)": {"primary": "#e84393", "secondary": "#9b59b6"},       # фиолетовый
+            "Amber (Yellow-Orange)": {"primary": "#f39c12", "secondary": "#e67e22"},   # оранжевый
         }
         
         # Theme selector with radio buttons or selectbox
