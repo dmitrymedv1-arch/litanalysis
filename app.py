@@ -14,7 +14,298 @@ import difflib
 import math
 from collections import defaultdict
 from itertools import combinations
-import html  # Added for HTML escaping
+import html 
+# ======================== COLOR UTILITIES FOR DYNAMIC THEMES ========================
+import colorsys
+
+def hex_to_rgb(hex_color: str) -> tuple:
+    """Convert hex color to RGB tuple"""
+    hex_color = hex_color.lstrip('#')
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+
+def rgb_to_hex(rgb: tuple) -> str:
+    """Convert RGB tuple to hex color"""
+    return '#{:02x}{:02x}{:02x}'.format(int(rgb[0]), int(rgb[1]), int(rgb[2]))
+
+def get_complementary_color(hex_color: str) -> str:
+    """
+    Generate complementary color by rotating hue by 180 degrees
+    Returns a color that pairs well with the base color
+    """
+    rgb = hex_to_rgb(hex_color)
+    h, s, v = colorsys.rgb_to_hsv(rgb[0]/255.0, rgb[1]/255.0, rgb[2]/255.0)
+    # Rotate hue by 0.5 (180 degrees)
+    complementary_hue = (h + 0.5) % 1.0
+    complementary_rgb = colorsys.hsv_to_rgb(complementary_hue, s, v)
+    return rgb_to_hex(tuple(int(c * 255) for c in complementary_rgb))
+
+def show_color_preview():
+    """Display interactive color preview in sidebar"""
+    primary = st.session_state.get('primary_color', '#667eea')
+    secondary = get_complementary_color(primary)
+    analogous = get_analogous_colors(primary, 2)
+    
+    st.markdown("### 🎨 Color Preview")
+    
+    # Create a visual palette
+    palette_html = f"""
+    <div style="display: flex; gap: 10px; margin: 15px 0; flex-wrap: wrap;">
+        <div style="flex: 1; text-align: center;">
+            <div style="background: {primary}; height: 60px; border-radius: 10px 10px 0 0;"></div>
+            <div style="background: {secondary}; height: 60px; border-radius: 0 0 10px 10px;"></div>
+            <div style="font-size: 11px; margin-top: 5px;">Primary → Complementary</div>
+        </div>
+        <div style="flex: 1; text-align: center;">
+            <div style="background: {analogous[0] if analogous else primary}; height: 60px; border-radius: 10px;"></div>
+            <div style="font-size: 11px; margin-top: 5px;">Analogous 1</div>
+        </div>
+        <div style="flex: 1; text-align: center;">
+            <div style="background: {analogous[1] if len(analogous) > 1 else secondary}; height: 60px; border-radius: 10px;"></div>
+            <div style="font-size: 11px; margin-top: 5px;">Analogous 2</div>
+        </div>
+    </div>
+    
+    <div style="display: flex; gap: 10px; margin: 10px 0;">
+        <div style="flex: 1; background: linear-gradient(135deg, {primary}, {secondary}); height: 30px; border-radius: 15px;"></div>
+        <div style="flex: 1; background: linear-gradient(90deg, {primary}, {secondary}); height: 30px; border-radius: 15px;"></div>
+    </div>
+    """
+    st.markdown(palette_html, unsafe_allow_html=True)
+    
+    # Button to reset to default
+    if st.button("Reset to Default Theme", use_container_width=True):
+        st.session_state.primary_color = '#667eea'
+        st.rerun()
+
+def get_analogous_colors(hex_color: str, count: int = 2) -> List[str]:
+    """
+    Generate analogous colors (colors adjacent on color wheel)
+    Useful for gradients and accents
+    """
+    rgb = hex_to_rgb(hex_color)
+    h, s, v = colorsys.rgb_to_hsv(rgb[0]/255.0, rgb[1]/255.0, rgb[2]/255.0)
+    
+    colors = []
+    step = 30 / 360.0  # 30 degrees in hue space
+    
+    for i in range(count):
+        offset = (i + 1) * step
+        new_hue = (h + offset) % 1.0
+        new_rgb = colorsys.hsv_to_rgb(new_hue, s, v)
+        colors.append(rgb_to_hex(tuple(int(c * 255) for c in new_rgb)))
+    
+    return colors
+
+def get_gradient_colors(hex_color: str, steps: int = 5) -> List[str]:
+    """
+    Generate gradient colors from base color to lighter shades
+    """
+    rgb = hex_to_rgb(hex_color)
+    colors = []
+    
+    for i in range(steps):
+        factor = 0.3 + (i * 0.14)  # 0.3 to 0.86
+        new_rgb = tuple(min(255, int(c * (1 + factor * 0.5))) for c in rgb)
+        colors.append(rgb_to_hex(new_rgb))
+    
+    return colors
+
+def get_contrast_color(hex_color: str) -> str:
+    """
+    Get contrasting color (black or white) for text on a colored background
+    Uses luminance calculation for optimal readability
+    """
+    rgb = hex_to_rgb(hex_color)
+    # Calculate relative luminance (WCAG formula)
+    luminance = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255
+    return '#FFFFFF' if luminance < 0.5 else '#000000'
+
+def generate_css_variables(base_color: str, accent_color: str = None) -> Dict[str, str]:
+    """
+    Generate complete CSS variable set for the theme
+    """
+    if accent_color is None:
+        accent_color = get_complementary_color(base_color)
+    
+    # Generate gradient colors
+    gradient_start = base_color
+    gradient_end = accent_color
+    
+    # Generate lighter shades for backgrounds
+    lighter_base = get_gradient_colors(base_color, 1)[0]
+    lighter_accent = get_gradient_colors(accent_color, 1)[0]
+    
+    # Get contrast colors for text
+    base_contrast = get_contrast_color(base_color)
+    accent_contrast = get_contrast_color(accent_color)
+    
+    # Generate analogous colors for accents
+    analogous = get_analogous_colors(base_color, 2)
+    
+    return {
+        '--primary-color': base_color,
+        '--secondary-color': accent_color,
+        '--primary-light': lighter_base,
+        '--secondary-light': lighter_accent,
+        '--primary-contrast': base_contrast,
+        '--secondary-contrast': accent_contrast,
+        '--gradient-start': gradient_start,
+        '--gradient-end': gradient_end,
+        '--accent-1': analogous[0] if len(analogous) > 0 else accent_color,
+        '--accent-2': analogous[1] if len(analogous) > 1 else accent_color,
+        '--hover-light': f"{base_color}20",
+    }
+
+def apply_theme_css(base_color: str, accent_color: str = None):
+    """
+    Apply dynamic CSS theme based on selected colors
+    """
+    if accent_color is None:
+        accent_color = get_complementary_color(base_color)
+    
+    css_vars = generate_css_variables(base_color, accent_color)
+    
+    theme_css = f"""
+    <style>
+        :root {{
+            --primary: {css_vars['--primary-color']};
+            --secondary: {css_vars['--secondary-color']};
+            --primary-light: {css_vars['--primary-light']};
+            --secondary-light: {css_vars['--secondary-light']};
+            --primary-contrast: {css_vars['--primary-contrast']};
+            --secondary-contrast: {css_vars['--secondary-contrast']};
+            --gradient-start: {css_vars['--gradient-start']};
+            --gradient-end: {css_vars['--gradient-end']};
+            --accent-1: {css_vars['--accent-1']};
+            --accent-2: {css_vars['--accent-2']};
+            --hover-light: {css_vars['--hover-light']};
+        }}
+        
+        /* Update all gradient backgrounds */
+        .stApp {{
+            background: linear-gradient(135deg, 
+                rgba({int(hex_to_rgb(css_vars['--gradient-start'])[0])}, {int(hex_to_rgb(css_vars['--gradient-start'])[1])}, {int(hex_to_rgb(css_vars['--gradient-start'])[2])}, 0.05) 0%,
+                rgba({int(hex_to_rgb(css_vars['--gradient-end'])[0])}, {int(hex_to_rgb(css_vars['--gradient-end'])[1])}, {int(hex_to_rgb(css_vars['--gradient-end'])[2])}, 0.08) 100%);
+        }}
+        
+        .metric-number {{
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }}
+        
+        .section-header {{
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+        }}
+        
+        .rank-item {{
+            border-left: 3px solid var(--primary);
+        }}
+        
+        .rank-number {{
+            color: var(--primary);
+        }}
+        
+        .progress-fill {{
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+        }}
+        
+        .custom-tab-button.active {{
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+        }}
+        
+        .custom-tab-button:hover {{
+            background: linear-gradient(135deg, var(--primary-light) 0%, var(--secondary-light) 100%);
+        }}
+        
+        .colored-progress-bar {{
+            background: linear-gradient(90deg, 
+                var(--primary) 0%, 
+                var(--secondary) 50%,
+                var(--primary) 100%);
+        }}
+        
+        .section-title {{
+            border-bottom: 3px solid var(--primary);
+        }}
+        
+        .concept-card {{
+            background: linear-gradient(135deg, var(--hover-light) 0%, var(--secondary-light) 100%);
+            border: 1px solid var(--primary-light);
+        }}
+        
+        .concept-name {{
+            color: var(--primary);
+        }}
+        
+        .clickable-link {{
+            color: var(--primary);
+        }}
+        
+        .clickable-link:hover {{
+            color: var(--secondary);
+        }}
+        
+        .badge-success {{
+            background: var(--primary-light);
+            color: var(--primary-contrast);
+        }}
+        
+        .custom-tab-button .custom-tab-title {{
+            color: inherit;
+        }}
+        
+        /* Additional hover effects */
+        .metric-card:hover {{
+            box-shadow: 0 6px 12px rgba({int(hex_to_rgb(css_vars['--primary-color'])[0])}, {int(hex_to_rgb(css_vars['--primary-color'])[1])}, {int(hex_to_rgb(css_vars['--primary-color'])[2])}, 0.15);
+        }}
+        
+        /* Smooth color transitions */
+        * {{
+            transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+        }}
+        
+        /* Custom color picker preview */
+        .color-preview {{
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            margin-left: 10px;
+            vertical-align: middle;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }}
+        
+        .color-preview:hover {{
+            transform: scale(1.1);
+        }}
+        
+        /* Complementary color indicator */
+        .complementary-preview {{
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            margin-left: 10px;
+            vertical-align: middle;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }}
+        
+        /* Theme info panel */
+        .theme-info {{
+            background: var(--hover-light);
+            border-radius: 10px;
+            padding: 12px;
+            margin-top: 15px;
+            font-size: 12px;
+            text-align: center;
+        }}
+    </style>
+    """
+    st.markdown(theme_css, unsafe_allow_html=True)
 
 # Try to import additional libraries for new features
 try:
@@ -623,56 +914,10 @@ COUNTRY_CODES = {
 
 # ======================== COLORED PROGRESS BAR ========================
 def update_colored_progress(progress_percent: float, success_rate: float = None, data_density: float = None):
-    """
-    Update progress bar with color based on:
-    - progress_percent: 0-100 completion percentage
-    - success_rate: 0-1 ratio of successful API responses (optional)
-    - data_density: 0-1 ratio of found DOIs to total references (optional)
-    """
+    """Update progress bar with theme colors"""
     
-    # Determine color based on multiple factors
-    if success_rate is not None:
-        # Color by API success rate (better metric)
-        if success_rate >= 0.8:
-            color = "#00CC96"  # Rich green - excellent
-        elif success_rate >= 0.6:
-            color = "#FFA042"  # Orange - good
-        elif success_rate >= 0.4:
-            color = "#FF6B6B"  # Coral - moderate
-        elif success_rate >= 0.2:
-            color = "#FF4444"  # Red - poor
-        else:
-            color = "#CC0000"  # Dark red - critical
-    elif data_density is not None:
-        # Color by data density (how many DOIs found)
-        if data_density >= 0.9:
-            color = "#00CC96"  # Green - dense data
-        elif data_density >= 0.7:
-            color = "#00B5F1"  # Blue - good data
-        elif data_density >= 0.5:
-            color = "#FFA042"  # Orange - moderate
-        elif data_density >= 0.3:
-            color = "#FF6B6B"  # Coral - sparse
-        else:
-            color = "#FF4444"  # Red - very sparse
-    else:
-        # Default: gradient from green to red based on progress
-        if progress_percent < 30:
-            # Green to yellow-green
-            r = int(0 + (255 * progress_percent / 30))
-            g = 255
-            b = int(100 - (100 * progress_percent / 30))
-        elif progress_percent < 70:
-            # Yellow to orange
-            r = 255
-            g = int(255 - (255 * (progress_percent - 30) / 40))
-            b = 0
-        else:
-            # Orange to red
-            r = 255
-            g = int(100 - (100 * (progress_percent - 70) / 30))
-            b = 0
-        color = f"rgb({r}, {g}, {b})"
+    primary_color = st.session_state.get('primary_color', '#667eea')
+    secondary_color = get_complementary_color(primary_color)
     
     # Create custom HTML/CSS for colored progress bar
     progress_html = f"""
@@ -695,9 +940,9 @@ def update_colored_progress(progress_percent: float, success_rate: float = None,
         width: {progress_percent}%;
         height: 28px;
         background: linear-gradient(90deg, 
-            {color} 0%, 
-            {color}CC 50%,
-            {color} 100%);
+            {primary_color} 0%, 
+            {secondary_color} 50%,
+            {primary_color} 100%);
         background-size: 200% 100%;
         animation: shimmer 2s infinite linear;
         border-radius: 20px;
@@ -727,19 +972,6 @@ def update_colored_progress(progress_percent: float, success_rate: float = None,
         color: #666;
         margin-top: 5px;
     }}
-    
-    .progress-badge {{
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 12px;
-        font-size: 11px;
-        font-weight: 600;
-    }}
-    
-    .badge-green {{ background: #d4edda; color: #155724; }}
-    .badge-blue {{ background: #d1ecf1; color: #0c5460; }}
-    .badge-orange {{ background: #fff3cd; color: #856404; }}
-    .badge-red {{ background: #f8d7da; color: #721c24; }}
     </style>
     
     <div class="colored-progress-container">
@@ -3816,8 +4048,15 @@ def get_color_for_author(index: int) -> str:
     return colors[index % len(colors)]
 
 # ======================== HTML REPORT (ENGLISH, UPDATED WITH NEW TYPES) ========================
-def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_authors: Set[str] = None, lang: str = 'en', journal_name: str = '', article_number: str = '', duplicates: List[Dict] = None) -> str:
+def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_authors: Set[str] = None, lang: str = 'en', journal_name: str = '', article_number: str = '', duplicates: List[Dict] = None, primary_color: str = '#667eea', secondary_color: str = None) -> str:
     """Generate enhanced HTML report with PNG icons (no emojis) and professional design"""
+
+    if secondary_color is None:
+        secondary_color = get_complementary_color(primary_color)
+    
+    analogous = get_analogous_colors(primary_color, 2)
+    
+    css_vars = generate_css_variables(primary_color, secondary_color)
     
     import base64
     import os
@@ -4953,6 +5192,89 @@ def main():
             st.session_state.language = lang_option
             st.rerun()
         st.markdown("---")
+
+        # ========== NEW: COLOR THEME SELECTOR ==========
+        st.markdown(f"## 🎨 Color Theme")
+        
+        # Initialize color theme in session state
+        if 'primary_color' not in st.session_state:
+            st.session_state.primary_color = '#667eea'  # Default blue-purple
+        
+        # Predefined theme options
+        preset_themes = {
+            "Default (Blue-Purple)": "#667eea",
+            "Emerald (Green-Teal)": "#2ecc71",
+            "Sunset (Orange-Coral)": "#e74c3c",
+            "Ocean (Deep Blue)": "#3498db",
+            "Royal (Purple-Pink)": "#9b59b6",
+            "Forest (Dark Green)": "#27ae60",
+            "Cherry (Red-Pink)": "#e84393",
+            "Amber (Yellow-Orange)": "#f39c12",
+        }
+        
+        # Theme selector with radio buttons or selectbox
+        theme_option = st.selectbox(
+            "🎨 Preset themes",
+            options=list(preset_themes.keys()),
+            index=0
+        )
+        
+        # Option to use preset or custom
+        use_preset = st.checkbox("Use preset theme", value=True)
+        
+        if use_preset:
+            selected_color = preset_themes[theme_option]
+            st.session_state.primary_color = selected_color
+        else:
+            # Custom color picker
+            selected_color = st.color_picker(
+                "🎨 Pick your primary color",
+                value=st.session_state.primary_color,
+                help="Choose any color. Complementary color will be auto-generated!"
+            )
+            st.session_state.primary_color = selected_color
+        
+        # Calculate and display complementary color
+        complementary = get_complementary_color(st.session_state.primary_color)
+        
+        # Display color preview
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(
+                f'<div style="text-align: center;">'
+                f'<div class="color-preview" style="background: {st.session_state.primary_color};"></div>'
+                f'<div style="font-size: 11px; margin-top: 5px;">Primary</div>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+        with col2:
+            st.markdown(
+                f'<div style="text-align: center;">'
+                f'<div class="color-preview" style="background: {complementary};"></div>'
+                f'<div style="font-size: 11px; margin-top: 5px;">Complementary</div>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+        
+        # Show gradient preview
+        st.markdown(
+            f'<div class="complementary-preview" style="height: 8px; width: 100%; margin: 10px 0;"></div>',
+            unsafe_allow_html=True
+        )
+        
+        # Show theme info
+        st.markdown(
+            f'<div class="theme-info">'
+            f'✨ Complementary color automatically selected<br>'
+            f'🎨 Gradient: Primary → Complementary'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+        
+        # Apply theme on color change
+        apply_theme_css(st.session_state.primary_color)
+        
+        st.markdown("---")
     
     st.image("logo.png", width=250)
     st.markdown("---")
@@ -5787,6 +6109,10 @@ def main():
             
             st.markdown(f"### {get_text('export_report')}")
             st.markdown(get_text('download_html'))
+
+            # Get current theme colors
+            primary_color = st.session_state.get('primary_color', '#667eea')
+            secondary_color = get_complementary_color(primary_color)
             
             # Generate HTML report with duplicates and new types
             html_report = generate_html_report_advanced(
@@ -5796,7 +6122,8 @@ def main():
                 st.session_state.language, 
                 journal_name, 
                 article_number, 
-                duplicates
+                duplicates,
+                secondary_color
             )
             
             # Generate filename from journal abbreviation and article number (no datetime)
