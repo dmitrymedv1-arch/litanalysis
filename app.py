@@ -4048,11 +4048,8 @@ def get_color_for_author(index: int) -> str:
     return colors[index % len(colors)]
 
 # ======================== HTML REPORT (ENGLISH, UPDATED WITH NEW TYPES) ========================
-def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_authors: Set[str] = None, lang: str = 'en', journal_name: str = '', article_number: str = '', duplicates: List[Dict] = None, primary_color: str = '#667eea', secondary_color: str = None) -> str:
+def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_authors: Set[str] = None, lang: str = 'en', journal_name: str = '', article_number: str = '', duplicates: List[Dict] = None, primary_color: str = '#667eea', secondary_color: str = '#f39c12') -> str:
     """Generate enhanced HTML report with PNG icons (no emojis) and professional design"""
-
-    if secondary_color is None:
-        secondary_color = get_complementary_color(primary_color)
     
     analogous = get_analogous_colors(primary_color, 2)
     
@@ -5201,18 +5198,20 @@ def main():
         
         # Initialize color theme in session state
         if 'primary_color' not in st.session_state:
-            st.session_state.primary_color = '#667eea'  # Default blue-purple
+            st.session_state.primary_color = '#667eea'
+        if 'secondary_color' not in st.session_state:
+            st.session_state.secondary_color = '#f39c12'
         
         # Predefined theme options
         preset_themes = {
-            "Default (Blue-Purple)": "#667eea",
-            "Emerald (Green-Teal)": "#2ecc71",
-            "Sunset (Orange-Coral)": "#e74c3c",
-            "Ocean (Deep Blue)": "#3498db",
-            "Royal (Purple-Pink)": "#9b59b6",
-            "Forest (Dark Green)": "#27ae60",
-            "Cherry (Red-Pink)": "#e84393",
-            "Amber (Yellow-Orange)": "#f39c12",
+            "Default (Blue-Purple)": {"primary": "#667eea", "secondary": "#f39c12"},  # сине-фиолетовый + янтарный
+            "Emerald (Green-Teal)": {"primary": "#2ecc71", "secondary": "#e84393"},    # изумрудный + розовый
+            "Sunset (Orange-Coral)": {"primary": "#e74c3c", "secondary": "#3498db"},   # коралловый + синий
+            "Ocean (Deep Blue)": {"primary": "#3498db", "secondary": "#e74c3c"},       # глубокий синий + коралловый
+            "Royal (Purple-Pink)": {"primary": "#9b59b6", "secondary": "#f1c40f"},     # фиолетовый + золотой
+            "Forest (Dark Green)": {"primary": "#27ae60", "secondary": "#e67e22"},     # лесной зеленый + оранжевый
+            "Cherry (Red-Pink)": {"primary": "#e84393", "secondary": "#2ecc71"},       # вишневый + изумрудный
+            "Amber (Yellow-Orange)": {"primary": "#f39c12", "secondary": "#667eea"},   # янтарный + сине-фиолетовый
         }
         
         # Theme selector with radio buttons or selectbox
@@ -5226,8 +5225,9 @@ def main():
         use_preset = st.checkbox("Use preset theme", value=True)
         
         if use_preset:
-            selected_color = preset_themes[theme_option]
-            st.session_state.primary_color = selected_color
+            selected_theme = preset_themes[theme_option]
+            st.session_state.primary_color = selected_theme["primary"]
+            st.session_state.secondary_color = selected_theme["secondary"]
         else:
             # Custom color picker
             selected_color = st.color_picker(
@@ -5236,9 +5236,11 @@ def main():
                 help="Choose any color. Complementary color will be auto-generated!"
             )
             st.session_state.primary_color = selected_color
+            # Для кастомного цвета генерируем комплементарный автоматически
+            st.session_state.secondary_color = get_complementary_color(selected_color)
         
-        # Calculate and display complementary color
-        complementary = get_complementary_color(st.session_state.primary_color)
+        # Use secondary color from session state
+        complementary = st.session_state.secondary_color
         
         # Display color preview
         col1, col2 = st.columns(2)
@@ -5275,7 +5277,8 @@ def main():
         )
         
         # Apply theme on color change
-        apply_theme_css(st.session_state.primary_color)
+        secondary = st.session_state.get('secondary_color', get_complementary_color(st.session_state.primary_color))
+        apply_theme_css(st.session_state.primary_color, secondary)
         
         st.markdown("---")
     
