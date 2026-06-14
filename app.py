@@ -4597,6 +4597,7 @@ def display_potential_reviewers_section(reviewers: List[Dict]):
 
 def generate_reviewers_html_section(reviewers: List[Dict], lang: str = 'en') -> str:
     """Generate HTML for potential reviewers section in the report"""
+    import html as html_module  # Добавьте это в начале функции для ясности
     
     if not reviewers:
         return f'<div class="section"><p>{get_text("no_reviewers_found")}</p></div>'
@@ -4607,7 +4608,7 @@ def generate_reviewers_html_section(reviewers: List[Dict], lang: str = 'en') -> 
     else:
         warning_text = get_text('potential_reviewers_confidential_en')
     
-    html = f'''
+    output_html = f'''
     <div id="reviewers" class="section">
         <div class="section-title">👥 {get_text("potential_reviewers")}</div>
         <div class="confidential-warning" style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 10px; padding: 15px; margin-bottom: 20px; text-align: center;">
@@ -4623,73 +4624,73 @@ def generate_reviewers_html_section(reviewers: List[Dict], lang: str = 'en') -> 
         orcid = reviewer.get('orcid', '')
         orcid_profile = reviewer.get('orcid_profile', {})
         
-        html += f'''
+        output_html += f'''
         <div class="reviewer-card">
-            <div class="reviewer-name">#{reviewer['rank']} {reviewer['display_name']}</div>
+            <div class="reviewer-name">#{reviewer['rank']} {html_module.escape(reviewer['display_name'])}</div>
             <div class="reviewer-orcid">
         '''
         
         if orcid:
             clean_orcid = clean_orcid_id(orcid)
             if clean_orcid:
-                html += f'<strong>ORCID:</strong> <a href="https://orcid.org/{clean_orcid}" target="_blank" style="color: #667eea;">{clean_orcid}</a>'
+                output_html += f'<strong>ORCID:</strong> <a href="https://orcid.org/{clean_orcid}" target="_blank" style="color: #667eea;">{clean_orcid}</a>'
                 if orcid_profile and orcid_profile.get('full_name'):
-                    html += f'<br><strong>Full name:</strong> {orcid_profile["full_name"]}'
+                    output_html += f'<br><strong>Full name:</strong> {html_module.escape(orcid_profile["full_name"])}'
             else:
-                html += f'<strong>ORCID:</strong> {get_text("reviewer_orcid_not_available")}'
+                output_html += f'<strong>ORCID:</strong> {get_text("reviewer_orcid_not_available")}'
         else:
-            html += f'<strong>ORCID:</strong> {get_text("reviewer_orcid_not_available")}'
+            output_html += f'<strong>ORCID:</strong> {get_text("reviewer_orcid_not_available")}'
         
-        html += '</div>'
+        output_html += '</div>'
         
         # Affiliations
         if reviewer.get('affiliations'):
-            html += f'<div class="reviewer-section-title">{get_text("reviewer_affiliations")}</div><ul>'
+            output_html += f'<div class="reviewer-section-title">{get_text("reviewer_affiliations")}</div><ul>'
             for aff in sorted(list(reviewer['affiliations']))[:5]:
-                html += f'<li>{html.escape(aff)}</li>'
-            html += '</ul>'
+                output_html += f'<li>{html_module.escape(aff)}</li>'
+            output_html += '</ul>'
         
         # Countries
         if reviewer.get('countries'):
-            html += f'<div class="reviewer-section-title">{get_text("reviewer_countries")}</div>'
-            html += f'<p>{", ".join(reviewer["countries"])}</p>'
+            output_html += f'<div class="reviewer-section-title">{get_text("reviewer_countries")}</div>'
+            output_html += f'<p>{", ".join(reviewer["countries"])}</p>'
         
         # Websites & Social links
         if orcid_profile and orcid_profile.get('researcher_urls'):
-            html += f'<div class="reviewer-section-title">{get_text("reviewer_websites")}</div><ul>'
+            output_html += f'<div class="reviewer-section-title">{get_text("reviewer_websites")}</div><ul>'
             for url_info in orcid_profile['researcher_urls'][:5]:
                 url_name = url_info.get('name', 'Website')
                 url_value = url_info.get('url', '')
                 if url_value:
-                    html += f'<li><a href="{url_value}" target="_blank">{html.escape(url_name)}</a></li>'
-            html += '</ul>'
+                    output_html += f'<li><a href="{url_value}" target="_blank">{html_module.escape(url_name)}</a></li>'
+            output_html += '</ul>'
         
         # External IDs
         if orcid_profile and orcid_profile.get('external_ids'):
-            html += f'<div class="reviewer-section-title">{get_text("reviewer_other_ids")}</div>'
+            output_html += f'<div class="reviewer-section-title">{get_text("reviewer_other_ids")}</div>'
             external_ids_html = format_external_ids_html(orcid_profile['external_ids'])
-            html += f'<div>{external_ids_html}</div>'
+            output_html += f'<div>{external_ids_html}</div>'
         
         # Works
-        html += f'<div class="reviewer-section-title">{get_text("reviewer_works_title")}</div><ul>'
+        output_html += f'<div class="reviewer-section-title">{get_text("reviewer_works_title")}</div><ul>'
         for work in reviewer.get('recent_works', [])[:5]:
             year = work.get('year', '?')
             journal = work.get('journal', '')
             title = work.get('title', 'Untitled')[:100]
             doi = work.get('doi', '')
             
-            html += f'<li>{year}. {html.escape(title)}'
+            output_html += f'<li>{year}. {html_module.escape(title)}'
             if journal:
-                html += f' <em>{html.escape(journal)}</em>'
+                output_html += f' <em>{html_module.escape(journal)}</em>'
             if doi:
-                html += f' <a href="https://doi.org/{doi}" target="_blank">DOI</a>'
-            html += '</li>'
-        html += '</ul>'
+                output_html += f' <a href="https://doi.org/{doi}" target="_blank">DOI</a>'
+            output_html += '</li>'
+        output_html += '</ul>'
         
-        html += '</div>'
+        output_html += '</div>'
     
-    html += '</div>'
-    return html
+    output_html += '</div>'
+    return output_html
 
 # ======================== HELPER FUNCTION FOR AUTHOR HIGHLIGHTING ========================
 def format_authors_with_highlight(authors_list: List[str], highlight_authors_norm_set: Set[str], normalize_func) -> str:
