@@ -1036,136 +1036,127 @@ COUNTRY_CODES = {
 
 # ======================== NEW FUNCTIONS FOR AFFILIATIONS (FROM EXAMPLE CODE) ========================
 
-def extract_country_from_affiliation_string(affiliation_string: str) -> str:
+def extract_country_from_affiliation_string_simple(affiliation_string: str) -> str:
     """
-    Extract country from affiliation string (fallback method when country_code is not available)
-    This is a simplified version from the working example code
+    Извлекает страну из строки аффилиации (упрощенная версия для fallback).
     """
-    if not affiliation_string or not isinstance(affiliation_string, str):
-        return ""
+    if not affiliation_string:
+        return "N/A"
     
     affiliation_string = affiliation_string.strip()
     
-    # Known countries mapping (expanded from example)
-    known_countries = {
-        'usa': 'US', 'united states': 'US', 'america': 'US',
-        'uk': 'GB', 'united kingdom': 'GB', 'great britain': 'GB',
-        'china': 'CN', 'pr china': 'CN', "people's republic of china": 'CN',
-        'germany': 'DE', 'deutschland': 'DE',
-        'france': 'FR', 'japan': 'JP', 'canada': 'CA',
-        'australia': 'AU', 'russia': 'RU', 'россия': 'RU', 'russian federation': 'RU',
-        'india': 'IN', 'brazil': 'BR', 'italy': 'IT',
-        'spain': 'ES', 'south korea': 'KR', 'korea': 'KR',
-        'netherlands': 'NL', 'switzerland': 'CH', 'sweden': 'SE',
-        'norway': 'NO', 'denmark': 'DK', 'finland': 'FI',
-        'belgium': 'BE', 'poland': 'PL', 'portugal': 'PT',
-        'greece': 'GR', 'turkey': 'TR', 'israel': 'IL',
-        'singapore': 'SG', 'taiwan': 'TW', 'hong kong': 'HK',
-        'mexico': 'MX', 'argentina': 'AR', 'chile': 'CL',
-        'colombia': 'CO', 'ukraine': 'UA', 'czech republic': 'CZ',
-        'hungary': 'HU', 'romania': 'RO', 'bulgaria': 'BG',
-        'serbia': 'RS', 'croatia': 'HR', 'slovakia': 'SK',
-        'slovenia': 'SI', 'lithuania': 'LT', 'latvia': 'LV',
-        'estonia': 'EE', 'ireland': 'IE', 'new zealand': 'NZ',
-        'south africa': 'ZA', 'egypt': 'EG', 'saudi arabia': 'SA',
-        'uae': 'AE', 'united arab emirates': 'AE', 'qatar': 'QA',
-        'iran': 'IR', 'pakistan': 'PK', 'bangladesh': 'BD',
-        'vietnam': 'VN', 'thailand': 'TH', 'malaysia': 'MY',
-        'indonesia': 'ID', 'philippines': 'PH', 'kazakhstan': 'KZ',
-        'belarus': 'BY', 'uzbekistan': 'UZ', 'azerbaijan': 'AZ',
-        'georgia': 'GE', 'armenia': 'AM', 'moldova': 'MD'
-    }
+    known_countries = [
+        'USA', 'UK', 'China', 'Germany', 'France', 'Japan', 'Canada', 'Australia',
+        'Russia', 'India', 'Brazil', 'Italy', 'Spain', 'South Korea', 'Netherlands',
+        'Switzerland', 'Sweden', 'Belgium', 'Norway', 'Denmark', 'Finland',
+        'United States', 'United Kingdom', 'Китай', 'США', 'Великобритания', 'Германия', 'Франция',
+        'Portugal', 'Poland', 'Greece', 'Turkey', 'Israel', 'Singapore', 'Taiwan',
+        'Hong Kong', 'Mexico', 'Argentina', 'Chile', 'Colombia', 'Ukraine', 'Czech Republic',
+        'Hungary', 'Romania', 'Bulgaria', 'Serbia', 'Croatia', 'Slovakia', 'Slovenia',
+        'Lithuania', 'Latvia', 'Estonia', 'Ireland', 'New Zealand', 'South Africa',
+        'Egypt', 'Saudi Arabia', 'UAE', 'Qatar', 'Iran', 'Pakistan', 'Bangladesh',
+        'Vietnam', 'Thailand', 'Malaysia', 'Indonesia', 'Philippines', 'Kazakhstan',
+        'Belarus', 'Uzbekistan', 'Azerbaijan', 'Georgia', 'Armenia', 'Moldova'
+    ]
     
-    aff_lower = affiliation_string.lower()
-    
-    # Search for known country names
-    for country_name, country_code in known_countries.items():
-        if re.search(r'\b' + re.escape(country_name) + r'\b', aff_lower):
-            return country_code
-    
-    # If not found, try to take the last part after comma (common pattern)
     parts = [p.strip() for p in affiliation_string.split(',')]
-    if len(parts) > 1:
-        last_part = parts[-1]
-        # Check if it's not too short and not just digits
-        if len(last_part) > 2 and not last_part.isdigit():
-            # Convert to uppercase for consistency
-            return last_part.upper()
     
-    return ""
+    for part in reversed(parts):
+        for country in known_countries:
+            if country.lower() in part.lower():
+                return part
+    
+    if len(parts) > 1:
+        potential_country = parts[-1]
+        if len(potential_country) > 2 and not potential_country.isdigit():
+            return potential_country
+    
+    return "Не определена"
 
-def extract_authors_with_affiliations_from_openalex(openalex_data: Dict) -> List[Dict]:
+def get_authors_with_all_affiliations_from_openalex(openalex_data: Dict) -> List[Dict]:
     """
-    Extract authors with ALL their affiliations and countries from OpenAlex.
-    This follows the logic from the working example code.
-    Preserves FULL affiliation names without cleaning.
+    Получает информацию об авторах со ВСЕМИ их аффилиациями через OpenAlex API.
+    Адаптировано из вашего рабочего кода.
     """
-    authors = []
+    authors_data = []
     
     if not openalex_data or 'authorships' not in openalex_data:
-        return authors
+        return authors_data
     
     for authorship in openalex_data.get('authorships', []):
         author_info = authorship.get('author', {})
-        author_name = author_info.get('display_name', '')
+        author_name = author_info.get('display_name', 'Unknown')
         orcid = author_info.get('orcid', '')
         
-        if not author_name:
-            continue
-        
-        # Get institutions (affiliations) for this author
         institutions = authorship.get('institutions', [])
+        
         affiliations_list = []
         countries_set = set()
         
         for inst in institutions:
-            affiliation_name = inst.get('display_name', '')
-            if not affiliation_name:
-                continue
-            
-            # Get country: priority to country_code, then parse from name
-            country_code = inst.get('country_code', '')
-            country = country_code if country_code and country_code != 'XX' else ''
+            affiliation_name = inst.get('display_name', 'Не указана')
+            country = inst.get('country_code', '')
             
             if not country:
-                country = extract_country_from_affiliation_string(affiliation_name)
+                country = extract_country_from_affiliation_string_simple(affiliation_name)
+            else:
+                country_names = {
+                    'US': 'USA', 'GB': 'UK', 'CN': 'China', 'DE': 'Germany',
+                    'FR': 'France', 'JP': 'Japan', 'CA': 'Canada', 'AU': 'Australia',
+                    'RU': 'Russia', 'IN': 'India', 'BR': 'Brazil', 'IT': 'Italy',
+                    'ES': 'Spain', 'KR': 'South Korea', 'NL': 'Netherlands',
+                    'CH': 'Switzerland', 'SE': 'Sweden', 'BE': 'Belgium',
+                    'NO': 'Norway', 'DK': 'Denmark', 'FI': 'Finland', 'PT': 'Portugal',
+                    'PL': 'Poland', 'GR': 'Greece', 'TR': 'Turkey', 'IL': 'Israel',
+                    'SG': 'Singapore', 'TW': 'Taiwan', 'HK': 'Hong Kong', 'MX': 'Mexico',
+                    'AR': 'Argentina', 'CL': 'Chile', 'CO': 'Colombia', 'UA': 'Ukraine',
+                    'CZ': 'Czech Republic', 'HU': 'Hungary', 'RO': 'Romania', 'BG': 'Bulgaria',
+                    'RS': 'Serbia', 'HR': 'Croatia', 'SK': 'Slovakia', 'SI': 'Slovenia',
+                    'LT': 'Lithuania', 'LV': 'Latvia', 'EE': 'Estonia', 'IE': 'Ireland',
+                    'NZ': 'New Zealand', 'ZA': 'South Africa', 'EG': 'Egypt', 'SA': 'Saudi Arabia',
+                    'AE': 'UAE', 'QA': 'Qatar', 'IR': 'Iran', 'PK': 'Pakistan', 'BD': 'Bangladesh',
+                    'VN': 'Vietnam', 'TH': 'Thailand', 'MY': 'Malaysia', 'ID': 'Indonesia',
+                    'PH': 'Philippines', 'KZ': 'Kazakhstan', 'BY': 'Belarus', 'UZ': 'Uzbekistan',
+                    'AZ': 'Azerbaijan', 'GE': 'Georgia', 'AM': 'Armenia', 'MD': 'Moldova',
+                    'KG': 'Kyrgyzstan', 'TJ': 'Tajikistan', 'TM': 'Turkmenistan', 'MN': 'Mongolia'
+                }
+                country = country_names.get(country, country)
             
             affiliations_list.append({
-                'name': affiliation_name,  # FULL name, NOT cleaned
+                'name': affiliation_name,
                 'country': country
             })
-            if country:
+            if country and country not in ['N/A', 'Не указана', 'Не определена']:
                 countries_set.add(country)
         
-        # Normalize author name for comparison
+        # Нормализуем имя автора для сравнения
         compare_name, display_name = normalize_author_name(author_name)
         
-        # Format ORCID URL if present
+        # Форматируем ORCID если есть
         formatted_orcid = format_orcid_id(orcid) if orcid else ''
         
-        authors.append({
-            'display_name': display_name,
+        authors_data.append({
+            'author': display_name,
             'compare_name': compare_name,
             'raw_name': author_name,
             'orcid': formatted_orcid,
-            'affiliations': affiliations_list,           # Full list of {name, country}
-            'countries': list(countries_set),           # Unique countries
-            'institutions': [aff['name'] for aff in affiliations_list],  # Just names
-            'primary_institution': affiliations_list[0]['name'] if affiliations_list else '',
-            'primary_country': list(countries_set)[0] if countries_set else ''
+            'affiliations': affiliations_list,
+            'countries': list(countries_set) if countries_set else [],
+            'num_affiliations': len(affiliations_list),
+            'num_countries': len(countries_set)
         })
     
-    return authors
+    return authors_data
 
-def extract_authors_from_crossref_simple(crossref_data: Dict) -> List[Dict]:
+def extract_authors_from_crossref_fallback(crossref_data: Dict) -> List[Dict]:
     """
-    Extract authors from Crossref with affiliations (simplified, no aggressive cleaning).
-    Used as fallback when OpenAlex data is not available.
+    Извлекает авторов из Crossref (fallback, когда нет OpenAlex).
+    Максимально простая, без очистки.
     """
-    authors = []
+    authors_data = []
     
     if not crossref_data or 'author' not in crossref_data:
-        return authors
+        return authors_data
     
     for author in crossref_data.get('author', []):
         given = author.get('given', '')
@@ -1178,7 +1169,7 @@ def extract_authors_from_crossref_simple(crossref_data: Dict) -> List[Dict]:
         raw_name = f"{given} {family}".strip() if given else family
         compare_name, display_name = normalize_author_name(raw_name)
         
-        # Extract affiliations from Crossref (without aggressive cleaning)
+        # Извлекаем аффилиации из Crossref (без очистки)
         affiliations_list = []
         countries_set = set()
         
@@ -1186,102 +1177,106 @@ def extract_authors_from_crossref_simple(crossref_data: Dict) -> List[Dict]:
             for aff in author['affiliation']:
                 aff_name = aff.get('name', '')
                 if aff_name:
-                    # Store FULL name as is, no cleaning
-                    country = extract_country_from_affiliation_string(aff_name)
+                    country = extract_country_from_affiliation_string_simple(aff_name)
                     affiliations_list.append({
                         'name': aff_name,
                         'country': country
                     })
-                    if country:
+                    if country and country not in ['N/A', 'Не указана', 'Не определена']:
                         countries_set.add(country)
         
-        # Format ORCID URL if present
         formatted_orcid = format_orcid_id(orcid) if orcid else ''
         
-        authors.append({
-            'display_name': display_name,
+        authors_data.append({
+            'author': display_name,
             'compare_name': compare_name,
             'raw_name': raw_name,
             'orcid': formatted_orcid,
             'affiliations': affiliations_list,
             'countries': list(countries_set),
-            'institutions': [aff['name'] for aff in affiliations_list],
-            'primary_institution': affiliations_list[0]['name'] if affiliations_list else '',
-            'primary_country': list(countries_set)[0] if countries_set else ''
+            'num_affiliations': len(affiliations_list),
+            'num_countries': len(countries_set)
         })
     
-    return authors
+    return authors_data
 
-def merge_authors_from_all_results(results: List[Dict]) -> List[Dict]:
+def merge_authors_from_articles(all_authors_data: List[Dict]) -> List[Dict]:
     """
-    Merge authors from all results, collecting ALL unique affiliations and countries.
-    This follows the logic from the working example code.
+    Объединяет одинаковых авторов из всех статей.
+    Собирает все уникальные аффилиации и страны, считает частоту упоминаний.
+    Адаптировано из вашего рабочего кода.
     """
-    merged = defaultdict(lambda: {
-        'display_name': '',
-        'compare_name': '',
-        'orcid': '',
-        'count': 0,
-        'affiliations': set(),  # set of tuples (name, country)
+    merged_authors = defaultdict(lambda: {
+        'affiliations': set(),
         'countries': set(),
-        'articles': set()
+        'mention_count': 0,
+        'articles': set(),
+        'all_affiliations_details': [],
+        'orcid': '',
+        'compare_name': '',
+        'display_name': ''
     })
     
-    for result in results:
-        doi = result.get('doi', 'unknown')
-        for author in result.get('authors', []):
-            compare_name = author.get('compare_name', '')
-            if not compare_name:
-                continue
+    for article_data in all_authors_data:
+        doi = article_data['doi']
+        for author in article_data['authors']:
+            author_name = author['author']
+            compare_name = author.get('compare_name', normalize_author_name(author_name)[0])
+            display_name = author.get('display_name', author_name)
+            orcid = author.get('orcid', '')
             
-            data = merged[compare_name]
+            # Добавляем аффилиации (используем tuple для set)
+            for aff in author['affiliations']:
+                aff_tuple = (aff['name'], aff['country'])
+                merged_authors[compare_name]['affiliations'].add(aff_tuple)
+                if aff['country'] and aff['country'] not in ['N/A', 'Не указана', 'Не определена']:
+                    merged_authors[compare_name]['countries'].add(aff['country'])
+                merged_authors[compare_name]['all_affiliations_details'].append({
+                    'doi': doi,
+                    'affiliation': aff['name'],
+                    'country': aff['country']
+                })
             
-            # Set display name if not set yet
-            if not data['display_name']:
-                data['display_name'] = author.get('display_name', '')
-                data['compare_name'] = compare_name
+            merged_authors[compare_name]['mention_count'] += 1
+            merged_authors[compare_name]['articles'].add(doi)
             
-            # Set ORCID if not set and available
-            if not data['orcid'] and author.get('orcid'):
-                data['orcid'] = author['orcid']
+            # Сохраняем ORCID если есть
+            if orcid and not merged_authors[compare_name]['orcid']:
+                merged_authors[compare_name]['orcid'] = orcid
             
-            # Increment count
-            data['count'] += 1
+            # Сохраняем display_name
+            if not merged_authors[compare_name]['display_name']:
+                merged_authors[compare_name]['display_name'] = display_name
             
-            # Track articles
-            data['articles'].add(doi)
-            
-            # Collect all affiliations (as tuples for set)
-            for aff in author.get('affiliations', []):
-                aff_tuple = (aff['name'], aff.get('country', ''))
-                data['affiliations'].add(aff_tuple)
-                if aff.get('country'):
-                    data['countries'].add(aff['country'])
+            if not merged_authors[compare_name]['compare_name']:
+                merged_authors[compare_name]['compare_name'] = compare_name
     
-    # Convert to list format
-    result_list = []
-    for compare_name, data in merged.items():
-        # Convert affiliations set to list of dicts
-        affiliations_list = [{'name': name, 'country': country} for name, country in data['affiliations']]
-        countries_list = sorted(list(data['countries']))
+    # Конвертируем set обратно в списки
+    result = []
+    for compare_name, data in merged_authors.items():
+        # Получаем список стран
+        countries_list = sorted(list(data['countries'])) if data['countries'] else []
         
-        result_list.append({
-            'display_name': data['display_name'],
+        # Получаем список аффилиаций
+        affiliations_list = [{'name': aff[0], 'country': aff[1]} for aff in data['affiliations']]
+        
+        result.append({
+            'author': data['display_name'],
             'compare_name': compare_name,
-            'orcid': data['orcid'],
-            'count': data['count'],
-            'affiliations': affiliations_list,
+            'orcid': data.get('orcid', ''),
+            'mention_count': data['mention_count'],
+            'num_articles': len(data['articles']),
+            'articles': list(data['articles']),
             'countries': countries_list,
-            'primary_institution': affiliations_list[0]['name'] if affiliations_list else '',
-            'primary_country': countries_list[0] if countries_list else '',
-            'num_affiliations': len(affiliations_list),
             'num_countries': len(countries_list),
-            'articles': list(data['articles'])[:5]  # Limit to 5 for display
+            'num_affiliations': len(data['affiliations']),
+            'affiliations': affiliations_list,
+            'affiliations_details': data['all_affiliations_details']
         })
     
-    # Sort by count descending
-    result_list.sort(key=lambda x: x['count'], reverse=True)
-    return result_list
+    # Сортируем по количеству упоминаний
+    result.sort(key=lambda x: x['mention_count'], reverse=True)
+    return result
 
 # ======================== NEW FUNCTIONS FOR POTENTIAL REVIEWERS ========================
 
@@ -1431,19 +1426,18 @@ def extract_orcid_personal_info(profile_data: Dict) -> Dict:
     
     return info
 
-def get_reviewer_candidates(results: List[Dict], paper_authors: Set[str], paper_affiliations: Set[str]) -> List[Dict]:
+def get_reviewer_candidates(results: List[Dict], paper_authors_norm: Set[str], paper_affiliations: List[str]) -> List[Dict]:
     """
-    Get potential reviewer candidates from cited works.
-    Criteria:
-    1. Not a self-citation (author not in paper_authors)
-    2. No affiliation overlap with paper_affiliations
-    3. Publication year >= current_year - 4
+    Получает кандидатов в рецензенты из цитируемых работ.
+    Критерии:
+    1. Не самоцитирование (автор не в paper_authors_norm)
+    2. Нет общих аффилиаций (точное совпадение строк с paper_affiliations)
+    3. Год публикации >= текущий_год - 4
     """
     current_year = datetime.now().year
     min_year = current_year - 4
     
-    # Collect all authors from results with their metadata
-    candidates = {}  # key: compare_name, value: candidate info
+    candidates = {}  # key: compare_name
     
     for result in results:
         year = result.get('year')
@@ -1455,28 +1449,23 @@ def get_reviewer_candidates(results: List[Dict], paper_authors: Set[str], paper_
             if not compare_name:
                 continue
             
-            # Skip self-citations
-            if compare_name in paper_authors:
+            # Проверка на самоцитирование
+            if compare_name in paper_authors_norm:
                 continue
             
-            # Get author affiliations for this work
-            author_affiliations = set()
-            for aff in author.get('affiliations', []):
-                aff_name = aff.get('name', '')
-                if aff_name:
-                    author_affiliations.add(aff_name.lower())
+            # Проверка на общие аффилиации (точное совпадение строк)
+            author_affiliations = [aff.get('name', '') for aff in author.get('affiliations', [])]
+            has_common_affiliation = False
             
-            # Check for affiliation overlap with paper
-            has_overlap = False
             for paper_aff in paper_affiliations:
-                if paper_aff.lower() in author_affiliations or any(paper_aff.lower() in aff for aff in author_affiliations):
-                    has_overlap = True
+                if paper_aff in author_affiliations:
+                    has_common_affiliation = True
                     break
             
-            if has_overlap:
+            if has_common_affiliation:
                 continue
             
-            # Candidate passes all filters
+            # Кандидат проходит все фильтры
             if compare_name not in candidates:
                 candidates[compare_name] = {
                     'display_name': author.get('display_name', ''),
@@ -1489,7 +1478,6 @@ def get_reviewer_candidates(results: List[Dict], paper_authors: Set[str], paper_
                     'total_citations': 0
                 }
             
-            # Add this article to candidate's record
             candidates[compare_name]['candidate_articles'].append({
                 'doi': result.get('doi', ''),
                 'year': year,
@@ -1497,14 +1485,12 @@ def get_reviewer_candidates(results: List[Dict], paper_authors: Set[str], paper_
                 'title': result.get('openalex_data', {}).get('title', '') or result.get('crossref_data', {}).get('title', [''])[0]
             })
             
-            # Update latest year
             if year > candidates[compare_name]['latest_year']:
                 candidates[compare_name]['latest_year'] = year
             
-            # Add citations count
             candidates[compare_name]['total_citations'] += result.get('citations_count', 0)
     
-    # Convert to list and sort by latest_year desc, then by total_citations desc
+    # Конвертируем в список и сортируем
     candidate_list = list(candidates.values())
     candidate_list.sort(key=lambda x: (-x['latest_year'], -x['total_citations']))
     
@@ -1512,14 +1498,14 @@ def get_reviewer_candidates(results: List[Dict], paper_authors: Set[str], paper_
 
 def filter_reviewers_by_affiliation(candidates: List[Dict], max_per_affiliation: int = 3) -> List[Dict]:
     """
-    Filter candidates to ensure no more than max_per_affiliation from the same affiliation.
-    Priority given to candidates with ORCID.
+    Ограничивает количество кандидатов из одной аффилиации (не более max_per_affiliation).
+    Приоритет у кандидатов с ORCID.
     """
-    # Group candidates by primary affiliation
+    # Группируем кандидатов по основной аффилиации
     affiliation_groups = defaultdict(list)
     
     for candidate in candidates:
-        # Get primary affiliation (first one)
+        # Берем первую аффилиацию как основную
         primary_aff = ''
         if candidate.get('affiliations'):
             primary_aff = candidate['affiliations'][0].get('name', '').lower()
@@ -1528,17 +1514,16 @@ def filter_reviewers_by_affiliation(candidates: List[Dict], max_per_affiliation:
         
         affiliation_groups[primary_aff].append(candidate)
     
-    # Sort within each group: ORCID first, then by latest_year
+    # Сортируем внутри каждой группы: сначала с ORCID, потом по свежести
     filtered_candidates = []
     for aff, group in affiliation_groups.items():
-        # Sort: has ORCID first (True > False), then by latest_year desc
-        group.sort(key=lambda x: (x['orcid'] != '', x['latest_year']), reverse=True)
+        group.sort(key=lambda x: (bool(x['orcid']), x['latest_year']), reverse=True)
         filtered_candidates.extend(group[:max_per_affiliation])
     
-    # Re-sort final list by latest_year desc
+    # Сортируем финальный список
     filtered_candidates.sort(key=lambda x: -x['latest_year'])
     
-    return filtered_candidates[:30]  # Limit to top 30
+    return filtered_candidates[:30]
 
 def fetch_orcid_profiles_parallel(candidates: List[Dict], progress_callback=None) -> List[Dict]:
     """
@@ -2836,17 +2821,45 @@ def analyze_journal_frequency_all(results: List[Dict]) -> Dict:
 
 def analyze_author_frequency_all(results: List[Dict]) -> Dict:
     """
-    Analyze author frequency with PROPER merging using NORMALIZED name as primary key.
-    Uses the new merge_authors_from_all_results function.
+    Анализирует частоту авторов с правильным объединением.
+    Использует вашу функцию merge_authors_from_articles.
     """
+    # Собираем все данные об авторах из результатов
+    all_authors_data = []
     
-    # Use the new merge function that preserves all affiliations
-    merged_authors = merge_authors_from_all_results(results)
+    for result in results:
+        doi = result.get('doi', 'unknown')
+        authors = result.get('authors', [])
+        
+        if authors:
+            all_authors_data.append({
+                'doi': doi,
+                'authors': authors
+            })
+    
+    # Объединяем авторов используя вашу функцию
+    merged_authors = merge_authors_from_articles(all_authors_data)
+    
+    # Форматируем для совместимости с остальным кодом
+    formatted_authors = []
+    for author in merged_authors:
+        formatted_authors.append({
+            'display_name': author['author'],
+            'compare_name': author['compare_name'],
+            'orcid': author.get('orcid', ''),
+            'count': author['mention_count'],
+            'countries': author['countries'],
+            'affiliations': author['affiliations'],
+            'primary_institution': author['affiliations'][0]['name'] if author['affiliations'] else '',
+            'primary_country': author['countries'][0] if author['countries'] else '',
+            'num_affiliations': author['num_affiliations'],
+            'num_countries': author['num_countries']
+        })
     
     return {
-        'all_authors': merged_authors,
-        'unique_authors': len(merged_authors),
-        'top_20': merged_authors[:20]
+        'all_authors': formatted_authors,
+        'unique_authors': len(formatted_authors),
+        'top_20': formatted_authors[:20]
     }
 
 def analyze_orcid_coverage(results: List[Dict]) -> Dict:
@@ -4278,11 +4291,11 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
     }
 
 def display_top_authors(stats: Dict):
-    """Display top authors with proper ORCID and affiliation information (showing ALL affiliations)"""
+    """Отображает топ авторов с их аффилиациями (как в вашей таблице)."""
     st.markdown(f"### {get_text('top_authors')}")
     
     for i, author in enumerate(stats['author_frequency_all']['all_authors'][:30], 1):
-        # Format ORCID as clickable link if exists
+        # ORCID ссылка
         orcid_html = ""
         if author.get('orcid'):
             orcid_url = author['orcid']
@@ -4290,42 +4303,36 @@ def display_top_authors(stats: Dict):
                 orcid_url = f"https://orcid.org/{orcid_url}"
             orcid_html = f' 🔗 <a href="{orcid_url}" target="_blank" style="color: #667eea; text-decoration: none;">ORCID</a>'
         
-        # Format primary institution (if exists)
-        inst_text = f" 🏛 {author['primary_institution'][:50]}" if author.get('primary_institution') else ""
-        
-        # Format primary country
-        country_text = f" 🌍 {author['primary_country']}" if author.get('primary_country') else ""
-        
-        # Format ALL affiliations (if multiple)
+        # Аффилиации (как в вашем коде - список)
         affiliations_text = ""
-        if author.get('affiliations') and len(author['affiliations']) > 1:
-            aff_list = author['affiliations'][:5]
-            affiliations_text = f"<div style='font-size: 11px; color: #666; margin-top: 5px;'><strong>{get_text('all_affiliations')}:</strong><br>"
-            for aff in aff_list:
-                affiliations_text += f"• {html.escape(aff['name'][:80])} ({aff['country'] if aff['country'] else get_text('not_found')})<br>"
-            affiliations_text += "</div>"
+        if author.get('affiliations'):
+            affiliations_list = author['affiliations']
+            if len(affiliations_list) > 1:
+                affiliations_text = "<div style='margin-top: 5px;'><strong>🏛️ Аффилиации:</strong><br>"
+                for aff in affiliations_list:
+                    country_str = f"({aff['country']})" if aff.get('country') else ""
+                    affiliations_text += f"  • {aff['name']} {country_str}<br>"
+                affiliations_text += "</div>"
+            else:
+                aff = affiliations_list[0]
+                country_str = f"({aff['country']})" if aff.get('country') else ""
+                affiliations_text = f"<div style='margin-top: 5px;'><strong>🏛️ Аффилиация:</strong> {aff['name']} {country_str}</div>"
         
-        # Format ALL countries
+        # Страны
         countries_text = ""
-        if author.get('countries') and len(author['countries']) > 1:
-            countries_text = f"<div style='font-size: 11px; color: #666; margin-top: 3px;'><strong>{get_text('all_countries')}:</strong> {', '.join(author['countries'][:5])}</div>"
-        
-        # Show number of affiliations and countries
-        meta_text = ""
-        if author.get('num_affiliations', 1) > 1 or author.get('num_countries', 1) > 1:
-            meta_text = f"<div style='font-size: 10px; color: #999; margin-top: 3px;'>{author.get('num_affiliations', 1)} {get_text('num_affiliations')}, {author.get('num_countries', 1)} {get_text('num_countries')}</div>"
+        if author.get('countries') and len(author['countries']) > 0:
+            countries_text = f"<div style='margin-top: 3px; font-size: 11px; color: #666;'><strong>🌍 Страны:</strong> {', '.join(author['countries'][:5])}</div>"
         
         st.markdown(f"""
         <div class="rank-item">
             <span class="rank-number">{i}.</span>
-            <span class="rank-name">{author['display_name']}{orcid_html}{inst_text}{country_text}</span>
+            <span class="rank-name">{author['display_name']}{orcid_html}</span>
             <span class="rank-count">{author['count']} {get_text('html_citations_label')}</span>
             <div class="progress-bar-custom">
                 <div class="progress-fill" style="width: {author['count'] / stats['author_frequency_all']['all_authors'][0]['count'] * 100 if stats['author_frequency_all']['all_authors'] else 0}%;"></div>
             </div>
             {affiliations_text}
             {countries_text}
-            {meta_text}
         </div>
         """, unsafe_allow_html=True)
 
