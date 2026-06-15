@@ -1882,6 +1882,32 @@ def normalize_author_name(name: str) -> Tuple[str, str]:
     # Fallback: return original as-is
     return name.lower(), name
 
+def format_orcid_id(orcid: str) -> str:
+    """Format ORCID ID to full URL"""
+    if not orcid or not isinstance(orcid, str):
+        return ""
+    
+    if orcid.startswith('https://orcid.org/'):
+        return orcid
+    
+    # Clean ORCID from non-alphanumeric characters except dash
+    clean_id = re.sub(r'[^\dXx-]', '', orcid.strip())
+    
+    if '-' in clean_id:
+        # Already has dashes in correct format
+        if re.match(r'^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$', clean_id, re.IGNORECASE):
+            return f"https://orcid.org/{clean_id}"
+    
+    # Format without dashes
+    if len(clean_id) == 16:
+        formatted = f"{clean_id[:4]}-{clean_id[4:8]}-{clean_id[8:12]}-{clean_id[12:]}"
+        return f"https://orcid.org/{formatted}"
+    elif len(clean_id) == 15 and clean_id[15] in ['X', 'x']:
+        formatted = f"{clean_id[:4]}-{clean_id[4:8]}-{clean_id[8:12]}-{clean_id[12:15]}X"
+        return f"https://orcid.org/{formatted}"
+    else:
+        return f"https://orcid.org/{clean_id}"
+
 def extract_authors_from_crossref(data: Dict) -> List[Dict]:
     """
     Extract authors from Crossref with ALL affiliations and ALL countries.
