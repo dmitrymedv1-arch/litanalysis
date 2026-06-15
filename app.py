@@ -1824,6 +1824,64 @@ def extract_authors_from_openalex(data: Dict) -> List[Dict]:
     
     return authors
 
+def normalize_author_name(name: str) -> Tuple[str, str]:
+    """
+    Normalize author name to format {Lastname} {FirstInitial}.
+    Returns (compare_name, display_name)
+    Example: "Danil E. Matkin" -> ("matkin d.", "Matkin D.")
+    Example: "Matkin, Danil E." -> ("matkin d.", "Matkin D.")
+    Example: "Medvedev D." -> ("medvedev d.", "Medvedev D.")
+    """
+    if not name or not isinstance(name, str):
+        return "", ""
+    
+    name = name.strip()
+    
+    # Handle comma-separated format: "Matkin, Danil E." -> "Matkin D."
+    if ',' in name:
+        last, first = name.split(',', 1)
+        last = last.strip()
+        first = first.strip()
+        
+        # Extract first initial from first name part
+        first_initial = ''
+        if first:
+            # Handle "Danil E." -> take 'D'
+            first_parts = first.split()
+            for part in first_parts:
+                if part and part[0].isalpha():
+                    first_initial = part[0].upper()
+                    break
+        
+        display_name = f"{last} {first_initial}." if first_initial else last
+        compare_name = f"{last.lower()} {first_initial.lower()}."
+        return compare_name, display_name
+    
+    # Handle "First Last" format: "Danil E. Matkin" -> "Matkin D."
+    parts = name.split()
+    if len(parts) >= 2:
+        last = parts[-1]
+        
+        # Extract first initial from first part(s)
+        first_initial = ''
+        for part in parts[:-1]:
+            if part and part[0].isalpha():
+                first_initial = part[0].upper()
+                break
+        
+        display_name = f"{last} {first_initial}." if first_initial else last
+        compare_name = f"{last.lower()} {first_initial.lower()}."
+        return compare_name, display_name
+    
+    # Handle single word (unlikely, but possible)
+    if len(parts) == 1:
+        display_name = parts[0]
+        compare_name = parts[0].lower()
+        return compare_name, display_name
+    
+    # Fallback: return original as-is
+    return name.lower(), name
+
 def extract_authors_from_crossref(data: Dict) -> List[Dict]:
     """
     Extract authors from Crossref with ALL affiliations and ALL countries.
