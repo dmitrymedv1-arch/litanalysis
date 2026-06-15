@@ -2600,14 +2600,18 @@ def extract_orcid_personal_info(profile_data: Dict) -> Dict:
     
     return info
 
-def identify_potential_reviewers(results: List[Dict], paper_authors: Set[str], paper_author_affiliations: Set[str]) -> List[Dict]:
+def identify_potential_reviewers(results: List[Dict], paper_authors: Set[str], paper_author_affiliations: Set[str], paper_author_coauthors: Set[str] = None) -> List[Dict]:
     """
     Identify potential reviewers based on:
-    1. Not a self-citation author
+    1. Not a self-citation author (exclude paper_authors themselves)
     2. No common affiliation with any paper author
-    3. Article published within last 4 years
+    3. No co-authorship with any paper author (never published together)
+    4. Article published within last 4 years
     Returns list of candidate reviewers with their ORCID data.
     """
+    if paper_author_coauthors is None:
+        paper_author_coauthors = set()
+    
     current_year = datetime.now().year
     min_year = current_year - 4
     
@@ -2629,22 +2633,39 @@ def identify_potential_reviewers(results: List[Dict], paper_authors: Set[str], p
             if not compare_name:
                 continue
             
-            # Check self-citation exclusion
+            # ========== CRITERION 1: Exclude self-citation authors ==========
             if compare_name in paper_authors:
                 continue
             
-            # Get author affiliations
+            # ========== CRITERION 3: Exclude co-authors of paper authors ==========
+            if compare_name in paper_author_coauthors:
+                continue
+            
+            # Get author affiliations for this candidate
             author_affiliations = set()
             for aff in author.get('affiliations', []):
                 aff_name = aff.get('name', '')
                 if aff_name:
-                    author_affiliations.add(aff_name.lower())
+                    author_affiliations.add(aff_name.lower().strip())
             
-            # Check affiliation overlap with paper authors
+            # ========== CRITERION 2: Check affiliation overlap with paper authors ==========
             has_common_affiliation = False
             for paper_aff in paper_author_affiliations:
-                if paper_aff.lower() in author_affiliations or any(paper_aff.lower() in aff for aff in author_affiliations):
+                paper_aff_lower = paper_aff.lower().strip()
+                if not paper_aff_lower:
+                    continue
+                
+                # Direct match
+                if paper_aff_lower in author_affiliations:
                     has_common_affiliation = True
+                    break
+                
+                # Partial match (one affiliation contains the other)
+                for cand_aff in author_affiliations:
+                    if paper_aff_lower in cand_aff or cand_aff in paper_aff_lower:
+                        has_common_affiliation = True
+                        break
+                if has_common_affiliation:
                     break
             
             if has_common_affiliation:
@@ -2659,7 +2680,8 @@ def identify_potential_reviewers(results: List[Dict], paper_authors: Set[str], p
                     'latest_year': year,
                     'citation_count': 1,
                     'affiliations': list(author_affiliations),
-                    'countries': author.get('countries', [])
+                    'countries': author.get('countries', []),
+                    'raw_affiliations': author.get('affiliations', [])
                 }
             else:
                 # Update latest year if newer
@@ -2670,6 +2692,10 @@ def identify_potential_reviewers(results: List[Dict], paper_authors: Set[str], p
                 for aff in author_affiliations:
                     if aff not in candidates[compare_name]['affiliations']:
                         candidates[compare_name]['affiliations'].append(aff)
+                # Merge countries
+                for country in author.get('countries', []):
+                    if country and country not in candidates[compare_name]['countries']:
+                        candidates[compare_name]['countries'].append(country)
     
     # Convert to list and sort by latest_year (newest first) then citation_count
     candidate_list = list(candidates.values())
@@ -2685,7 +2711,7 @@ def identify_potential_reviewers(results: List[Dict], paper_authors: Set[str], p
     # Filter: keep only top 3 from each affiliation, prioritizing those with ORCID
     filtered_candidates = []
     for aff, group in affiliation_groups.items():
-        # Sort group: those with ORCID first
+        # Sort group: those with ORCID first, then by latest_year, then by citation_count
         group.sort(key=lambda x: (0 if x['orcid'] else 1, -x['latest_year'], -x['citation_count']))
         filtered_candidates.extend(group[:3])
     
@@ -5774,6 +5800,7 @@ def main():
             # Generate potential reviewers if checkbox is enabled
             potential_reviewers = []
             paper_author_affiliations = set()
+            paper_author_coauthors = set()
             
             if st.session_state.get('propose_reviewers', False):
                 # Collect normalized paper authors for self-citation check
@@ -5782,17 +5809,61 @@ def main():
                     norm, _ = normalize_author_name(author)
                     paper_authors_norm.add(norm)
                 
-                # Collect paper author affiliations from results (need to get from analysis)
-                # This is a simplified approach - in real implementation, we would need to
-                # extract affiliations from the paper's own authors (not from references)
-                # For now, we'll use a placeholder - in production, this should come from
-                # the paper's authors' affiliations from the system
+                # ========== COLLECT PAPER AUTHOR AFFILIATIONS FROM SELF-CITATION REFERENCES ==========
+                # Iterate through all results to find self-citations (articles where paper authors appear)
+                for result in results:
+                    # Check if this reference is a self-citation (contains any paper author)
+                    is_self_citation = False
+                    for author in result.get('authors', []):
+                        if author.get('compare_name') in paper_authors_norm:
+                            is_self_citation = True
+                            break
+                    
+                    if is_self_citation:
+                        # This reference contains at least one paper author
+                        # Extract all authors from this reference to track co-authors
+                        ref_authors = result.get('authors', [])
+                        
+                        for author in ref_authors:
+                            author_compare = author.get('compare_name', '')
+                            
+                            # If this author is one of the paper authors, collect their affiliations
+                            if author_compare in paper_authors_norm:
+                                # Add all affiliations of this paper author
+                                for aff in author.get('affiliations', []):
+                                    aff_name = aff.get('name', '')
+                                    if aff_name:
+                                        paper_author_affiliations.add(aff_name.lower().strip())
+                            
+                            # Add ALL authors from this reference as co-authors (including the paper author themselves)
+                            # We need to exclude the paper authors themselves from being reviewers,
+                            # so we add everyone from self-cited papers to co-authors set
+                            if author_compare:
+                                paper_author_coauthors.add(author_compare)
+                
+                # Also add the paper authors themselves to co-authors (they should be excluded anyway)
+                for norm_author in paper_authors_norm:
+                    paper_author_coauthors.add(norm_author)
+                
+                # Debug output (optional, can be removed in production)
+                if paper_author_affiliations:
+                    st.write(f"📋 Paper author affiliations collected: {len(paper_author_affiliations)}")
+                    with st.expander("View collected affiliations"):
+                        for aff in sorted(paper_author_affiliations)[:10]:
+                            st.write(f"- {aff}")
+                
+                if paper_author_coauthors:
+                    st.write(f"👥 Paper author co-authors collected: {len(paper_author_coauthors)}")
+                    with st.expander("View collected co-authors"):
+                        for coauth in sorted(paper_author_coauthors)[:20]:
+                            st.write(f"- {coauth}")
                 
                 with st.spinner(get_text('fetching_orcid_profiles')):
                     potential_reviewers = identify_potential_reviewers(
                         results, 
                         paper_authors_norm, 
-                        paper_author_affiliations
+                        paper_author_affiliations,
+                        paper_author_coauthors
                     )
             
             # Display metrics with percentages
@@ -6491,20 +6562,55 @@ def main():
             
             # Generate potential reviewers if enabled
             potential_reviewers = []
+            paper_author_affiliations = set()
+            paper_author_coauthors = set()
+            
             if propose_reviewers:
                 paper_authors_norm = set()
                 for author in paper_authors:
                     norm, _ = normalize_author_name(author)
                     paper_authors_norm.add(norm)
                 
-                # Collect paper author affiliations (simplified for now)
-                paper_author_affiliations = set()
+                # ========== COLLECT PAPER AUTHOR AFFILIATIONS FROM SELF-CITATION REFERENCES ==========
+                # Iterate through all results to find self-citations (articles where paper authors appear)
+                for result in results:
+                    # Check if this reference is a self-citation (contains any paper author)
+                    is_self_citation = False
+                    for author in result.get('authors', []):
+                        if author.get('compare_name') in paper_authors_norm:
+                            is_self_citation = True
+                            break
+                    
+                    if is_self_citation:
+                        # This reference contains at least one paper author
+                        # Extract all authors from this reference to track co-authors
+                        ref_authors = result.get('authors', [])
+                        
+                        for author in ref_authors:
+                            author_compare = author.get('compare_name', '')
+                            
+                            # If this author is one of the paper authors, collect their affiliations
+                            if author_compare in paper_authors_norm:
+                                # Add all affiliations of this paper author
+                                for aff in author.get('affiliations', []):
+                                    aff_name = aff.get('name', '')
+                                    if aff_name:
+                                        paper_author_affiliations.add(aff_name.lower().strip())
+                            
+                            # Add ALL authors from this reference as co-authors (including the paper author themselves)
+                            if author_compare:
+                                paper_author_coauthors.add(author_compare)
+                
+                # Also add the paper authors themselves to co-authors (they should be excluded anyway)
+                for norm_author in paper_authors_norm:
+                    paper_author_coauthors.add(norm_author)
                 
                 with st.spinner(get_text('fetching_orcid_profiles')):
                     potential_reviewers = identify_potential_reviewers(
                         results, 
                         paper_authors_norm, 
-                        paper_author_affiliations
+                        paper_author_affiliations,
+                        paper_author_coauthors
                     )
             
             st.markdown(f"### {get_text('export_report')}")
