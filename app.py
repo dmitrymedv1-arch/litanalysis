@@ -15,6 +15,8 @@ import math
 from collections import defaultdict
 from itertools import combinations
 import html 
+from urllib.parse import urlparse
+
 # ======================== COLOR UTILITIES FOR DYNAMIC THEMES ========================
 import colorsys
 
@@ -311,8 +313,8 @@ def apply_theme_css(base_color: str, accent_color: str = None):
             padding: 16px;
             margin-bottom: 16px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            transition: all 0.3s;
             border-left: 4px solid var(--primary);
+            transition: transform 0.2s;
         }}
         
         .reviewer-card:hover {{
@@ -328,52 +330,44 @@ def apply_theme_css(base_color: str, accent_color: str = None):
         }}
         
         .reviewer-orcid {{
-            font-size: 13px;
-            margin-bottom: 8px;
-        }}
-        
-        .reviewer-country {{
-            font-size: 13px;
-            color: #666;
+            font-family: monospace;
+            font-size: 12px;
             margin-bottom: 8px;
         }}
         
         .reviewer-section-title {{
             font-weight: 600;
             margin-top: 12px;
-            margin-bottom: 8px;
-            font-size: 14px;
+            margin-bottom: 6px;
+            font-size: 13px;
+            color: #555;
+        }}
+        
+        .external-id-link {{
+            display: inline-block;
+            background: #f0f0f0;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            margin: 3px;
+            text-decoration: none;
             color: #333;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 4px;
+            transition: all 0.2s;
         }}
         
-        .external-id-item {{
-            font-size: 12px;
-            margin-bottom: 6px;
-            padding-left: 8px;
-        }}
-        
-        .reviewer-website {{
-            font-size: 12px;
-            margin-bottom: 6px;
+        .external-id-link:hover {{
+            background: var(--primary);
+            color: white;
         }}
         
         .confidential-banner {{
-            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
-            color: white;
-            padding: 15px 20px;
-            border-radius: 10px;
-            margin-bottom: 25px;
-            text-align: center;
-            font-weight: bold;
-            border: 2px solid #ffd32a;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        }}
-        
-        .confidential-banner::before {{
-            content: "🔒 ";
-            font-size: 20px;
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            border-left: 4px solid #dc3545;
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            color: #856404;
         }}
     </style>
     """
@@ -420,6 +414,20 @@ TEXTS = {
         'last_year': "Last Year",
         'years': "years",
         'no_identifier': "No identifier",
+        'propose_reviewers': "🔍 Propose potential reviewers",
+        'propose_reviewers_help': "Identify qualified reviewers from cited authors (max 30, max 3 per affiliation)",
+        'potential_reviewers': "👥 Potential Reviewers",
+        'reviewer_confidential_banner': "CONFIDENTIAL: This report is intended for editorial use only and must not be shared with reviewers or authors.",
+        'fetching_orcid_profiles': "🔍 Fetching ORCID profiles for potential reviewers...",
+        'orcid_profile_not_public': "ORCID profile is not public or not found",
+        'orcid_other_ids': "Other identifiers",
+        'orcid_websites': "Websites & social links",
+        'orcid_country': "Country",
+        'reviewer_affiliations': "Affiliations",
+        'reviewer_from_reference': "Cited in reference",
+        'reviewer_year': "Publication year",
+        'reviewer_no_orcid': "No ORCID available",
+        'reviewer_no_affiliation': "Affiliation not specified",
         
         # Tabs
         'tab_upload': "📥 Data Upload",
@@ -617,6 +625,11 @@ TEXTS = {
         'international_collab': "International collaboration",
         'collaboration_matrix': "Collaboration matrix (country pairs)",
         'all_authors_affiliations': "All Author Affiliations",
+        'all_affiliations': "All affiliations",
+        'all_countries': "All countries",
+        'num_affiliations': "Number of affiliations",
+        'num_countries': "Number of countries",
+        'affiliation': "Affiliation",
         
         # Additional UI
         'authors_warning_text': "Author name format not recognized: '{}'. Expected format: 'N. Fukatsu' or 'N Fukatsu'",
@@ -633,27 +646,6 @@ TEXTS = {
         'references_count': "references",
         'percent_sign': "%",
         'cumulative': "cumulative",
-        
-        # New strings for Potential Reviewers
-        'propose_reviewers': "🔍 Propose potential reviewers",
-        'potential_reviewers': "👥 Potential Reviewers",
-        'reviewer_confidential_banner': "CONFIDENTIAL: This report is intended for editorial use only and must not be shared with reviewers or authors.",
-        'fetching_orcid_profiles': "🔍 Fetching ORCID profiles for potential reviewers...",
-        'orcid_profile_not_public': "ORCID profile is not public or not found",
-        'orcid_other_ids': "Other identifiers",
-        'orcid_websites': "Websites & social links",
-        'orcid_country': "Country",
-        'all_affiliations': "All affiliations",
-        'all_countries': "All countries",
-        'num_affiliations': "Number of affiliations",
-        'num_countries': "Number of countries",
-        'affiliation': "Affiliation",
-        'confidential_banner_en': "CONFIDENTIAL: This report is intended for editorial use only and must not be shared with reviewers or authors.",
-        'confidential_banner_ru': "КОНФИДЕНЦИАЛЬНО: Этот отчет предназначен только для редакционного использования и не подлежит распространению среди рецензентов или авторов.",
-        'orcid_loading_error': "Error loading ORCID profile",
-        'reviewer_affiliations': "Affiliations in cited works",
-        'reviewer_candidate': "Candidate",
-        'reviewer_articles_count': "cited articles",
     },
     'ru': {
         # General UI
@@ -686,6 +678,20 @@ TEXTS = {
         'last_year': "Последний год",
         'years': "лет",
         'no_identifier': "Нет идентификатора",
+        'propose_reviewers': "🔍 Предложить потенциальных рецензентов",
+        'propose_reviewers_help': "Выявить квалифицированных рецензентов из цитируемых авторов (макс. 30, не более 3 от одной аффилиации)",
+        'potential_reviewers': "👥 Потенциальные рецензенты",
+        'reviewer_confidential_banner': "КОНФИДЕНЦИАЛЬНО: Этот отчет предназначен только для редакционного использования и не подлежит распространению среди рецензентов или авторов.",
+        'fetching_orcid_profiles': "🔍 Загрузка профилей ORCID для потенциальных рецензентов...",
+        'orcid_profile_not_public': "Профиль ORCID не публичен или не найден",
+        'orcid_other_ids': "Другие идентификаторы",
+        'orcid_websites': "Веб-сайты и профили",
+        'orcid_country': "Страна",
+        'reviewer_affiliations': "Аффилиации",
+        'reviewer_from_reference': "Цитируется в ссылке",
+        'reviewer_year': "Год публикации",
+        'reviewer_no_orcid': "ORCID не указан",
+        'reviewer_no_affiliation': "Аффилиация не указана",
         
         # Tabs
         'tab_upload': "📥 Загрузка данных",
@@ -883,6 +889,11 @@ TEXTS = {
         'international_collab': "Международная коллаборация",
         'collaboration_matrix': "Матрица коллабораций (пары стран)",
         'all_authors_affiliations': "Все аффилиации авторов",
+        'all_affiliations': "Все аффилиации",
+        'all_countries': "Все страны",
+        'num_affiliations': "Количество аффилиаций",
+        'num_countries': "Количество стран",
+        'affiliation': "Аффилиация",
         
         # Additional UI
         'authors_warning_text': "Формат имени автора не распознан: '{}'. Ожидаемый формат: 'Н. Фукацу' или 'Н Фукацу'",
@@ -899,27 +910,6 @@ TEXTS = {
         'references_count': "ссылок",
         'percent_sign': "%",
         'cumulative': "накоплено",
-        
-        # New strings for Potential Reviewers
-        'propose_reviewers': "🔍 Предложить потенциальных рецензентов",
-        'potential_reviewers': "👥 Потенциальные рецензенты",
-        'reviewer_confidential_banner': "КОНФИДЕНЦИАЛЬНО: Этот отчет предназначен только для редакционного использования и не подлежит распространению среди рецензентов или авторов.",
-        'fetching_orcid_profiles': "🔍 Загрузка профилей ORCID для потенциальных рецензентов...",
-        'orcid_profile_not_public': "Профиль ORCID не публичен или не найден",
-        'orcid_other_ids': "Другие идентификаторы",
-        'orcid_websites': "Веб-сайты и профили",
-        'orcid_country': "Страна",
-        'all_affiliations': "Все аффилиации",
-        'all_countries': "Все страны",
-        'num_affiliations': "Количество аффилиаций",
-        'num_countries': "Количество стран",
-        'affiliation': "Аффилиация",
-        'confidential_banner_en': "CONFIDENTIAL: This report is intended for editorial use only and must not be shared with reviewers or authors.",
-        'confidential_banner_ru': "КОНФИДЕНЦИАЛЬНО: Этот отчет предназначен только для редакционного использования и не подлежит распространению среди рецензентов или авторов.",
-        'orcid_loading_error': "Ошибка загрузки профиля ORCID",
-        'reviewer_affiliations': "Аффилиации в цитируемых работах",
-        'reviewer_candidate': "Кандидат",
-        'reviewer_articles_count': "цитируемых статей",
     }
 }
 
@@ -944,19 +934,19 @@ if 'language' not in st.session_state:
 if 'bad_dois' not in st.session_state:
     st.session_state.bad_dois = set()
 
-# Initialize ORCID cache in session state for potential reviewers
-if 'orcid_cache' not in st.session_state:
-    st.session_state.orcid_cache = {}
-
 # Initialize journal and article number in session state
 if 'journal_name' not in st.session_state:
     st.session_state.journal_name = ''
 if 'article_number' not in st.session_state:
     st.session_state.article_number = ''
 
-# Initialize potential reviewers toggle in session state
-if 'show_potential_reviewers' not in st.session_state:
-    st.session_state.show_potential_reviewers = False
+# Initialize ORCID cache in session state
+if 'orcid_cache' not in st.session_state:
+    st.session_state.orcid_cache = {}
+
+# Initialize show reviewers flag
+if 'show_reviewers' not in st.session_state:
+    st.session_state.show_reviewers = False
 
 # ======================== COUNTRY CODES MAPPING ========================
 COUNTRY_CODES = {
@@ -1033,724 +1023,6 @@ COUNTRY_CODES = {
     'Turkmenistan': 'TM', 'Turkmenistan': 'TM',
     'Mongolia': 'MN', 'Mongolia': 'MN',
 }
-
-# ======================== NEW FUNCTIONS FOR AFFILIATIONS (FROM EXAMPLE CODE) ========================
-
-def extract_country_from_affiliation_string_simple(affiliation_string: str) -> str:
-    """
-    Извлекает страну из строки аффилиации (упрощенная версия для fallback).
-    """
-    if not affiliation_string:
-        return "N/A"
-    
-    affiliation_string = affiliation_string.strip()
-    
-    known_countries = [
-        'USA', 'UK', 'China', 'Germany', 'France', 'Japan', 'Canada', 'Australia',
-        'Russia', 'India', 'Brazil', 'Italy', 'Spain', 'South Korea', 'Netherlands',
-        'Switzerland', 'Sweden', 'Belgium', 'Norway', 'Denmark', 'Finland',
-        'United States', 'United Kingdom', 'Китай', 'США', 'Великобритания', 'Германия', 'Франция',
-        'Portugal', 'Poland', 'Greece', 'Turkey', 'Israel', 'Singapore', 'Taiwan',
-        'Hong Kong', 'Mexico', 'Argentina', 'Chile', 'Colombia', 'Ukraine', 'Czech Republic',
-        'Hungary', 'Romania', 'Bulgaria', 'Serbia', 'Croatia', 'Slovakia', 'Slovenia',
-        'Lithuania', 'Latvia', 'Estonia', 'Ireland', 'New Zealand', 'South Africa',
-        'Egypt', 'Saudi Arabia', 'UAE', 'Qatar', 'Iran', 'Pakistan', 'Bangladesh',
-        'Vietnam', 'Thailand', 'Malaysia', 'Indonesia', 'Philippines', 'Kazakhstan',
-        'Belarus', 'Uzbekistan', 'Azerbaijan', 'Georgia', 'Armenia', 'Moldova'
-    ]
-    
-    parts = [p.strip() for p in affiliation_string.split(',')]
-    
-    for part in reversed(parts):
-        for country in known_countries:
-            if country.lower() in part.lower():
-                return part
-    
-    if len(parts) > 1:
-        potential_country = parts[-1]
-        if len(potential_country) > 2 and not potential_country.isdigit():
-            return potential_country
-    
-    return "Не определена"
-
-def get_authors_with_all_affiliations_from_openalex(openalex_data: Dict) -> List[Dict]:
-    """
-    Получает информацию об авторах со ВСЕМИ их аффилиациями через OpenAlex API.
-    Адаптировано из вашего рабочего кода.
-    """
-    authors_data = []
-    
-    if not openalex_data or 'authorships' not in openalex_data:
-        return authors_data
-    
-    for authorship in openalex_data.get('authorships', []):
-        author_info = authorship.get('author', {})
-        author_name = author_info.get('display_name', 'Unknown')
-        orcid = author_info.get('orcid', '')
-        
-        institutions = authorship.get('institutions', [])
-        
-        affiliations_list = []
-        countries_set = set()
-        
-        for inst in institutions:
-            affiliation_name = inst.get('display_name', 'Не указана')
-            country = inst.get('country_code', '')
-            
-            if not country:
-                country = extract_country_from_affiliation_string_simple(affiliation_name)
-            else:
-                country_names = {
-                    'US': 'USA', 'GB': 'UK', 'CN': 'China', 'DE': 'Germany',
-                    'FR': 'France', 'JP': 'Japan', 'CA': 'Canada', 'AU': 'Australia',
-                    'RU': 'Russia', 'IN': 'India', 'BR': 'Brazil', 'IT': 'Italy',
-                    'ES': 'Spain', 'KR': 'South Korea', 'NL': 'Netherlands',
-                    'CH': 'Switzerland', 'SE': 'Sweden', 'BE': 'Belgium',
-                    'NO': 'Norway', 'DK': 'Denmark', 'FI': 'Finland', 'PT': 'Portugal',
-                    'PL': 'Poland', 'GR': 'Greece', 'TR': 'Turkey', 'IL': 'Israel',
-                    'SG': 'Singapore', 'TW': 'Taiwan', 'HK': 'Hong Kong', 'MX': 'Mexico',
-                    'AR': 'Argentina', 'CL': 'Chile', 'CO': 'Colombia', 'UA': 'Ukraine',
-                    'CZ': 'Czech Republic', 'HU': 'Hungary', 'RO': 'Romania', 'BG': 'Bulgaria',
-                    'RS': 'Serbia', 'HR': 'Croatia', 'SK': 'Slovakia', 'SI': 'Slovenia',
-                    'LT': 'Lithuania', 'LV': 'Latvia', 'EE': 'Estonia', 'IE': 'Ireland',
-                    'NZ': 'New Zealand', 'ZA': 'South Africa', 'EG': 'Egypt', 'SA': 'Saudi Arabia',
-                    'AE': 'UAE', 'QA': 'Qatar', 'IR': 'Iran', 'PK': 'Pakistan', 'BD': 'Bangladesh',
-                    'VN': 'Vietnam', 'TH': 'Thailand', 'MY': 'Malaysia', 'ID': 'Indonesia',
-                    'PH': 'Philippines', 'KZ': 'Kazakhstan', 'BY': 'Belarus', 'UZ': 'Uzbekistan',
-                    'AZ': 'Azerbaijan', 'GE': 'Georgia', 'AM': 'Armenia', 'MD': 'Moldova',
-                    'KG': 'Kyrgyzstan', 'TJ': 'Tajikistan', 'TM': 'Turkmenistan', 'MN': 'Mongolia'
-                }
-                country = country_names.get(country, country)
-            
-            affiliations_list.append({
-                'name': affiliation_name,
-                'country': country
-            })
-            if country and country not in ['N/A', 'Не указана', 'Не определена']:
-                countries_set.add(country)
-        
-        # Нормализуем имя автора для сравнения
-        compare_name, display_name = normalize_author_name(author_name)
-        
-        # Форматируем ORCID если есть
-        formatted_orcid = format_orcid_id(orcid) if orcid else ''
-        
-        authors_data.append({
-            'author': display_name,
-            'compare_name': compare_name,
-            'raw_name': author_name,
-            'orcid': formatted_orcid,
-            'affiliations': affiliations_list,
-            'countries': list(countries_set) if countries_set else [],
-            'num_affiliations': len(affiliations_list),
-            'num_countries': len(countries_set)
-        })
-    
-    return authors_data
-
-def extract_authors_from_crossref_fallback(crossref_data: Dict) -> List[Dict]:
-    """
-    Извлекает авторов из Crossref (fallback, когда нет OpenAlex).
-    Максимально простая, без очистки.
-    """
-    authors_data = []
-    
-    if not crossref_data or 'author' not in crossref_data:
-        return authors_data
-    
-    for author in crossref_data.get('author', []):
-        given = author.get('given', '')
-        family = author.get('family', '')
-        orcid = author.get('ORCID', None)
-        
-        if not family:
-            continue
-        
-        raw_name = f"{given} {family}".strip() if given else family
-        compare_name, display_name = normalize_author_name(raw_name)
-        
-        # Извлекаем аффилиации из Crossref (без очистки)
-        affiliations_list = []
-        countries_set = set()
-        
-        if 'affiliation' in author and author['affiliation']:
-            for aff in author['affiliation']:
-                aff_name = aff.get('name', '')
-                if aff_name:
-                    country = extract_country_from_affiliation_string_simple(aff_name)
-                    affiliations_list.append({
-                        'name': aff_name,
-                        'country': country
-                    })
-                    if country and country not in ['N/A', 'Не указана', 'Не определена']:
-                        countries_set.add(country)
-        
-        formatted_orcid = format_orcid_id(orcid) if orcid else ''
-        
-        authors_data.append({
-            'author': display_name,
-            'compare_name': compare_name,
-            'raw_name': raw_name,
-            'orcid': formatted_orcid,
-            'affiliations': affiliations_list,
-            'countries': list(countries_set),
-            'num_affiliations': len(affiliations_list),
-            'num_countries': len(countries_set)
-        })
-    
-    return authors_data
-
-def merge_authors_from_articles(all_authors_data: List[Dict]) -> List[Dict]:
-    """
-    Объединяет одинаковых авторов из всех статей.
-    Собирает все уникальные аффилиации и страны, считает частоту упоминаний.
-    Адаптировано из вашего рабочего кода.
-    """
-    merged_authors = defaultdict(lambda: {
-        'affiliations': set(),
-        'countries': set(),
-        'mention_count': 0,
-        'articles': set(),
-        'all_affiliations_details': [],
-        'orcid': '',
-        'compare_name': '',
-        'display_name': ''
-    })
-    
-    for article_data in all_authors_data:
-        doi = article_data['doi']
-        for author in article_data['authors']:
-            author_name = author['author']
-            compare_name = author.get('compare_name', normalize_author_name(author_name)[0])
-            display_name = author.get('display_name', author_name)
-            orcid = author.get('orcid', '')
-            
-            # Добавляем аффилиации (используем tuple для set)
-            for aff in author['affiliations']:
-                aff_tuple = (aff['name'], aff['country'])
-                merged_authors[compare_name]['affiliations'].add(aff_tuple)
-                if aff['country'] and aff['country'] not in ['N/A', 'Не указана', 'Не определена']:
-                    merged_authors[compare_name]['countries'].add(aff['country'])
-                merged_authors[compare_name]['all_affiliations_details'].append({
-                    'doi': doi,
-                    'affiliation': aff['name'],
-                    'country': aff['country']
-                })
-            
-            merged_authors[compare_name]['mention_count'] += 1
-            merged_authors[compare_name]['articles'].add(doi)
-            
-            # Сохраняем ORCID если есть
-            if orcid and not merged_authors[compare_name]['orcid']:
-                merged_authors[compare_name]['orcid'] = orcid
-            
-            # Сохраняем display_name
-            if not merged_authors[compare_name]['display_name']:
-                merged_authors[compare_name]['display_name'] = display_name
-            
-            if not merged_authors[compare_name]['compare_name']:
-                merged_authors[compare_name]['compare_name'] = compare_name
-    
-    # Конвертируем set обратно в списки
-    result = []
-    for compare_name, data in merged_authors.items():
-        # Получаем список стран
-        countries_list = sorted(list(data['countries'])) if data['countries'] else []
-        
-        # Получаем список аффилиаций
-        affiliations_list = [{'name': aff[0], 'country': aff[1]} for aff in data['affiliations']]
-        
-        result.append({
-            'author': data['display_name'],
-            'compare_name': compare_name,
-            'orcid': data.get('orcid', ''),
-            'mention_count': data['mention_count'],
-            'num_articles': len(data['articles']),
-            'articles': list(data['articles']),
-            'countries': countries_list,
-            'num_countries': len(countries_list),
-            'num_affiliations': len(data['affiliations']),
-            'affiliations': affiliations_list,
-            'affiliations_details': data['all_affiliations_details']
-        })
-    
-    # Сортируем по количеству упоминаний
-    result.sort(key=lambda x: x['mention_count'], reverse=True)
-    return result
-
-# ======================== NEW FUNCTIONS FOR POTENTIAL REVIEWERS ========================
-
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=5))
-def fetch_orcid_profile(orcid_id: str) -> Optional[Dict]:
-    """
-    Fetch ORCID profile data from ORCID API.
-    Uses the same logic as in the example code.
-    """
-    # Clean ORCID ID
-    orcid_clean = orcid_id.strip().replace('https://orcid.org/', '').replace('http://orcid.org/', '')
-    
-    # Validate format
-    parts = orcid_clean.split('-')
-    if len(parts) != 4 or not all(len(part) == 4 for part in parts):
-        return None
-    
-    url = f"https://pub.orcid.org/v3.0/{orcid_clean}"
-    headers = {'Accept': 'application/json'}
-    
-    try:
-        response = requests.get(url, headers=headers, timeout=15)
-        if response.status_code == 200:
-            return response.json()
-        elif response.status_code == 404:
-            return None
-        else:
-            return None
-    except requests.exceptions.RequestException:
-        return None
-
-def extract_orcid_personal_info(profile_data: Dict) -> Dict:
-    """
-    Extract personal information from ORCID profile.
-    Follows the logic from the example code.
-    """
-    if not profile_data or 'person' not in profile_data:
-        return {}
-    
-    person = profile_data.get('person', {})
-    if person is None:
-        return {}
-    
-    info = {}
-    
-    # Name section
-    name = person.get('name')
-    if name and isinstance(name, dict):
-        given_names = name.get('given-names')
-        info['given_names'] = given_names.get('value', '') if given_names and isinstance(given_names, dict) else ''
-        
-        family_name = name.get('family-name')
-        info['family_name'] = family_name.get('value', '') if family_name and isinstance(family_name, dict) else ''
-        
-        credit_name = name.get('credit-name')
-        info['credit_name'] = credit_name.get('value', '') if credit_name and isinstance(credit_name, dict) else ''
-    else:
-        info['given_names'] = ''
-        info['family_name'] = ''
-        info['credit_name'] = ''
-    
-    # Other names
-    other_names = person.get('other-names')
-    if other_names and isinstance(other_names, dict):
-        other_names_list = other_names.get('other-name', [])
-        info['other_names'] = [n.get('content', '') for n in other_names_list if isinstance(n, dict)] if other_names_list else []
-    else:
-        info['other_names'] = []
-    
-    # Biography
-    bio = person.get('biography')
-    info['biography'] = bio.get('value', '') if bio and isinstance(bio, dict) else ''
-    
-    # Country
-    addresses = person.get('addresses')
-    if addresses and isinstance(addresses, dict):
-        address_list = addresses.get('address', [])
-        if address_list and len(address_list) > 0:
-            first_address = address_list[0]
-            if isinstance(first_address, dict):
-                country = first_address.get('country')
-                info['country'] = country.get('value', '') if country and isinstance(country, dict) else ''
-            else:
-                info['country'] = ''
-        else:
-            info['country'] = ''
-    else:
-        info['country'] = ''
-    
-    # Keywords
-    keywords = person.get('keywords')
-    if keywords and isinstance(keywords, dict):
-        keyword_list = keywords.get('keyword', [])
-        info['keywords'] = [k.get('content', '') for k in keyword_list if isinstance(k, dict)] if keyword_list else []
-    else:
-        info['keywords'] = []
-    
-    # Researcher URLs
-    researcher_urls = person.get('researcher-urls')
-    if researcher_urls and isinstance(researcher_urls, dict):
-        url_list = researcher_urls.get('researcher-url', [])
-        info['researcher_urls'] = []
-        for url_item in url_list:
-            if isinstance(url_item, dict):
-                url_name = url_item.get('url-name', '')
-                url_value = url_item.get('url', {}).get('value', '')
-                if url_value:
-                    info['researcher_urls'].append({'name': url_name, 'url': url_value})
-    else:
-        info['researcher_urls'] = []
-    
-    # External identifiers with hyperlinks
-    external_ids = person.get('external-identifiers')
-    info['external_ids'] = {}
-    
-    # Define URL patterns for common external ID types
-    id_url_patterns = {
-        'scopus-author-id': 'https://www.scopus.com/authid/detail.uri?authorId={}',
-        'researcher-id': 'http://www.researcherid.com/rid/{}',
-        'publons': 'https://publons.com/researcher/{}',
-        'loop': 'https://loop.frontiersin.org/people/{}',
-        'linkedin': 'https://www.linkedin.com/in/{}/',
-        'researchgate': 'https://www.researchgate.net/profile/{}',
-        'google-scholar': 'https://scholar.google.com/citations?user={}',
-        'wos-researcherid': 'https://www.webofscience.com/wos/author/rid/{}',
-        'arxiv': 'https://arxiv.org/a/{}',
-        'ssrn': 'https://papers.ssrn.com/sol3/cf_dev/AbsByAuth.cfm?per_id={}',
-        'orcid': 'https://orcid.org/{}',
-    }
-    
-    if external_ids and isinstance(external_ids, dict):
-        ext_id_list = external_ids.get('external-identifier', [])
-        for ext_id in ext_id_list:
-            if isinstance(ext_id, dict):
-                id_type = ext_id.get('external-id-type', '').lower()
-                id_value = ext_id.get('external-id-value', '')
-                id_url = ext_id.get('external-id-url', {}).get('value', '')
-                
-                if id_type and id_value:
-                    if id_url:
-                        info['external_ids'][id_type] = {'value': id_value, 'url': id_url}
-                    elif id_type in id_url_patterns:
-                        url = id_url_patterns[id_type].format(id_value)
-                        info['external_ids'][id_type] = {'value': id_value, 'url': url}
-                    else:
-                        info['external_ids'][id_type] = {'value': id_value, 'url': None}
-    
-    return info
-
-def get_reviewer_candidates(results: List[Dict], paper_authors_norm: Set[str], paper_affiliations: List[str]) -> List[Dict]:
-    """
-    Получает кандидатов в рецензенты из цитируемых работ.
-    Критерии:
-    1. Не самоцитирование (автор не в paper_authors_norm)
-    2. Нет общих аффилиаций (точное совпадение строк с paper_affiliations)
-    3. Год публикации >= текущий_год - 4
-    """
-    current_year = datetime.now().year
-    min_year = current_year - 4
-    
-    candidates = {}  # key: compare_name
-    
-    for result in results:
-        year = result.get('year')
-        if not year or not isinstance(year, (int, float)) or year < min_year:
-            continue
-        
-        for author in result.get('authors', []):
-            compare_name = author.get('compare_name', '')
-            if not compare_name:
-                continue
-            
-            # Проверка на самоцитирование
-            if compare_name in paper_authors_norm:
-                continue
-            
-            # Проверка на общие аффилиации (точное совпадение строк)
-            author_affiliations = [aff.get('name', '') for aff in author.get('affiliations', [])]
-            has_common_affiliation = False
-            
-            for paper_aff in paper_affiliations:
-                if paper_aff in author_affiliations:
-                    has_common_affiliation = True
-                    break
-            
-            if has_common_affiliation:
-                continue
-            
-            # Кандидат проходит все фильтры
-            if compare_name not in candidates:
-                candidates[compare_name] = {
-                    'display_name': author.get('display_name', ''),
-                    'compare_name': compare_name,
-                    'orcid': author.get('orcid', ''),
-                    'affiliations': author.get('affiliations', []),
-                    'countries': author.get('countries', []),
-                    'candidate_articles': [],
-                    'latest_year': year,
-                    'total_citations': 0
-                }
-            
-            candidates[compare_name]['candidate_articles'].append({
-                'doi': result.get('doi', ''),
-                'year': year,
-                'journal': result.get('journal', ''),
-                'title': result.get('openalex_data', {}).get('title', '') or result.get('crossref_data', {}).get('title', [''])[0]
-            })
-            
-            if year > candidates[compare_name]['latest_year']:
-                candidates[compare_name]['latest_year'] = year
-            
-            candidates[compare_name]['total_citations'] += result.get('citations_count', 0)
-    
-    # Конвертируем в список и сортируем
-    candidate_list = list(candidates.values())
-    candidate_list.sort(key=lambda x: (-x['latest_year'], -x['total_citations']))
-    
-    return candidate_list
-
-def filter_reviewers_by_affiliation(candidates: List[Dict], max_per_affiliation: int = 3) -> List[Dict]:
-    """
-    Ограничивает количество кандидатов из одной аффилиации (не более max_per_affiliation).
-    Приоритет у кандидатов с ORCID.
-    """
-    # Группируем кандидатов по основной аффилиации
-    affiliation_groups = defaultdict(list)
-    
-    for candidate in candidates:
-        # Берем первую аффилиацию как основную
-        primary_aff = ''
-        if candidate.get('affiliations'):
-            primary_aff = candidate['affiliations'][0].get('name', '').lower()
-        if not primary_aff:
-            primary_aff = 'unknown'
-        
-        affiliation_groups[primary_aff].append(candidate)
-    
-    # Сортируем внутри каждой группы: сначала с ORCID, потом по свежести
-    filtered_candidates = []
-    for aff, group in affiliation_groups.items():
-        group.sort(key=lambda x: (bool(x['orcid']), x['latest_year']), reverse=True)
-        filtered_candidates.extend(group[:max_per_affiliation])
-    
-    # Сортируем финальный список
-    filtered_candidates.sort(key=lambda x: -x['latest_year'])
-    
-    return filtered_candidates[:30]
-
-def fetch_orcid_profiles_parallel(candidates: List[Dict], progress_callback=None) -> List[Dict]:
-    """
-    Fetch ORCID profiles for candidates in parallel with progress bar.
-    Uses caching in session_state.
-    """
-    if not candidates:
-        return candidates
-    
-    results = []
-    total = len(candidates)
-    
-    # Check which candidates need fetching
-    to_fetch = []
-    for candidate in candidates:
-        orcid = candidate.get('orcid', '')
-        if orcid and orcid not in st.session_state.orcid_cache:
-            to_fetch.append(candidate)
-        elif orcid and orcid in st.session_state.orcid_cache:
-            candidate['orcid_profile'] = st.session_state.orcid_cache[orcid]
-            results.append(candidate)
-        else:
-            candidate['orcid_profile'] = None
-            results.append(candidate)
-    
-    if to_fetch:
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-        
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            future_to_candidate = {}
-            for i, candidate in enumerate(to_fetch):
-                orcid = candidate.get('orcid', '')
-                if orcid:
-                    future = executor.submit(fetch_orcid_profile, orcid)
-                    future_to_candidate[future] = (i, candidate)
-            
-            completed = 0
-            for future in as_completed(future_to_candidate):
-                i, candidate = future_to_candidate[future]
-                try:
-                    profile = future.result(timeout=20)
-                    orcid = candidate.get('orcid', '')
-                    if profile:
-                        personal_info = extract_orcid_personal_info(profile)
-                        candidate['orcid_profile'] = personal_info
-                        st.session_state.orcid_cache[orcid] = personal_info
-                    else:
-                        candidate['orcid_profile'] = None
-                        st.session_state.orcid_cache[orcid] = None
-                except Exception:
-                    candidate['orcid_profile'] = None
-                
-                completed += 1
-                progress_bar.progress(completed / total)
-                status_text.text(f"{get_text('fetching_orcid_profiles')} {completed}/{total}")
-                
-                results.append(candidate)
-        
-        progress_bar.empty()
-        status_text.empty()
-    
-    # Sort results by latest_year desc
-    results.sort(key=lambda x: -x.get('latest_year', 0))
-    
-    return results
-
-def display_potential_reviewers_section(candidates: List[Dict]):
-    """
-    Display potential reviewers section in the Streamlit interface.
-    """
-    if not candidates:
-        st.info(get_text('none_detected'))
-        return
-    
-    st.markdown(f"### {get_text('potential_reviewers')}")
-    st.markdown(f"*{len(candidates)} {get_text('reviewer_candidate').lower()}s found*")
-    
-    for i, candidate in enumerate(candidates, 1):
-        with st.expander(f"{i}. {candidate['display_name']} ({len(candidate['candidate_articles'])} {get_text('reviewer_articles_count')})"):
-            # Name and ORCID
-            st.markdown(f"**{get_text('orcid_label')}:** ", unsafe_allow_html=True)
-            if candidate.get('orcid'):
-                orcid_url = candidate['orcid']
-                if not orcid_url.startswith('http'):
-                    orcid_url = f"https://orcid.org/{orcid_url}"
-                st.markdown(f'<a href="{orcid_url}" target="_blank">{candidate["orcid"]}</a>', unsafe_allow_html=True)
-            else:
-                st.markdown(get_text('not_found'))
-            
-            # Country from ORCID profile or from affiliations
-            orcid_profile = candidate.get('orcid_profile')
-            if orcid_profile and orcid_profile.get('country'):
-                st.markdown(f"**{get_text('orcid_country')}:** {orcid_profile['country']}")
-            elif candidate.get('countries'):
-                st.markdown(f"**{get_text('orcid_country')}:** {', '.join(candidate['countries'][:3])}")
-            
-            # Affiliations from cited works
-            if candidate.get('affiliations'):
-                st.markdown(f"**{get_text('reviewer_affiliations')}:**")
-                for aff in candidate['affiliations'][:5]:
-                    st.markdown(f"- {aff['name']} ({aff['country'] if aff['country'] else get_text('not_found')})")
-            
-            # ORCID Profile: External IDs
-            if orcid_profile and orcid_profile.get('external_ids'):
-                st.markdown(f"**{get_text('orcid_other_ids')}:**")
-                friendly_names = {
-                    'scopus-author-id': 'Scopus Author ID',
-                    'researcher-id': 'ResearcherID (Web of Science)',
-                    'wos-researcherid': 'Web of Science ResearcherID',
-                    'publons': 'Publons',
-                    'loop': 'Loop',
-                    'linkedin': 'LinkedIn',
-                    'researchgate': 'ResearchGate',
-                    'google-scholar': 'Google Scholar',
-                    'arxiv': 'arXiv',
-                    'ssrn': 'SSRN',
-                }
-                for id_type, id_info in orcid_profile['external_ids'].items():
-                    display_name = friendly_names.get(id_type, id_type.replace('-', ' ').title())
-                    if id_info.get('url'):
-                        st.markdown(f"- **{display_name}:** <a href='{id_info['url']}' target='_blank'>{id_info['value'][:30]}...</a>", unsafe_allow_html=True)
-                    else:
-                        st.markdown(f"- **{display_name}:** {id_info['value'][:30]}...")
-            
-            # ORCID Profile: Websites
-            if orcid_profile and orcid_profile.get('researcher_urls'):
-                st.markdown(f"**{get_text('orcid_websites')}:**")
-                for url_info in orcid_profile['researcher_urls'][:5]:
-                    st.markdown(f"- <a href='{url_info['url']}' target='_blank'>{url_info['name']}</a>", unsafe_allow_html=True)
-            
-            # Cited articles
-            st.markdown(f"**Cited articles (last 4 years):**")
-            for article in candidate['candidate_articles'][:5]:
-                title = article.get('title', 'No title')[:100]
-                doi = article.get('doi', '')
-                year = article.get('year', 'Unknown')
-                journal = article.get('journal', 'Unknown journal')
-                st.markdown(f"- {title} ({year}) - {journal}")
-                if doi:
-                    st.markdown(f"  DOI: <a href='https://doi.org/{doi}' target='_blank'>{doi}</a>", unsafe_allow_html=True)
-
-def generate_reviewers_html(candidates: List[Dict], lang: str = 'en') -> str:
-    """
-    Generate HTML for potential reviewers section.
-    """
-    if not candidates:
-        return f'<p>{get_text("none_detected")}</p>'
-    
-    html_parts = []
-    html_parts.append(f'<div class="section" id="potential_reviewers">')
-    html_parts.append(f'<div class="section-title">{get_text("potential_reviewers")}</div>')
-    html_parts.append(f'<p><strong>{len(candidates)} candidates found</strong></p>')
-    
-    for i, candidate in enumerate(candidates, 1):
-        orcid_profile = candidate.get('orcid_profile')
-        
-        html_parts.append(f'''
-        <div class="reviewer-card">
-            <div class="reviewer-name">{i}. {candidate['display_name']}</div>
-        ''')
-        
-        # ORCID
-        if candidate.get('orcid'):
-            orcid_url = candidate['orcid']
-            if not orcid_url.startswith('http'):
-                orcid_url = f"https://orcid.org/{orcid_url}"
-            html_parts.append(f'<div class="reviewer-orcid"><strong>{get_text("orcid_label")}:</strong> <a href="{orcid_url}" target="_blank">{candidate["orcid"]}</a></div>')
-        else:
-            html_parts.append(f'<div class="reviewer-orcid"><strong>{get_text("orcid_label")}:</strong> {get_text("not_found")}</div>')
-        
-        # Country
-        if orcid_profile and orcid_profile.get('country'):
-            html_parts.append(f'<div class="reviewer-country"><strong>{get_text("orcid_country")}:</strong> {orcid_profile["country"]}</div>')
-        elif candidate.get('countries'):
-            html_parts.append(f'<div class="reviewer-country"><strong>{get_text("orcid_country")}:</strong> {", ".join(candidate["countries"][:3])}</div>')
-        
-        # Affiliations
-        if candidate.get('affiliations'):
-            html_parts.append(f'<div class="reviewer-section-title">{get_text("reviewer_affiliations")}</div>')
-            for aff in candidate['affiliations'][:5]:
-                html_parts.append(f'<div class="external-id-item">• {aff["name"]} ({aff["country"] if aff["country"] else get_text("not_found")})</div>')
-        
-        # External IDs
-        if orcid_profile and orcid_profile.get('external_ids'):
-            html_parts.append(f'<div class="reviewer-section-title">{get_text("orcid_other_ids")}</div>')
-            friendly_names = {
-                'scopus-author-id': 'Scopus Author ID',
-                'researcher-id': 'ResearcherID (Web of Science)',
-                'wos-researcherid': 'Web of Science ResearcherID',
-                'publons': 'Publons',
-                'loop': 'Loop',
-                'linkedin': 'LinkedIn',
-                'researchgate': 'ResearchGate',
-                'google-scholar': 'Google Scholar',
-                'arxiv': 'arXiv',
-                'ssrn': 'SSRN',
-            }
-            for id_type, id_info in orcid_profile['external_ids'].items():
-                display_name = friendly_names.get(id_type, id_type.replace('-', ' ').title())
-                if id_info.get('url'):
-                    html_parts.append(f'<div class="external-id-item">• <strong>{display_name}:</strong> <a href="{id_info["url"]}" target="_blank">{id_info["value"][:40]}...</a></div>')
-                else:
-                    html_parts.append(f'<div class="external-id-item">• <strong>{display_name}:</strong> {id_info["value"][:40]}...</div>')
-        
-        # Websites
-        if orcid_profile and orcid_profile.get('researcher_urls'):
-            html_parts.append(f'<div class="reviewer-section-title">{get_text("orcid_websites")}</div>')
-            for url_info in orcid_profile['researcher_urls'][:5]:
-                html_parts.append(f'<div class="reviewer-website">• <a href="{url_info["url"]}" target="_blank">{url_info["name"]}</a></div>')
-        
-        # Cited articles
-        html_parts.append(f'<div class="reviewer-section-title">Cited articles (last 4 years):</div>')
-        for article in candidate['candidate_articles'][:5]:
-            title = article.get('title', 'No title')[:100]
-            doi = article.get('doi', '')
-            year = article.get('year', 'Unknown')
-            journal = article.get('journal', 'Unknown journal')
-            html_parts.append(f'<div class="external-id-item">• {title} ({year}) - {journal}')
-            if doi:
-                html_parts.append(f'<br><span style="font-size: 11px;">DOI: <a href="https://doi.org/{doi}" target="_blank">{doi}</a></span>')
-            html_parts.append('</div>')
-        
-        html_parts.append('</div>')
-    
-    html_parts.append('</div>')
-    return '\n'.join(html_parts)
 
 # ======================== COLORED PROGRESS BAR ========================
 def update_colored_progress(progress_percent: float, success_rate: float = None, data_density: float = None):
@@ -2143,6 +1415,63 @@ st.markdown("""
         background: #fff2c9 !important;
         border-left: 3px solid #b26b00 !important;
     }
+    
+    /* Reviewer card styles */
+    .reviewer-card {
+        background: white;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border-left: 4px solid #667eea;
+        transition: transform 0.2s;
+    }
+    .reviewer-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .reviewer-name {
+        font-size: 18px;
+        font-weight: 600;
+        color: #667eea;
+        margin-bottom: 8px;
+    }
+    .reviewer-orcid {
+        font-family: monospace;
+        font-size: 12px;
+        margin-bottom: 8px;
+    }
+    .reviewer-section-title {
+        font-weight: 600;
+        margin-top: 12px;
+        margin-bottom: 6px;
+        font-size: 13px;
+        color: #555;
+    }
+    .external-id-link {
+        display: inline-block;
+        background: #f0f0f0;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 11px;
+        margin: 3px;
+        text-decoration: none;
+        color: #333;
+        transition: all 0.2s;
+    }
+    .external-id-link:hover {
+        background: #667eea;
+        color: white;
+    }
+    .confidential-banner {
+        background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+        border-left: 4px solid #dc3545;
+        padding: 12px 20px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        font-weight: 500;
+        color: #856404;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -2190,33 +1519,377 @@ def fetch_openalex_concepts(work_id: str) -> List[Dict]:
         pass
     return []
 
-# ======================== HELPER FUNCTIONS FOR AUTHOR PROCESSING ========================
+# ======================== NEW: ORCID API FUNCTIONS ========================
 
-def format_orcid_id(orcid: str) -> str:
-    """Format ORCID ID to full URL"""
-    if not orcid or not isinstance(orcid, str):
-        return ""
+def clean_orcid_id(orcid_input: str) -> Optional[str]:
+    """Clean and format ORCID ID"""
+    if not orcid_input:
+        return None
     
-    if orcid.startswith('https://orcid.org/'):
-        return orcid
+    orcid_clean = orcid_input.strip().replace("https://orcid.org/", "").replace("http://orcid.org/", "")
+    parts = orcid_clean.split('-')
+    if len(parts) == 4 and all(len(part) == 4 for part in parts):
+        return orcid_clean
+    # Also accept format without dashes
+    if len(orcid_clean) == 16 and orcid_clean[:4].isdigit() and orcid_clean[4:8].isdigit():
+        return f"{orcid_clean[:4]}-{orcid_clean[4:8]}-{orcid_clean[8:12]}-{orcid_clean[12:16]}"
+    return None
+
+def fetch_orcid_profile_data(orcid_id: str) -> Optional[Dict]:
+    """Fetch ORCID profile data from public API"""
+    if not orcid_id:
+        return None
     
-    # Clean ORCID from non-alphanumeric characters except dash
-    clean_id = re.sub(r'[^\dXx-]', '', orcid.strip())
+    # Check cache first
+    if orcid_id in st.session_state.orcid_cache:
+        return st.session_state.orcid_cache[orcid_id]
     
-    if '-' in clean_id:
-        # Already has dashes in correct format
-        if re.match(r'^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$', clean_id, re.IGNORECASE):
-            return f"https://orcid.org/{clean_id}"
+    clean_id = clean_orcid_id(orcid_id)
+    if not clean_id:
+        return None
     
-    # Format without dashes
-    if len(clean_id) == 16:
-        formatted = f"{clean_id[:4]}-{clean_id[4:8]}-{clean_id[8:12]}-{clean_id[12:]}"
-        return f"https://orcid.org/{formatted}"
-    elif len(clean_id) == 15 and clean_id[15] in ['X', 'x']:
-        formatted = f"{clean_id[:4]}-{clean_id[4:8]}-{clean_id[8:12]}-{clean_id[12:15]}X"
-        return f"https://orcid.org/{formatted}"
+    url = f"https://pub.orcid.org/v3.0/{clean_id}"
+    headers = {'Accept': 'application/json'}
+    
+    try:
+        response = requests.get(url, headers=headers, timeout=15)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Cache the result
+        st.session_state.orcid_cache[orcid_id] = data
+        return data
+    except requests.exceptions.RequestException:
+        return None
+    except Exception:
+        return None
+
+def extract_personal_info_from_orcid(profile_data: Dict) -> Dict:
+    """Extract personal information from ORCID profile"""
+    if not profile_data or 'person' not in profile_data:
+        return {}
+    
+    person = profile_data.get('person', {})
+    if person is None:
+        return {}
+    
+    info = {}
+    
+    # Name section
+    name = person.get('name')
+    if name and isinstance(name, dict):
+        given_names = name.get('given-names')
+        info['given_names'] = given_names.get('value', '') if given_names and isinstance(given_names, dict) else ''
+        
+        family_name = name.get('family-name')
+        info['family_name'] = family_name.get('value', '') if family_name and isinstance(family_name, dict) else ''
+        
+        credit_name = name.get('credit-name')
+        info['credit_name'] = credit_name.get('value', '') if credit_name and isinstance(credit_name, dict) else ''
     else:
-        return f"https://orcid.org/{clean_id}"
+        info['given_names'] = ''
+        info['family_name'] = ''
+        info['credit_name'] = ''
+    
+    # Biography
+    bio = person.get('biography')
+    info['biography'] = bio.get('value', '') if bio and isinstance(bio, dict) else ''
+    
+    # Country
+    addresses = person.get('addresses')
+    if addresses and isinstance(addresses, dict):
+        address_list = addresses.get('address', [])
+        if address_list and len(address_list) > 0:
+            first_address = address_list[0]
+            if isinstance(first_address, dict):
+                country = first_address.get('country')
+                info['country'] = country.get('value', '') if country and isinstance(country, dict) else ''
+            else:
+                info['country'] = ''
+        else:
+            info['country'] = ''
+    else:
+        info['country'] = ''
+    
+    # Keywords
+    keywords = person.get('keywords')
+    if keywords and isinstance(keywords, dict):
+        keyword_list = keywords.get('keyword', [])
+        info['keywords'] = [k.get('content', '') for k in keyword_list if isinstance(k, dict)] if keyword_list else []
+    else:
+        info['keywords'] = []
+    
+    # Researcher URLs
+    researcher_urls = person.get('researcher-urls')
+    if researcher_urls and isinstance(researcher_urls, dict):
+        url_list = researcher_urls.get('researcher-url', [])
+        info['researcher_urls'] = []
+        for url_item in url_list:
+            if isinstance(url_item, dict):
+                url_name = url_item.get('url-name', '')
+                url_value = url_item.get('url', {}).get('value', '')
+                if url_value:
+                    info['researcher_urls'].append({'name': url_name, 'url': url_value})
+    else:
+        info['researcher_urls'] = []
+    
+    # External identifiers with hyperlinks
+    external_ids = person.get('external-identifiers')
+    info['external_ids'] = {}
+    
+    id_url_patterns = {
+        'scopus-author-id': 'https://www.scopus.com/authid/detail.uri?authorId={}',
+        'researcher-id': 'http://www.researcherid.com/rid/{}',
+        'publons': 'https://publons.com/researcher/{}',
+        'loop': 'https://loop.frontiersin.org/people/{}',
+        'linkedin': 'https://www.linkedin.com/in/{}/',
+        'researchgate': 'https://www.researchgate.net/profile/{}',
+        'google-scholar': 'https://scholar.google.com/citations?user={}',
+        'wos-researcherid': 'https://www.webofscience.com/wos/author/rid/{}',
+        'arxiv': 'https://arxiv.org/a/{}',
+        'ssrn': 'https://papers.ssrn.com/sol3/cf_dev/AbsByAuth.cfm?per_id={}',
+        'orcid': 'https://orcid.org/{}',
+    }
+    
+    if external_ids and isinstance(external_ids, dict):
+        ext_id_list = external_ids.get('external-identifier', [])
+        for ext_id in ext_id_list:
+            if isinstance(ext_id, dict):
+                id_type = ext_id.get('external-id-type', '').lower()
+                id_value = ext_id.get('external-id-value', '')
+                id_url = ext_id.get('external-id-url', {}).get('value', '')
+                
+                if id_type and id_value:
+                    if id_url:
+                        info['external_ids'][id_type] = {'value': id_value, 'url': id_url}
+                    elif id_type in id_url_patterns:
+                        url = id_url_patterns[id_type].format(id_value)
+                        info['external_ids'][id_type] = {'value': id_value, 'url': url}
+                    else:
+                        info['external_ids'][id_type] = {'value': id_value, 'url': None}
+    
+    return info
+
+# ======================== NEW: AFFILIATION AND AUTHOR EXTRACTION (FROM YOUR CODE) ========================
+
+def extract_country_from_affiliation_string(affiliation_string: str) -> str:
+    """
+    Extract country from affiliation string (fallback method)
+    This is the SAME function from your working code
+    """
+    if not affiliation_string:
+        return "N/A"
+    
+    affiliation_string = affiliation_string.strip()
+    
+    known_countries = [
+        'USA', 'UK', 'China', 'Germany', 'France', 'Japan', 'Canada', 'Australia',
+        'Russia', 'India', 'Brazil', 'Italy', 'Spain', 'South Korea', 'Netherlands',
+        'Switzerland', 'Sweden', 'Belgium', 'Norway', 'Denmark', 'Finland',
+        'United States', 'United Kingdom', 'Китай', 'США', 'Великобритания', 'Германия', 'Франция'
+    ]
+    
+    parts = [p.strip() for p in affiliation_string.split(',')]
+    
+    for part in reversed(parts):
+        for country in known_countries:
+            if country.lower() in part.lower():
+                return part
+    
+    if len(parts) > 1:
+        potential_country = parts[-1]
+        if len(potential_country) > 2 and not potential_country.isdigit():
+            return potential_country
+    
+    return "Не определена"
+
+def get_authors_with_all_affiliations_from_openalex(openalex_data: Dict) -> List[Dict]:
+    """
+    Extracts authors with ALL their affiliations from OpenAlex API data.
+    This is ADAPTED from your get_authors_with_all_affiliations function.
+    Returns list of authors with full affiliation details.
+    """
+    authors_data = []
+    
+    if not openalex_data or 'authorships' not in openalex_data:
+        return authors_data
+    
+    for authorship in openalex_data.get('authorships', []):
+        author_info = authorship.get('author', {})
+        author_name = author_info.get('display_name', 'Unknown')
+        orcid = author_info.get('orcid', '')
+        
+        if not author_name or author_name == 'Unknown':
+            continue
+        
+        institutions = authorship.get('institutions', [])
+        
+        affiliations_list = []
+        countries_set = set()
+        
+        for inst in institutions:
+            affiliation_name = inst.get('display_name', 'Не указана')
+            country_code = inst.get('country_code', '')
+            
+            if not country_code or country_code == 'XX':
+                country = extract_country_from_affiliation_string(affiliation_name)
+            else:
+                # Map country codes to full names (or keep as is)
+                country_names = {
+                    'US': 'USA', 'GB': 'UK', 'CN': 'China', 'DE': 'Germany',
+                    'FR': 'France', 'JP': 'Japan', 'CA': 'Canada', 'AU': 'Australia',
+                    'RU': 'Russia', 'IN': 'India', 'BR': 'Brazil', 'IT': 'Italy',
+                    'ES': 'Spain', 'KR': 'South Korea', 'NL': 'Netherlands',
+                    'CH': 'Switzerland', 'SE': 'Sweden', 'BE': 'Belgium',
+                    'NO': 'Norway', 'DK': 'Denmark', 'FI': 'Finland'
+                }
+                country = country_names.get(country_code, country_code)
+            
+            if affiliation_name and affiliation_name != 'Не указана':
+                affiliations_list.append({
+                    'name': affiliation_name,
+                    'country': country
+                })
+                if country and country not in ['N/A', 'Не указана', 'Не определена']:
+                    countries_set.add(country)
+        
+        # Normalize author name
+        compare_name, display_name = normalize_author_name(author_name)
+        
+        # Format ORCID
+        formatted_orcid = format_orcid_id(orcid) if orcid else ''
+        
+        authors_data.append({
+            'author': display_name,
+            'compare_name': compare_name,
+            'orcid': formatted_orcid,
+            'affiliations': affiliations_list,
+            'countries': list(countries_set) if countries_set else ['Не указана'],
+            'raw_affiliations': [aff['name'] for aff in affiliations_list]
+        })
+    
+    return authors_data
+
+def get_authors_from_crossref_simple(crossref_data: Dict) -> List[Dict]:
+    """
+    Simple extraction from Crossref WITHOUT aggressive cleaning.
+    Used as fallback when OpenAlex returns no data.
+    """
+    authors_data = []
+    
+    if not crossref_data or 'author' not in crossref_data:
+        return authors_data
+    
+    for author in crossref_data.get('author', []):
+        given = author.get('given', '')
+        family = author.get('family', '')
+        orcid = author.get('ORCID', None)
+        
+        if not family:
+            continue
+        
+        raw_name = f"{given} {family}".strip() if given else family
+        compare_name, display_name = normalize_author_name(raw_name)
+        
+        # Extract affiliations from Crossref (without aggressive cleaning)
+        affiliations_list = []
+        countries_set = set()
+        
+        if 'affiliation' in author and author['affiliation']:
+            for aff in author['affiliation']:
+                aff_name = aff.get('name', '')
+                if aff_name:
+                    country = extract_country_from_affiliation_string(aff_name)
+                    affiliations_list.append({
+                        'name': aff_name,
+                        'country': country
+                    })
+                    if country and country not in ['N/A', 'Не указана', 'Не определена']:
+                        countries_set.add(country)
+        
+        # Format ORCID
+        formatted_orcid = format_orcid_id(orcid) if orcid else ''
+        
+        authors_data.append({
+            'author': display_name,
+            'compare_name': compare_name,
+            'orcid': formatted_orcid,
+            'affiliations': affiliations_list,
+            'countries': list(countries_set) if countries_set else ['Не указана']
+        })
+    
+    return authors_data
+
+def merge_authors_with_all_affiliations(all_authors_data: List[Dict]) -> List[Dict]:
+    """
+    Merge duplicate authors from all references.
+    Collects ALL unique affiliations and countries.
+    This is ADAPTED from your merge_authors function.
+    """
+    merged_authors = defaultdict(lambda: {
+        'affiliations': set(),
+        'countries': set(),
+        'mention_count': 0,
+        'articles': set(),
+        'all_affiliations_details': [],
+        'orcid': ''
+    })
+    
+    for article_data in all_authors_data:
+        doi = article_data.get('doi', 'unknown')
+        for author in article_data.get('authors', []):
+            author_name = author.get('author', '')
+            if not author_name:
+                continue
+            
+            # Add affiliations (use tuple for set)
+            for aff in author.get('affiliations', []):
+                aff_tuple = (aff.get('name', ''), aff.get('country', ''))
+                merged_authors[author_name]['affiliations'].add(aff_tuple)
+                if aff.get('country'):
+                    merged_authors[author_name]['countries'].add(aff.get('country'))
+                merged_authors[author_name]['all_affiliations_details'].append({
+                    'doi': doi,
+                    'affiliation': aff.get('name', ''),
+                    'country': aff.get('country', '')
+                })
+            
+            merged_authors[author_name]['mention_count'] += 1
+            merged_authors[author_name]['articles'].add(doi)
+            
+            # Store ORCID if available and not already set
+            if author.get('orcid') and not merged_authors[author_name]['orcid']:
+                merged_authors[author_name]['orcid'] = author['orcid']
+    
+    # Convert sets back to lists
+    result = []
+    for author_name, data in merged_authors.items():
+        # Find the best display name (most complete)
+        display_name = author_name
+        # Try to get a better display name from affiliations details
+        for detail in data['all_affiliations_details']:
+            # This is where we could extract full name, but for now keep as is
+            pass
+        
+        result.append({
+            'author': display_name,
+            'compare_name': normalize_author_name(display_name)[0],
+            'orcid': data['orcid'],
+            'mention_count': data['mention_count'],
+            'num_articles': len(data['articles']),
+            'articles': list(data['articles']),
+            'countries': sorted(list(data['countries'])) if data['countries'] else [],
+            'num_countries': len(data['countries']),
+            'num_affiliations': len(data['affiliations']),
+            'affiliations': [{'name': aff[0], 'country': aff[1]} for aff in data['affiliations']],
+            'affiliations_details': data['all_affiliations_details']
+        })
+    
+    # Sort by mention count descending
+    result.sort(key=lambda x: x['mention_count'], reverse=True)
+    return result
+
+# ======================== HELPER FUNCTIONS FOR AUTHOR PROCESSING (UPDATED) ========================
 
 def normalize_author_name(name: str) -> Tuple[str, str]:
     """
@@ -2276,6 +1949,32 @@ def normalize_author_name(name: str) -> Tuple[str, str]:
     # Fallback: return original as-is
     return name.lower(), name
 
+def format_orcid_id(orcid: str) -> str:
+    """Format ORCID ID to full URL"""
+    if not orcid or not isinstance(orcid, str):
+        return ""
+    
+    if orcid.startswith('https://orcid.org/'):
+        return orcid
+    
+    # Clean ORCID from non-alphanumeric characters except dash
+    clean_id = re.sub(r'[^\dXx-]', '', orcid.strip())
+    
+    if '-' in clean_id:
+        # Already has dashes in correct format
+        if re.match(r'^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$', clean_id, re.IGNORECASE):
+            return f"https://orcid.org/{clean_id}"
+    
+    # Format without dashes
+    if len(clean_id) == 16:
+        formatted = f"{clean_id[:4]}-{clean_id[4:8]}-{clean_id[8:12]}-{clean_id[12:]}"
+        return f"https://orcid.org/{formatted}"
+    elif len(clean_id) == 15 and clean_id[15] in ['X', 'x']:
+        formatted = f"{clean_id[:4]}-{clean_id[4:8]}-{clean_id[8:12]}-{clean_id[12:15]}X"
+        return f"https://orcid.org/{formatted}"
+    else:
+        return f"https://orcid.org/{clean_id}"
+
 # ======================== DUPLICATE DETECTION ========================
 def find_duplicate_references(references: List[str], threshold: float = 0.85) -> List[Dict]:
     """Find duplicate references in literature list - ONLY Full DOI match"""
@@ -2311,6 +2010,328 @@ def find_duplicate_references(references: List[str], threshold: float = 0.85) ->
             unique_duplicates.append(dup)
     
     return unique_duplicates
+
+# ======================== NEW: POTENTIAL REVIEWERS LOGIC ========================
+
+def extract_all_authors_from_results(results: List[Dict]) -> List[Dict]:
+    """
+    Extract all unique authors from results with their affiliations and publication years.
+    Returns list of candidate reviewers.
+    """
+    candidates = []
+    seen_authors = set()
+    
+    for result in results:
+        year = result.get('year')
+        # Only consider references with valid year within last 4 years
+        if year and isinstance(year, (int, float)):
+            current_year = datetime.now().year
+            if year < current_year - 4:
+                continue
+        
+        for author in result.get('authors', []):
+            # Get the normalized name for deduplication
+            author_name = author.get('display_name', '')
+            compare_name = author.get('compare_name', '')
+            
+            if not compare_name:
+                continue
+            
+            # Skip if already seen
+            if compare_name in seen_authors:
+                continue
+            
+            seen_authors.add(compare_name)
+            
+            # Get primary affiliation (first one)
+            affiliations = author.get('affiliations', [])
+            primary_affiliation = affiliations[0]['name'] if affiliations else ''
+            primary_country = affiliations[0]['country'] if affiliations else ''
+            
+            # Get all affiliations as list of names
+            all_affiliation_names = [aff['name'] for aff in affiliations]
+            all_countries = [aff['country'] for aff in affiliations if aff.get('country')]
+            
+            candidates.append({
+                'name': author_name,
+                'compare_name': compare_name,
+                'orcid': author.get('orcid', ''),
+                'primary_affiliation': primary_affiliation,
+                'affiliations': all_affiliation_names,
+                'all_affiliation_details': affiliations,
+                'countries': list(set(all_countries)),
+                'publication_year': year,
+                'doi': result.get('doi', ''),
+                'reference_text': result.get('original_text', '')[:200]
+            })
+    
+    return candidates
+
+def filter_candidates_by_affiliation(candidates: List[Dict], paper_author_affiliations: Set[str]) -> List[Dict]:
+    """
+    Filter out candidates who share ANY affiliation with paper authors.
+    """
+    filtered = []
+    for candidate in candidates:
+        # Check if candidate has any affiliation that matches paper authors' affiliations
+        has_common_affiliation = False
+        for aff in candidate.get('affiliations', []):
+            if aff in paper_author_affiliations:
+                has_common_affiliation = True
+                break
+        
+        if not has_common_affiliation:
+            filtered.append(candidate)
+    
+    return filtered
+
+def filter_candidates_by_self_citation(candidates: List[Dict], paper_authors_norm_set: Set[str]) -> List[Dict]:
+    """
+    Filter out candidates who are in the paper authors list.
+    """
+    filtered = []
+    for candidate in candidates:
+        if candidate['compare_name'] not in paper_authors_norm_set:
+            filtered.append(candidate)
+    
+    return filtered
+
+def limit_candidates_by_affiliation(candidates: List[Dict], max_per_affiliation: int = 3) -> List[Dict]:
+    """
+    Limit to maximum max_per_affiliation candidates per primary affiliation.
+    Prioritize those with ORCID.
+    """
+    # Group by primary affiliation
+    by_affiliation = defaultdict(list)
+    for candidate in candidates:
+        aff_key = candidate.get('primary_affiliation', 'Unknown')
+        by_affiliation[aff_key].append(candidate)
+    
+    # Sort each group: those with ORCID first
+    for aff_key in by_affiliation:
+        by_affiliation[aff_key].sort(key=lambda x: (0 if x.get('orcid') else 1, -x.get('publication_year', 0)))
+        # Keep only top max_per_affiliation
+        by_affiliation[aff_key] = by_affiliation[aff_key][:max_per_affiliation]
+    
+    # Flatten back to list
+    result = []
+    for aff_key, candidates_list in by_affiliation.items():
+        result.extend(candidates_list)
+    
+    # Sort final list by publication year (newest first) and then by ORCID presence
+    result.sort(key=lambda x: (0 if x.get('orcid') else 1, -x.get('publication_year', 0)))
+    
+    return result[:30]  # Return top 30
+
+def get_potential_reviewers(results: List[Dict], paper_authors: Set[str], paper_author_affiliations: Set[str]) -> List[Dict]:
+    """
+    Main function to get potential reviewers based on:
+    1. Not self-citation
+    2. Different affiliation from paper authors
+    3. Publication within last 4 years
+    4. Max 30 reviewers, max 3 per affiliation
+    """
+    # Normalize paper authors for comparison
+    paper_authors_norm = set()
+    for author in paper_authors:
+        norm, _ = normalize_author_name(author)
+        paper_authors_norm.add(norm)
+    
+    # Extract all candidates from results
+    all_candidates = extract_all_authors_from_results(results)
+    
+    # Filter by self-citation
+    candidates_no_self = filter_candidates_by_self_citation(all_candidates, paper_authors_norm)
+    
+    # Filter by affiliation
+    candidates_no_affiliation_overlap = filter_candidates_by_affiliation(candidates_no_self, paper_author_affiliations)
+    
+    # Limit by affiliation (max 3 per affiliation)
+    final_candidates = limit_candidates_by_affiliation(candidates_no_affiliation_overlap, max_per_affiliation=3)
+    
+    return final_candidates
+
+def fetch_orcid_profiles_for_reviewers(reviewers: List[Dict]) -> List[Dict]:
+    """
+    Fetch ORCID profiles for reviewers in parallel with progress bar.
+    """
+    if not reviewers:
+        return reviewers
+    
+    # Filter reviewers who have ORCID
+    reviewers_with_orcid = [r for r in reviewers if r.get('orcid')]
+    
+    if not reviewers_with_orcid:
+        return reviewers
+    
+    # Progress bar placeholder
+    progress_placeholder = st.empty()
+    status_placeholder = st.empty()
+    
+    status_placeholder.markdown(f"🔍 {get_text('fetching_orcid_profiles')}")
+    
+    # Process in parallel
+    enriched_reviewers = []
+    
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {}
+        for i, reviewer in enumerate(reviewers):
+            if reviewer.get('orcid'):
+                orcid_clean = clean_orcid_id(reviewer['orcid'])
+                if orcid_clean:
+                    future = executor.submit(fetch_orcid_profile_data, orcid_clean)
+                    futures[future] = i
+        
+        # Update progress
+        total = len(futures)
+        completed = 0
+        
+        for future in as_completed(futures):
+            idx = futures[future]
+            orcid_data = future.result()
+            completed += 1
+            
+            # Update progress bar
+            progress_percent = (completed / total) * 100 if total > 0 else 0
+            progress_placeholder.progress(progress_percent / 100)
+            
+            if orcid_data:
+                personal_info = extract_personal_info_from_orcid(orcid_data)
+                reviewers[idx]['orcid_profile'] = personal_info
+            else:
+                reviewers[idx]['orcid_profile'] = None
+    
+    # Clear progress placeholders
+    progress_placeholder.empty()
+    status_placeholder.empty()
+    
+    return reviewers
+
+def display_reviewer_card(reviewer: Dict, index: int):
+    """
+    Display a reviewer card with ORCID profile information.
+    """
+    primary_color = st.session_state.get('primary_color', '#667eea')
+    
+    # Get ORCID profile data
+    orcid_profile = reviewer.get('orcid_profile', {})
+    orcid_id = reviewer.get('orcid', '')
+    
+    # Build name
+    given_names = orcid_profile.get('given_names', '')
+    family_name = orcid_profile.get('family_name', '')
+    credit_name = orcid_profile.get('credit_name', '')
+    
+    if given_names and family_name:
+        full_name = f"{given_names} {family_name}"
+    elif credit_name:
+        full_name = credit_name
+    else:
+        full_name = reviewer.get('name', 'Unknown')
+    
+    # ORCID link
+    orcid_html = ""
+    if orcid_id:
+        orcid_url = format_orcid_id(orcid_id) if not orcid_id.startswith('http') else orcid_id
+        orcid_html = f'<div class="reviewer-orcid"><strong>ORCID:</strong> <a href="{orcid_url}" target="_blank" style="color: {primary_color};">{orcid_id}</a></div>'
+    else:
+        orcid_html = f'<div class="reviewer-orcid"><em>{get_text("reviewer_no_orcid")}</em></div>'
+    
+    # Country from ORCID
+    country = orcid_profile.get('country', '')
+    if not country and reviewer.get('countries'):
+        country = ', '.join(reviewer['countries'][:3])
+    
+    country_html = f'<div><strong>{get_text("orcid_country")}:</strong> {country}</div>' if country else ''
+    
+    # Affiliations
+    affiliations = reviewer.get('affiliations', [])
+    affiliations_html = ""
+    if affiliations:
+        aff_list = []
+        for aff in affiliations[:3]:
+            if isinstance(aff, dict):
+                aff_list.append(aff.get('name', ''))
+            else:
+                aff_list.append(aff)
+        affiliations_html = f'<div><strong>{get_text("reviewer_affiliations")}:</strong><br>{", ".join(aff_list)}</div>'
+    else:
+        affiliations_html = f'<div><em>{get_text("reviewer_no_affiliation")}</em></div>'
+    
+    # External IDs (Other IDs)
+    external_ids = orcid_profile.get('external_ids', {})
+    external_ids_html = ""
+    if external_ids:
+        friendly_names = {
+            'scopus-author-id': 'Scopus Author ID',
+            'researcher-id': 'ResearcherID (WoS)',
+            'wos-researcherid': 'Web of Science ResearcherID',
+            'publons': 'Publons',
+            'loop': 'Loop',
+            'linkedin': 'LinkedIn',
+            'researchgate': 'ResearchGate',
+            'google-scholar': 'Google Scholar',
+            'arxiv': 'arXiv',
+            'ssrn': 'SSRN',
+        }
+        id_links = []
+        for id_type, id_info in external_ids.items():
+            display_name = friendly_names.get(id_type, id_type.replace('-', ' ').title())
+            id_value = id_info.get('value', '')
+            id_url = id_info.get('url', '')
+            if id_url:
+                display_value = id_value[:30] + '...' if len(id_value) > 30 else id_value
+                id_links.append(f'<a href="{id_url}" target="_blank" class="external-id-link">{display_name}</a>')
+            elif id_value:
+                id_links.append(f'<span class="external-id-link">{display_name}: {id_value[:20]}</span>')
+        
+        if id_links:
+            external_ids_html = f'<div class="reviewer-section-title">{get_text("orcid_other_ids")}:</div><div>{" ".join(id_links)}</div>'
+    
+    # Websites
+    researcher_urls = orcid_profile.get('researcher_urls', [])
+    websites_html = ""
+    if researcher_urls:
+        url_links = []
+        for url_info in researcher_urls[:5]:
+            url_name = url_info.get('name', 'Website')
+            url_value = url_info.get('url', '')
+            if url_value:
+                url_links.append(f'<a href="{url_value}" target="_blank" class="external-id-link">{url_name}</a>')
+        if url_links:
+            websites_html = f'<div class="reviewer-section-title">{get_text("orcid_websites")}:</div><div>{" ".join(url_links)}</div>'
+    
+    # Publication info
+    pub_html = f'<div style="margin-top: 12px; font-size: 12px; color: #666;"><strong>{get_text("reviewer_from_reference")}:</strong> {reviewer.get("doi", "N/A")}<br><strong>{get_text("year")}:</strong> {reviewer.get("publication_year", "Unknown")}</div>'
+    
+    # Keywords/Research interests
+    keywords = orcid_profile.get('keywords', [])
+    keywords_html = ""
+    if keywords:
+        keywords_str = ', '.join(keywords[:5])
+        keywords_html = f'<div><strong>Research interests:</strong> {keywords_str}</div>'
+    
+    # Biography (truncated)
+    bio = orcid_profile.get('biography', '')
+    bio_html = ""
+    if bio:
+        bio_truncated = bio[:200] + '...' if len(bio) > 200 else bio
+        bio_html = f'<div style="margin-top: 8px; font-size: 12px; color: #555;"><em>{bio_truncated}</em></div>'
+    
+    # Render card
+    st.markdown(f"""
+    <div class="reviewer-card">
+        <div class="reviewer-name">{index}. {full_name}</div>
+        {orcid_html}
+        {country_html}
+        {affiliations_html}
+        {keywords_html}
+        {external_ids_html}
+        {websites_html}
+        {pub_html}
+        {bio_html}
+    </div>
+    """, unsafe_allow_html=True)
 
 # ======================== NEW ANALYSIS FUNCTIONS ========================
 
@@ -2355,79 +2376,20 @@ def analyze_geographic_distribution(results: List[Dict]) -> Dict:
     # Track per-reference data
     reference_countries = []  # List of country sets per reference
     
-    def extract_country(affiliation_string):
-        """Extract country from affiliation string (same as working code)"""
-        if not affiliation_string:
-            return "N/A"
-        
-        affiliation_string = affiliation_string.strip()
-        
-        known_countries = [
-            'USA', 'UK', 'China', 'Germany', 'France', 'Japan', 'Canada', 'Australia',
-            'Russia', 'India', 'Brazil', 'Italy', 'Spain', 'South Korea', 'Netherlands',
-            'Switzerland', 'Sweden', 'Belgium', 'Norway', 'Denmark', 'Finland',
-            'United States', 'United Kingdom', 'Китай', 'США', 'Великобритания', 'Германия', 'Франция'
-        ]
-        
-        parts = [p.strip() for p in affiliation_string.split(',')]
-        
-        for part in reversed(parts):
-            for country in known_countries:
-                if country.lower() in part.lower():
-                    return part
-        
-        if len(parts) > 1:
-            potential_country = parts[-1]
-            if len(potential_country) > 2 and not potential_country.isdigit():
-                return potential_country
-        
-        return "Не определена"
-    
     for result in results:
         # Collect all countries from authors in this reference
         ref_countries_set = set()
         
-        # Try to get from OpenAlex data (most reliable)
-        openalex_data = result.get('openalex_data')
-        if openalex_data and isinstance(openalex_data, dict):
-            if 'authorships' in openalex_data:
-                for authorship in openalex_data.get('authorships', []):
-                    institutions = authorship.get('institutions', [])
-                    for institution in institutions:
-                        country_code = institution.get('country_code', '')
-                        if country_code and country_code != 'XX':
-                            ref_countries_set.add(country_code)
-                            author_country_counter[country_code] += 1
-                        else:
-                            affiliation_name = institution.get('display_name', '')
-                            if affiliation_name:
-                                country = extract_country(affiliation_name)
-                                if country and country not in ['N/A', 'Не определена']:
-                                    ref_countries_set.add(country)
-                                    author_country_counter[country] += 1
-        
-        # SECOND: If OpenAlex didn't provide countries, try Crossref
-        if not ref_countries_set:
-            crossref_data = result.get('crossref_data')
-            if crossref_data and isinstance(crossref_data, dict):
-                if 'author' in crossref_data:
-                    for author in crossref_data.get('author', []):
-                        if 'affiliation' in author and author['affiliation']:
-                            for aff in author['affiliation']:
-                                aff_name = aff.get('name', '')
-                                if aff_name:
-                                    country = extract_country(aff_name)
-                                    if country and country not in ['N/A', 'Не определена']:
-                                        ref_countries_set.add(country)
-                                        author_country_counter[country] += 1
-        
-        # THIRD: Fallback to existing author countries from merged authors
-        if not ref_countries_set:
-            for author in result.get('authors', []):
-                for country in author.get('countries', []):
-                    if country and country not in ['N/A', 'Не определена', '']:
-                        ref_countries_set.add(country)
-                        author_country_counter[country] += 1
+        # Get authors from result (already processed with new affiliation logic)
+        for author in result.get('authors', []):
+            # Try author.get('countries') - from the new extraction
+            countries = author.get('countries', [])
+            
+            for country in countries:
+                if country and country not in ['N/A', 'Не указана', 'Не определена']:
+                    ref_countries_set.add(country)
+                    # Type 2: Count each author by their country
+                    author_country_counter[country] += 1
         
         if ref_countries_set:
             # Type 1: Count each reference once per unique country
@@ -2821,49 +2783,51 @@ def analyze_journal_frequency_all(results: List[Dict]) -> Dict:
 
 def analyze_author_frequency_all(results: List[Dict]) -> Dict:
     """
-    Анализирует частоту авторов с правильным объединением.
-    Использует вашу функцию merge_authors_from_articles.
+    Analyze author frequency with PROPER merging using the new affiliation logic.
+    Uses the merged authors from the new system.
     """
-    # Собираем все данные об авторах из результатов
+    # Collect all author occurrences with full affiliation data
     all_authors_data = []
     
     for result in results:
         doi = result.get('doi', 'unknown')
         authors = result.get('authors', [])
         
-        if authors:
-            all_authors_data.append({
-                'doi': doi,
-                'authors': authors
-            })
+        all_authors_data.append({
+            'doi': doi,
+            'authors': authors
+        })
     
-    # Объединяем авторов используя вашу функцию
-    merged_authors = merge_authors_from_articles(all_authors_data)
+    # Merge using the new merge function
+    merged_authors = merge_authors_with_all_affiliations(all_authors_data)
     
-    # Форматируем для совместимости с остальным кодом
-    formatted_authors = []
+    # Convert to the format expected by the UI
+    author_list = []
     for author in merged_authors:
-        formatted_authors.append({
+        # Get primary institution (first affiliation)
+        primary_institution = author['affiliations'][0]['name'] if author['affiliations'] else ''
+        primary_country = author['countries'][0] if author['countries'] else ''
+        
+        author_list.append({
             'display_name': author['author'],
             'compare_name': author['compare_name'],
             'orcid': author.get('orcid', ''),
             'count': author['mention_count'],
+            'country': primary_country,
             'countries': author['countries'],
-            'affiliations': author['affiliations'],
-            'primary_institution': author['affiliations'][0]['name'] if author['affiliations'] else '',
-            'primary_country': author['countries'][0] if author['countries'] else '',
-            'num_affiliations': author['num_affiliations'],
-            'num_countries': author['num_countries']
+            'institution': primary_institution,
+            'institutions': [aff['name'] for aff in author['affiliations']],
+            'affiliations': author['affiliations']
         })
     
     return {
-        'all_authors': formatted_authors,
-        'unique_authors': len(formatted_authors),
-        'top_20': formatted_authors[:20]
+        'all_authors': author_list,
+        'unique_authors': len(author_list),
+        'top_20': author_list[:20]
     }
 
 def analyze_orcid_coverage(results: List[Dict]) -> Dict:
-    """Analyze ORCID coverage"""
+    """Analyze ORCID coverage using the new author data"""
     total_authors = 0
     authors_with_orcid = 0
     orcid_by_country = Counter()
@@ -2875,8 +2839,8 @@ def analyze_orcid_coverage(results: List[Dict]) -> Dict:
                 authors_with_orcid += 1
                 # Get countries from author
                 countries = author.get('countries', [])
-                if not countries and author.get('primary_country'):
-                    countries = [author['primary_country']]
+                if not countries and author.get('country'):
+                    countries = [author['country']]
                 for country in countries:
                     if country:
                         orcid_by_country[country] += 1
@@ -3071,13 +3035,14 @@ def parse_reference_list(references_text: str) -> List[str]:
     return final_references
 
 def analyze_all_references(references: List[str], batch_size: int = 50, paper_authors: Set[str] = None) -> List[Dict]:
-    """Analyze all references with batching - NOW USING OPTIMIZED VERSION"""
-    # Use the optimized version for better performance
-    return analyze_all_references_optimized(references, batch_size, paper_authors)
+    """Analyze all references with batching - USING NEW AFFILIATION LOGIC"""
+    # Use the optimized version with new author extraction
+    return analyze_all_references_with_new_affiliations(references, batch_size, paper_authors)
 
-# ======================== OPTIMIZED BATCH PROCESSING ========================
-def analyze_reference_batch_optimized(references: List[str], progress_callback=None, paper_authors: Set[str] = None, batch_num: int = 0, total_batches: int = 1) -> List[Dict]:
-    """Analyze batch of references using optimized ThreadPoolExecutor with full OpenAlex support for journals and publishers"""
+# ======================== OPTIMIZED BATCH PROCESSING WITH NEW AFFILIATION LOGIC ========================
+
+def analyze_reference_batch_with_new_affiliations(references: List[str], progress_callback=None, paper_authors: Set[str] = None, batch_num: int = 0, total_batches: int = 1) -> List[Dict]:
+    """Analyze batch of references using NEW affiliation extraction logic (based on your working code)"""
     results = []
     batch_size = len(references)
     
@@ -3091,16 +3056,14 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
         if doi:
             dois_with_indices.append((idx, doi))
     
-    # Step 2: Fetch data using ThreadPoolExecutor (optimized approach)
+    # Step 2: Fetch data using ThreadPoolExecutor
     crossref_results = {}
     openalex_results = {}
     
     if dois_with_indices:
-        # OPTIMIZATION 1: Single global ThreadPoolExecutor for all DOIs in batch
         with ThreadPoolExecutor(max_workers=7) as executor:
             futures = {}
             for idx, doi in dois_with_indices:
-                # Check if DOI is in bad cache
                 if doi in st.session_state.bad_dois:
                     futures[(idx, 'crossref')] = None
                     futures[(idx, 'openalex')] = None
@@ -3108,7 +3071,6 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                     futures[(idx, 'crossref')] = executor.submit(fetch_crossref, doi)
                     futures[(idx, 'openalex')] = executor.submit(fetch_openalex, doi)
             
-            # Collect results
             for (idx, api_type), future in futures.items():
                 if future is not None:
                     try:
@@ -3128,17 +3090,15 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                     else:
                         openalex_results[idx] = None
             
-            # Mark bad DOIs for caching
             for idx, doi in dois_with_indices:
                 if crossref_results.get(idx) is None and openalex_results.get(idx) is None:
                     st.session_state.bad_dois.add(doi)
     
-    # Step 3: Build results for each reference
+    # Step 3: Build results for each reference with NEW AFFILIATION LOGIC
     for idx, ref in enumerate(references):
         identifiers = ref_doi_map[idx]
         doi = identifiers['doi']
         
-        # Get fetched data (if any)
         crossref_data = crossref_results.get(idx) if dois_with_indices else None
         openalex_data = openalex_results.get(idx) if dois_with_indices else None
         
@@ -3169,78 +3129,29 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
             'references_count': 0,
             'citations_count': 0,
             'is_suspicious_doi': False,
-            # NEW FIELDS FOR TYPE DETECTION
-            'is_repository': False,      # type == "repository" OR "posted_content" OR has arXiv ID
-            'is_ebook': False,           # type == "ebook platform" OR raw_type == "book-chapter"
-            'is_proceedings': False,     # raw_type == "proceedings-article"
+            'is_repository': False,
+            'is_ebook': False,
+            'is_proceedings': False,
             'openalex_type': None,
             'openalex_raw_type': None
         }
         
         if doi:
-            # Check for suspicious DOI
             if crossref_data is None and openalex_data is None:
                 result['is_suspicious_doi'] = True
                 result['crossmark_issues'].append('⚠️ Attention: invalid/suspicious DOI (not found in Crossref or OpenAlex)')
             
-            # ==================== PROCESS CROSSREF DATA ====================
-            if crossref_data:
-                result['crossref_data'] = crossref_data
-                result['crossref_status'] = True
-                
-                # Extract authors from Crossref using SIMPLE function (no aggressive cleaning)
-                authors_data = extract_authors_from_crossref_simple(crossref_data)
-                result['authors'].extend(authors_data)
-                
-                for auth in authors_data:
-                    result['authors_display'].append(auth['display_name'])
-                
-                # Extract journal from Crossref
-                if 'container-title' in crossref_data and crossref_data['container-title']:
-                    journal_name = crossref_data['container-title'][0]
-                    if journal_name and journal_name.strip():
-                        result['journal'] = journal_name.strip()
-                        result['journal_from'] = 'crossref'
-                
-                # Extract ISSN from Crossref
-                if 'ISSN' in crossref_data and crossref_data['ISSN']:
-                    result['issn'] = crossref_data['ISSN'][0]
-                
-                # Extract year from Crossref
-                if 'issued' in crossref_data and 'date-parts' in crossref_data['issued']:
-                    date_parts = crossref_data['issued']['date-parts']
-                    if date_parts and date_parts[0] and len(date_parts[0]) > 0:
-                        result['year'] = date_parts[0][0]
-                
-                # Extract publication type
-                if 'type' in crossref_data:
-                    result['type'] = crossref_data['type']
-                
-                # Extract publisher from Crossref
-                if 'publisher' in crossref_data and crossref_data['publisher']:
-                    publisher_name = crossref_data['publisher']
-                    if publisher_name and publisher_name.strip():
-                        result['publisher'] = publisher_name.strip()
-                        result['publisher_from'] = 'crossref'
-                
-                # Extract license
-                if 'license' in crossref_data:
-                    result['license'] = crossref_data['license'][0].get('URL', '') if crossref_data['license'] else None
-                
-                # Extract citation count
-                if 'is-referenced-by-count' in crossref_data:
-                    result['citations_count'] = crossref_data['is-referenced-by-count']
-                
-                # Extract Crossmark issues
-                if 'crossmark' in crossref_data:
-                    for cm in crossref_data.get('crossmark', []):
-                        if 'type' in cm:
-                            result['crossmark_issues'].append(cm['type'])
-            
-            # ==================== PROCESS OPENALEX DATA ====================
+            # ==================== PROCESS OPENALEX DATA FIRST (NEW AFFILIATION LOGIC) ====================
             if openalex_data:
                 result['openalex_data'] = openalex_data
                 result['openalex_status'] = True
+                
+                # Extract authors using NEW function (from your working code)
+                authors_data = get_authors_with_all_affiliations_from_openalex(openalex_data)
+                result['authors'].extend(authors_data)
+                
+                for auth in authors_data:
+                    result['authors_display'].append(auth['author'])
                 
                 # Extract OpenAlex type and raw_type
                 openalex_type = openalex_data.get('type', '') or ''
@@ -3251,25 +3162,18 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                 result['type'] = openalex_type
                 result['raw_type'] = raw_type
                 
-                # ========== IMPROVED TYPE DETECTION - FIXED VERSION ==========
-                # Get primary_location and source for accurate type detection
+                # Type detection
                 primary_location = openalex_data.get('primary_location', {})
                 source = primary_location.get('source', {})
-                source_type = source.get('type', '') or '' if source else ''
+                source_type = source.get('type', '') or ''
                 
-                # ========== 1. PROCEEDINGS DETECTION ==========
-                # Only raw_type == "proceedings-article" indicates conference proceedings
                 if raw_type == 'proceedings-article':
                     result['is_proceedings'] = True
                     result['crossmark_issues'].append('📊 Conference proceedings')
-                
-                # ========== 2. EBOOK DETECTION ==========
-                # Book chapter from an ebook platform
                 elif raw_type == 'book-chapter' and source_type == 'ebook platform':
                     result['is_ebook'] = True
                     result['crossmark_issues'].append('📖 Electronic book')
                 
-                # Check host_venue for ebook indicator (fallback)
                 if not result['is_ebook'] and openalex_data.get('host_venue'):
                     host_venue = openalex_data['host_venue']
                     if isinstance(host_venue, dict):
@@ -3278,48 +3182,27 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                             result['is_ebook'] = True
                             result['crossmark_issues'].append('📖 Electronic book (from series)')
                 
-                # ========== 3. REPOSITORY / PREPRINT DETECTION ==========
-                # CRITICAL: Only raw_type or source.type indicate repository/preprint
-                # DO NOT use top-level openalex_type == 'preprint' for regular articles!
-                # This field is often misclassified by OpenAlex for regular OA articles.
-                
-                # Repository indicators in raw_type
                 repository_raw_types = ['posted-content', 'posted_content', 'preprint']
-                
-                # Repository indicators in source.type
                 repository_source_types = ['repository']
                 
-                # Check via raw_type (primary method)
                 if raw_type.lower() in repository_raw_types:
                     result['is_repository'] = True
                     result['is_preprint'] = True
                     result['crossmark_issues'].append('📚 Repository / Preprint')
-                
-                # Check via source.type (fallback for repositories like Preprints.org)
                 elif source_type.lower() in repository_source_types:
                     result['is_repository'] = True
                     result['is_preprint'] = True
                     result['crossmark_issues'].append('📚 Repository / Preprint')
                 
-                # ========== 4. RETRACTION DETECTION ==========
                 if openalex_data.get('is_retracted') is True:
                     result['is_retracted'] = True
                     result['crossmark_issues'].append('⚠️ This article has been RETRACTED')
                 
-                # ========== EXTRACT AUTHORS FROM OPENALEX (NEW VERSION) ==========
-                authors_data = extract_authors_with_affiliations_from_openalex(openalex_data)
-                existing_compare = {a['compare_name'] for a in result['authors']}
-                for auth in authors_data:
-                    if auth['compare_name'] not in existing_compare:
-                        result['authors'].append(auth)
-                        result['authors_display'].append(auth['display_name'])
-                        existing_compare.add(auth['compare_name'])
-                
-                # Extract year from OpenAlex (if not already set by Crossref)
-                if not result['year'] and 'publication_year' in openalex_data:
+                # Extract year
+                if 'publication_year' in openalex_data:
                     result['year'] = openalex_data['publication_year']
                 
-                # ========== EXTRACT JOURNAL FROM OPENALEX ==========
+                # Extract journal
                 journal_from_openalex = None
                 
                 if openalex_data.get('host_venue'):
@@ -3327,8 +3210,6 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                     if isinstance(host_venue, dict):
                         if host_venue.get('display_name'):
                             journal_from_openalex = host_venue['display_name'].strip()
-                        elif host_venue.get('name'):
-                            journal_from_openalex = host_venue['name'].strip()
                 
                 if not journal_from_openalex and openalex_data.get('primary_location'):
                     primary = openalex_data['primary_location']
@@ -3336,31 +3217,12 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                         if primary.get('source') and isinstance(primary['source'], dict):
                             if primary['source'].get('display_name'):
                                 journal_from_openalex = primary['source']['display_name'].strip()
-                            elif primary['source'].get('name'):
-                                journal_from_openalex = primary['source']['name'].strip()
-                
-                if not journal_from_openalex and openalex_data.get('locations'):
-                    for loc in openalex_data['locations']:
-                        if isinstance(loc, dict) and loc.get('source'):
-                            source_obj = loc['source']
-                            if isinstance(source_obj, dict):
-                                if source_obj.get('display_name'):
-                                    journal_from_openalex = source_obj['display_name'].strip()
-                                    break
-                                elif source_obj.get('name'):
-                                    journal_from_openalex = source_obj['name'].strip()
-                                    break
                 
                 if journal_from_openalex and journal_from_openalex.strip():
-                    if not result['journal']:
-                        result['journal'] = journal_from_openalex
-                        result['journal_from'] = 'openalex'
-                    elif result['journal'] and journal_from_openalex != result['journal']:
-                        if len(journal_from_openalex) > len(result['journal']):
-                            result['journal'] = journal_from_openalex
-                            result['journal_from'] = 'openalex_override'
+                    result['journal'] = journal_from_openalex
+                    result['journal_from'] = 'openalex'
                 
-                # ========== EXTRACT PUBLISHER FROM OPENALEX ==========
+                # Extract publisher
                 publisher_from_openalex = None
                 
                 if openalex_data.get('host_venue'):
@@ -3368,8 +3230,6 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                     if isinstance(host_venue, dict):
                         if host_venue.get('publisher'):
                             publisher_from_openalex = host_venue['publisher'].strip()
-                        elif host_venue.get('publisher_name'):
-                            publisher_from_openalex = host_venue['publisher_name'].strip()
                 
                 if not publisher_from_openalex and openalex_data.get('primary_location'):
                     primary = openalex_data['primary_location']
@@ -3378,53 +3238,62 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                         if isinstance(source_obj, dict):
                             if source_obj.get('publisher'):
                                 publisher_from_openalex = source_obj['publisher'].strip()
-                            elif source_obj.get('publisher_name'):
-                                publisher_from_openalex = source_obj['publisher_name'].strip()
-                
-                if not publisher_from_openalex and openalex_data.get('locations'):
-                    for loc in openalex_data['locations']:
-                        if isinstance(loc, dict) and loc.get('source'):
-                            source_obj = loc['source']
-                            if isinstance(source_obj, dict):
-                                if source_obj.get('publisher'):
-                                    publisher_from_openalex = source_obj['publisher'].strip()
-                                    break
-                                elif source_obj.get('publisher_name'):
-                                    publisher_from_openalex = source_obj['publisher_name'].strip()
-                                    break
-                
-                if not publisher_from_openalex and openalex_data.get('host_organization'):
-                    host_org = openalex_data['host_organization']
-                    if isinstance(host_org, dict):
-                        if host_org.get('display_name'):
-                            publisher_from_openalex = host_org['display_name'].strip()
-                        elif host_org.get('name'):
-                            publisher_from_openalex = host_org['name'].strip()
-                    elif isinstance(host_org, str):
-                        publisher_from_openalex = host_org.strip()
-                
-                if not publisher_from_openalex and openalex_data.get('host_organization_name'):
-                    publisher_from_openalex = openalex_data['host_organization_name'].strip()
                 
                 if publisher_from_openalex and publisher_from_openalex.strip():
-                    if not result['publisher']:
-                        result['publisher'] = publisher_from_openalex
-                        result['publisher_from'] = 'openalex'
-                    elif result['publisher'] and publisher_from_openalex != result['publisher']:
-                        if len(publisher_from_openalex) > len(result['publisher']):
-                            result['publisher'] = publisher_from_openalex
-                            result['publisher_from'] = 'openalex_override'
+                    result['publisher'] = publisher_from_openalex
+                    result['publisher_from'] = 'openalex'
                 
-                # Extract reference count
+                # Extract citation and reference counts
                 if 'referenced_works_count' in openalex_data:
                     result['references_count'] = openalex_data['referenced_works_count']
-                
-                # Extract citation count (take max from both sources)
                 if 'cited_by_count' in openalex_data:
-                    result['citations_count'] = max(result['citations_count'], openalex_data['cited_by_count'])
+                    result['citations_count'] = openalex_data['cited_by_count']
+            
+            # ==================== FALLBACK: PROCESS CROSSREF DATA (if OpenAlex returned no authors) ====================
+            if crossref_data and not result['authors']:
+                result['crossref_data'] = crossref_data
+                result['crossref_status'] = True
+                
+                # Use SIMPLE Crossref extraction (without aggressive cleaning)
+                authors_data = get_authors_from_crossref_simple(crossref_data)
+                result['authors'].extend(authors_data)
+                
+                for auth in authors_data:
+                    result['authors_display'].append(auth['author'])
+                
+                # Extract journal
+                if 'container-title' in crossref_data and crossref_data['container-title']:
+                    journal_name = crossref_data['container-title'][0]
+                    if journal_name and journal_name.strip():
+                        result['journal'] = journal_name.strip()
+                        result['journal_from'] = 'crossref'
+                
+                # Extract ISSN
+                if 'ISSN' in crossref_data and crossref_data['ISSN']:
+                    result['issn'] = crossref_data['ISSN'][0]
+                
+                # Extract year
+                if 'issued' in crossref_data and 'date-parts' in crossref_data['issued']:
+                    date_parts = crossref_data['issued']['date-parts']
+                    if date_parts and date_parts[0] and len(date_parts[0]) > 0:
+                        result['year'] = date_parts[0][0]
+                
+                # Extract publication type
+                if 'type' in crossref_data:
+                    result['type'] = crossref_data['type']
+                
+                # Extract publisher
+                if 'publisher' in crossref_data and crossref_data['publisher']:
+                    publisher_name = crossref_data['publisher']
+                    if publisher_name and publisher_name.strip():
+                        result['publisher'] = publisher_name.strip()
+                        result['publisher_from'] = 'crossref'
+                
+                # Extract citation count
+                if 'is-referenced-by-count' in crossref_data:
+                    result['citations_count'] = max(result['citations_count'], crossref_data['is-referenced-by-count'])
         
         # ========== FALLBACK: arXiv ID AS REPOSITORY ==========
-        # If reference has arXiv ID but no repository flag set yet
         if identifiers.get('arxiv') and not result['is_repository']:
             result['is_repository'] = True
             result['is_preprint'] = True
@@ -3433,30 +3302,44 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
         # ========== SELF-CITATION DETECTION ==========
         if paper_authors and result['authors']:
             for author in result['authors']:
+                compare_name = author.get('compare_name', '')
                 for paper_author in paper_authors:
                     paper_norm, _ = normalize_author_name(paper_author)
-                    if author['compare_name'] == paper_norm:
+                    if compare_name == paper_norm:
                         result['is_self_citation'] = True
                         break
         
-        # Merge authors (deduplicate) - use the new merge function
+        # Merge authors (deduplicate within the same reference)
         if result['authors']:
-            # For a single reference, we don't need full merging, just deduplicate within this reference
-            temp_results_for_merge = [{'authors': result['authors'], 'doi': result.get('doi', '')}]
-            merged_for_ref = merge_authors_from_all_results(temp_results_for_merge)
-            result['authors'] = merged_for_ref
-            result['authors_display'] = [a['display_name'] for a in result['authors']]
+            # Use the new merge function for consistency
+            temp_list = [{'doi': result.get('doi', 'unknown'), 'authors': result['authors']}]
+            merged = merge_authors_with_all_affiliations(temp_list)
+            # Convert back to expected format
+            new_authors = []
+            for author in merged:
+                new_authors.append({
+                    'display_name': author['author'],
+                    'compare_name': author['compare_name'],
+                    'orcid': author.get('orcid', ''),
+                    'affiliations': author['affiliations'],
+                    'countries': author['countries'],
+                    'institutions': [aff['name'] for aff in author['affiliations']],
+                    'country': author['countries'][0] if author['countries'] else '',
+                    'institution': author['affiliations'][0]['name'] if author['affiliations'] else ''
+                })
+            result['authors'] = new_authors
+            result['authors_display'] = [a['display_name'] for a in new_authors]
         
         results.append(result)
         
-        # Update progress less frequently (only at batch level)
+        # Update progress less frequently
         if progress_callback and idx % 10 == 0:
             progress_callback(batch_num, idx, batch_size, total_batches)
     
     return results
 
-def analyze_all_references_optimized(references: List[str], batch_size: int = 50, paper_authors: Set[str] = None) -> List[Dict]:
-    """Analyze all references with optimized batching and COLORED progress updates"""
+def analyze_all_references_with_new_affiliations(references: List[str], batch_size: int = 50, paper_authors: Set[str] = None) -> List[Dict]:
+    """Analyze all references with optimized batching and NEW AFFILIATION LOGIC"""
     all_results = []
     total_batches = (len(references) + batch_size - 1) // batch_size
     
@@ -3490,14 +3373,6 @@ def analyze_all_references_optimized(references: List[str], batch_size: int = 50
     total_api_success = 0
     processed_refs = 0
     
-    def update_progress(batch_num, ref_idx, batch_len, total_batches):
-        """Update progress with dynamic coloring based on actual metrics"""
-        nonlocal total_dois_found, total_api_success, processed_refs
-        
-        # This is called from inside the batch, need to update counts carefully
-        # We'll use a simpler approach: update after each batch completion
-        pass
-    
     status_container = st.status(f"📊 Analyzing {len(references)} references...", expanded=True)
     
     for batch_num in range(total_batches):
@@ -3505,22 +3380,19 @@ def analyze_all_references_optimized(references: List[str], batch_size: int = 50
         end_idx = min(start_idx + batch_size, len(references))
         batch = references[start_idx:end_idx]
         
-        # Update status text
         status_container.update(
             label=f"📊 Analyzing batch {batch_num + 1} of {total_batches} (references {start_idx + 1}-{end_idx} of {len(references)})",
             state="running"
         )
         
-        # Process batch with optimized function
-        batch_results = analyze_reference_batch_optimized(
+        batch_results = analyze_reference_batch_with_new_affiliations(
             batch, 
-            progress_callback=None,  # Disable internal callback, we'll update manually
+            progress_callback=None,
             paper_authors=paper_authors,
             batch_num=batch_num,
             total_batches=total_batches
         )
         
-        # Update metrics after batch completion
         for result in batch_results:
             processed_refs += 1
             if result.get('doi'):
@@ -3530,22 +3402,18 @@ def analyze_all_references_optimized(references: List[str], batch_size: int = 50
         
         all_results.extend(batch_results)
         
-        # Calculate current progress and metrics
         progress_percent = (processed_refs / len(references)) * 100
         current_data_density = total_dois_found / processed_refs if processed_refs > 0 else 0
         api_success_rate = total_api_success / processed_refs if processed_refs > 0 else 0
         
-        # Get dynamic color based on actual metrics
         color, badge_text, badge_class = get_progress_color_by_metrics(
             total_dois_found, 
             processed_refs,
             total_api_success
         )
         
-        # Create animated shimmer effect based on progress speed
         shimmer_speed = "2s" if progress_percent < 50 else "1s"
         
-        # Update colored progress bar with metrics
         progress_html = f"""
         <style>
         @keyframes shimmer{{
@@ -3681,13 +3549,10 @@ def analyze_all_references_optimized(references: List[str], batch_size: int = 50
         """
         
         progress_placeholder.markdown(progress_html, unsafe_allow_html=True)
-        
-        # Also update the main Streamlit progress bar for compatibility
         st.progress(progress_percent / 100)
     
     status_container.update(label="✅ Analysis completed!", state="complete")
     
-    # Final progress bar with completion status
     final_color, final_badge, _ = get_progress_color_by_metrics(total_dois_found, len(references), total_api_success)
     final_html = f"""
     <div class="colored-progress-container">
@@ -3729,7 +3594,7 @@ def cache_issn_lookup(issn: str) -> Optional[Dict]:
         pass
     return None
 
-# ======================== IDENTIFIER EXTRACTION (NEW) ========================
+# ======================== IDENTIFIER EXTRACTION ========================
 def extract_identifiers(text: str) -> Dict[str, Optional[str]]:
     """Extract all types of identifiers from text (DOI, URL, arXiv, PMID, ISBN)"""
     text = text.replace('\n', ' ').replace('\r', ' ')
@@ -3757,14 +3622,10 @@ def extract_identifiers(text: str) -> Dict[str, Optional[str]]:
         if matches:
             for match in matches:
                 doi_raw = match.strip()
-                # Remove trailing punctuation that might be part of sentence
                 doi_raw = re.sub(r'[.,;:!?)]+$', '', doi_raw)
-                # Ensure closing parenthesis is preserved if it's part of DOI
                 if '(' in doi_raw and doi_raw.count('(') > doi_raw.count(')'):
-                    # Try to find matching closing parenthesis
                     open_count = doi_raw.count('(')
                     close_needed = open_count - doi_raw.count(')')
-                    # Look ahead for more closing parentheses
                     remaining_text = text[text.find(doi_raw) + len(doi_raw):]
                     for _ in range(close_needed):
                         match_close = re.search(r'\)', remaining_text)
@@ -3774,25 +3635,19 @@ def extract_identifiers(text: str) -> Dict[str, Optional[str]]:
                         else:
                             break
                 
-                # Validate DOI format (must have prefix and suffix)
                 if re.match(r'10\.\d{4,9}/.+', doi_raw):
-                    # Additional validation: DOI should not end with invalid characters
                     if not re.search(r'[.,;:!?]$', doi_raw):
                         result['doi'] = doi_raw
                         break
             if result['doi']:
                 break
     
-    # If DOI still not found with complex pattern, try simpler but more robust pattern
     if not result['doi']:
         simple_pattern = r'(10\.\d{4,9}/[^\s]+)'
         matches = re.findall(simple_pattern, text)
         for match in matches:
-            # Clean up the match
             doi_clean = re.sub(r'[.,;:!?)]+$', '', match)
-            # Ensure parentheses are properly matched
             if '(' in doi_clean and ')' not in doi_clean:
-                # Try to find closing parenthesis
                 remaining = text[text.find(doi_clean) + len(doi_clean):]
                 close_match = re.search(r'\)', remaining)
                 if close_match:
@@ -3805,7 +3660,6 @@ def extract_identifiers(text: str) -> Dict[str, Optional[str]]:
     url_pattern = r'https?://[^\s<>"\'()\[\]]+'
     url_matches = re.findall(url_pattern, text)
     if url_matches:
-        # Filter out DOI URLs (already captured)
         for url in url_matches:
             if 'doi.org' not in url and 'dx.doi.org' not in url:
                 result['url'] = url
@@ -3855,10 +3709,8 @@ def extract_doi_from_text(text: str) -> Optional[str]:
 
 def parse_paper_authors(authors_text: str) -> Set[str]:
     """Parse paper authors from text input into normalized format"""
-    # Split by common separators: newline, comma, tab
     authors = set()
     
-    # Replace common separators with newline for uniform processing
     text = authors_text.replace('\t', '\n').replace(',', '\n')
     lines = text.split('\n')
     
@@ -3867,10 +3719,6 @@ def parse_paper_authors(authors_text: str) -> Set[str]:
         if not line:
             continue
         
-        # Try to parse as "FirstInitial LastName" or "FirstInitial LastName, MI"
-        # Format: "N. Fukatsu", "N Fukatsu", "Z. Wei", "Danil E. Matkin" etc.
-        
-        # Pattern 1: "I. Lastname" or "I Lastname"
         match = re.match(r'^([A-Z]\.?)\s+([A-Za-z\-]+)', line)
         if match:
             initial = match.group(1).rstrip('.')
@@ -3878,7 +3726,6 @@ def parse_paper_authors(authors_text: str) -> Set[str]:
             authors.add(f"{initial}. {lastname}")
             continue
         
-        # Pattern 2: "Firstname Lastname" (full first name) - convert to initial format
         match = re.match(r'^([A-Z][a-z]+)\s+([A-Za-z\-]+)', line)
         if match:
             firstname = match.group(1)
@@ -3887,7 +3734,6 @@ def parse_paper_authors(authors_text: str) -> Set[str]:
             authors.add(f"{initial}. {lastname}")
             continue
         
-        # Pattern 3: "Lastname, I." or "Lastname, I"
         match = re.match(r'^([A-Za-z\-]+),\s*([A-Z]\.?)', line)
         if match:
             lastname = match.group(1)
@@ -3895,7 +3741,6 @@ def parse_paper_authors(authors_text: str) -> Set[str]:
             authors.add(f"{initial}. {lastname}")
             continue
         
-        # Pattern 4: "Lastname I." or "Lastname I"
         match = re.match(r'^([A-Za-z\-]+)\s+([A-Z]\.?)', line)
         if match:
             lastname = match.group(1)
@@ -3903,14 +3748,13 @@ def parse_paper_authors(authors_text: str) -> Set[str]:
             authors.add(f"{initial}. {lastname}")
             continue
         
-        # If no pattern matches, show warning but don't add
         st.warning(get_text('authors_warning_text').format(line))
     
     return authors
 
-# ======================== ENHANCED STATISTICS ========================
+# ======================== ENHANCED STATISTICS (UPDATED) ========================
 def generate_advanced_statistics(results: List[Dict]) -> Dict:
-    """Generate enhanced statistics with new metrics - WITH PERCENTAGES FOR ALL METRICS"""
+    """Generate enhanced statistics with new metrics - USING NEW AFFILIATION LOGIC"""
     
     total_references = len(results)
     
@@ -3925,7 +3769,6 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
     openalex_only_refs = []
     suspicious_doi_refs = []
     
-    # NEW: Collections for new types
     repository_refs = []
     ebook_refs = []
     proceedings_refs = []
@@ -3935,15 +3778,16 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
     
     publisher_sources = {'crossref': 0, 'openalex': 0, 'both': 0}
     
+    # Collect all paper author affiliations for reviewer filtering
+    paper_author_affiliations = set()
+    
     for result in results:
-        # ========== REPOSITORY / PREPRINT REFERENCES ==========
         if result.get('is_repository', False):
             repository_refs.append({
                 'text': result['original_text'],
                 'doi': result.get('doi', ''),
                 'note': get_text('repository')
             })
-            # Add to combined list for Non-journal Sources with DOI
             if result.get('doi'):
                 non_journal_sources_with_doi.append({
                     'text': result['original_text'],
@@ -3952,14 +3796,12 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
                     'note': get_text('repository')
                 })
         
-        # ========== EBOOK PLATFORM REFERENCES ==========
         if result.get('is_ebook', False):
             ebook_refs.append({
                 'text': result['original_text'],
                 'doi': result.get('doi', ''),
                 'note': get_text('ebook')
             })
-            # Add to combined list for Non-journal Sources with DOI
             if result.get('doi'):
                 non_journal_sources_with_doi.append({
                     'text': result['original_text'],
@@ -3968,14 +3810,12 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
                     'note': get_text('ebook')
                 })
         
-        # ========== PROCEEDINGS REFERENCES ==========
         if result.get('is_proceedings', False):
             proceedings_refs.append({
                 'text': result['original_text'],
                 'doi': result.get('doi', ''),
                 'note': get_text('proceedings')
             })
-            # Add to combined list for Non-journal Sources with DOI
             if result.get('doi'):
                 non_journal_sources_with_doi.append({
                     'text': result['original_text'],
@@ -3984,7 +3824,6 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
                     'note': get_text('proceedings')
                 })
         
-        # ========== RETRACTED REFERENCES ==========
         if result.get('is_retracted', False):
             retracted_refs.append({
                 'text': result['original_text'],
@@ -3992,11 +3831,14 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
                 'note': get_text('retracted')
             })
         
-        # ========== BOOKS WITH ISBN BUT NO DOI ==========
         if result.get('identifiers', {}).get('isbn') and not result.get('doi'):
             books_with_isbn_no_doi.append(result['original_text'])
         
-        # DOI Status analysis
+        # Collect paper author affiliations from the target paper
+        # This will be used for reviewer filtering later
+        # We need to get affiliations of authors from the target paper (paper_authors)
+        # This will be done separately using the paper_authors_set
+        
         if result['doi']:
             if result['crossref_status'] and result['openalex_status']:
                 doi_status['both'] += 1
@@ -4022,11 +3864,9 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         else:
             doi_status['none'] += 1
         
-        # Journal collection
         if result.get('journal'):
             journal_counter[result['journal']] += 1
         
-        # Publisher collection
         publisher = None
         publisher_source = None
         
@@ -4040,90 +3880,16 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
                 publisher_sources['openalex'] += 1
                 publisher_sources['both'] += 1 if result.get('crossref_status') else 0
         
-        # Fallback for publisher extraction (same as before)
-        if not publisher and result.get('openalex_data'):
-            openalex_data = result['openalex_data']
-            
-            if openalex_data.get('host_venue'):
-                host_venue = openalex_data['host_venue']
-                if isinstance(host_venue, dict):
-                    if host_venue.get('publisher'):
-                        publisher = host_venue['publisher'].strip()
-                        publisher_source = 'openalex_host_venue'
-                    elif host_venue.get('publisher_name'):
-                        publisher = host_venue['publisher_name'].strip()
-                        publisher_source = 'openalex_host_venue'
-            
-            if not publisher and openalex_data.get('primary_location'):
-                primary = openalex_data['primary_location']
-                if isinstance(primary, dict) and primary.get('source'):
-                    source = primary['source']
-                    if isinstance(source, dict):
-                        if source.get('publisher'):
-                            publisher = source['publisher'].strip()
-                            publisher_source = 'openalex_primary_location'
-                        elif source.get('publisher_name'):
-                            publisher = source['publisher_name'].strip()
-                            publisher_source = 'openalex_primary_location'
-            
-            if not publisher and openalex_data.get('locations'):
-                for loc in openalex_data['locations']:
-                    if isinstance(loc, dict) and loc.get('source'):
-                        source = loc['source']
-                        if isinstance(source, dict):
-                            if source.get('publisher'):
-                                publisher = source['publisher'].strip()
-                                publisher_source = 'openalex_locations'
-                                break
-                            elif source.get('publisher_name'):
-                                publisher = source['publisher_name'].strip()
-                                publisher_source = 'openalex_locations'
-                                break
-            
-            if not publisher and openalex_data.get('host_organization'):
-                host_org = openalex_data['host_organization']
-                if isinstance(host_org, dict):
-                    if host_org.get('display_name'):
-                        publisher = host_org['display_name'].strip()
-                        publisher_source = 'openalex_host_organization'
-                    elif host_org.get('name'):
-                        publisher = host_org['name'].strip()
-                        publisher_source = 'openalex_host_organization'
-                elif isinstance(host_org, str):
-                    publisher = host_org.strip()
-                    publisher_source = 'openalex_host_organization'
-            
-            if not publisher and openalex_data.get('host_organization_name'):
-                publisher = openalex_data['host_organization_name'].strip()
-                publisher_source = 'openalex_host_organization_name'
-            
-            if publisher:
-                result['publisher'] = publisher
-                result['publisher_from'] = publisher_source
-                publisher_sources['openalex'] += 1
-        
-        if not publisher and result.get('crossref_data'):
-            crossref_data = result['crossref_data']
-            if 'publisher' in crossref_data and crossref_data['publisher']:
-                publisher = crossref_data['publisher'].strip()
-                publisher_source = 'crossref'
-                result['publisher'] = publisher
-                result['publisher_from'] = publisher_source
-                publisher_sources['crossref'] += 1
-        
         if publisher:
             publisher_counter[publisher] += 1
         
-        # Publication type
         if result.get('type'):
             type_name = result['type'].replace('journal-', '').replace('-', ' ')
             type_counter[type_name] += 1
         
-        # Year
         if result.get('year') and isinstance(result['year'], (int, float)) and 1900 < result['year'] <= datetime.now().year:
             year_counter[int(result['year'])] += 1
         
-        # Problematic references detection
         has_problem = False
         problems = []
         if result.get('is_retracted'):
@@ -4141,27 +3907,17 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         if has_problem:
             problematic_refs.append({'text': result['original_text'], 'problems': ', '.join(problems)})
     
-    # Enhanced author analysis (uses new merge function)
     author_data = analyze_author_frequency_all(results)
     sorted_authors = author_data['all_authors']
     
-    # Format top authors for display (with ALL affiliations)
     top_authors_formatted = []
     for author in sorted_authors[:20]:
         orcid_str = f" 🔗 ORCID: {author['orcid']}" if author.get('orcid') else ""
-        inst_str = f" 🏛 {author['primary_institution'][:50]}" if author.get('primary_institution') else ""
-        country_str = f" 🌍 {author['primary_country']}" if author.get('primary_country') else ""
-        
-        # Show all affiliations if available
-        all_aff_str = ""
-        if author.get('affiliations') and len(author['affiliations']) > 1:
-            aff_list = [aff['name'][:40] for aff in author['affiliations'][:3]]
-            all_aff_str = f"\n   📍 All affiliations: {', '.join(aff_list)}"
-        
+        inst_str = f" 🏛 {author['institution'][:30]}" if author.get('institution') else ""
+        country_str = f" 🌍 {author['country']}" if author.get('country') else ""
         display = author['display_name']
-        top_authors_formatted.append(f"{display}{orcid_str}{inst_str}{country_str}{all_aff_str} — {author['count']} {get_text('html_citations_label')}")
+        top_authors_formatted.append(f"{display}{orcid_str}{inst_str}{country_str} — {author['count']} {get_text('html_citations_label')}")
     
-    # Citation stacking analysis
     total_refs_with_journal = sum(journal_counter.values())
     citation_stacking = []
     if total_refs_with_journal > 0:
@@ -4173,15 +3929,12 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
                     'percentage': f"{count/total_refs_with_journal:.1%}"
                 })
     
-    # Frequently cited authors
     frequently_cited = [a for a in sorted_authors if a['count'] >= 5]
     
-    # Basic metrics
     unique_doi_count = len([r for r in results if r['doi']])
     current_year = datetime.now().year
     years_last_5 = sum(count for year, count in year_counter.items() if year >= current_year - 5)
     
-    # New metrics
     concepts_data = extract_concepts_from_references(results)
     geo_data = analyze_geographic_distribution(results)
     collab_data = analyze_collaboration_network(results)
@@ -4198,20 +3951,8 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
     shannon_publishers = calculate_shannon_diversity(results, 'publishers')
     citation_classics = identify_citation_classics(results)
     
-    # Collect self-citations
     self_citation_refs = [r for r in results if r.get('is_self_citation', False)]
     
-    # Collect paper affiliations for reviewer filtering
-    paper_affiliations = set()
-    if results:
-        for result in results:
-            if result.get('is_self_citation', False):
-                for author in result.get('authors', []):
-                    for aff in author.get('affiliations', []):
-                        if aff.get('name'):
-                            paper_affiliations.add(aff['name'])
-    
-    # Calculate percentages
     def calc_percent(count):
         return (count / total_references * 100) if total_references > 0 else 0
     
@@ -4242,16 +3983,12 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         'self_citations_count': len([r for r in results if r.get('is_self_citation', False)]),
         'self_citations_percent': calc_percent(len([r for r in results if r.get('is_self_citation', False)])),
         'self_citation_refs': self_citation_refs,
-        
-        # Collections for new types
         'repository_refs': repository_refs[:20],
         'ebook_refs': ebook_refs[:20],
         'proceedings_refs': proceedings_refs[:20],
         'retracted_refs': retracted_refs[:20],
         'books_with_isbn_no_doi': books_with_isbn_no_doi[:20],
         'non_journal_sources_with_doi': non_journal_sources_with_doi[:50],
-        
-        # Enhanced data
         'concepts': concepts_data,
         'geography': geo_data,
         'collaboration': collab_data,
@@ -4266,7 +4003,6 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
             'has_isbn': calc_percent(identifier_data['stats']['has_isbn']),
             'has_none': calc_percent(identifier_data['stats']['has_none']),
             'multiple': calc_percent(identifier_data['stats']['multiple']),
-            # New percentages
             'preprint_repository': calc_percent(identifier_data['stats']['is_preprint_repository']),
             'ebook_platform': calc_percent(identifier_data['stats']['is_ebook_platform']),
             'proceedings': calc_percent(identifier_data['stats']['is_proceedings']),
@@ -4286,16 +4022,14 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         'citation_classics': citation_classics,
         'total_citations_sum': sum(r.get('citations_count', 0) for r in results),
         'avg_citations': sum(r.get('citations_count', 0) for r in results) / total_references if total_references else 0,
-        'publisher_sources': publisher_sources,
-        'paper_affiliations': list(paper_affiliations)
+        'publisher_sources': publisher_sources
     }
 
 def display_top_authors(stats: Dict):
-    """Отображает топ авторов с их аффилиациями (как в вашей таблице)."""
+    """Display top authors with proper ORCID and ALL affiliation information"""
     st.markdown(f"### {get_text('top_authors')}")
     
     for i, author in enumerate(stats['author_frequency_all']['all_authors'][:30], 1):
-        # ORCID ссылка
         orcid_html = ""
         if author.get('orcid'):
             orcid_url = author['orcid']
@@ -4303,30 +4037,42 @@ def display_top_authors(stats: Dict):
                 orcid_url = f"https://orcid.org/{orcid_url}"
             orcid_html = f' 🔗 <a href="{orcid_url}" target="_blank" style="color: #667eea; text-decoration: none;">ORCID</a>'
         
-        # Аффилиации (как в вашем коде - список)
+        inst_text = f" 🏛 {author['institution'][:50]}" if author.get('institution') else ""
+        country_text = f" 🌍 {author['country']}" if author.get('country') else ""
+        
+        # Show ALL affiliations
         affiliations_text = ""
         if author.get('affiliations'):
-            affiliations_list = author['affiliations']
-            if len(affiliations_list) > 1:
-                affiliations_text = "<div style='margin-top: 5px;'><strong>🏛️ Аффилиации:</strong><br>"
-                for aff in affiliations_list:
-                    country_str = f"({aff['country']})" if aff.get('country') else ""
-                    affiliations_text += f"  • {aff['name']} {country_str}<br>"
-                affiliations_text += "</div>"
-            else:
-                aff = affiliations_list[0]
-                country_str = f"({aff['country']})" if aff.get('country') else ""
-                affiliations_text = f"<div style='margin-top: 5px;'><strong>🏛️ Аффилиация:</strong> {aff['name']} {country_str}</div>"
+            aff_list = author['affiliations'][:5]  # Show up to 5 affiliations
+            affiliations_html = []
+            for aff in aff_list:
+                if isinstance(aff, dict):
+                    aff_name = aff.get('name', '')
+                    aff_country = aff.get('country', '')
+                    if aff_country and aff_country not in ['N/A', 'Не указана', 'Не определена']:
+                        affiliations_html.append(f'{html.escape(aff_name)} ({aff_country})')
+                    else:
+                        affiliations_html.append(html.escape(aff_name))
+                else:
+                    affiliations_html.append(html.escape(aff))
+            
+            if affiliations_html:
+                affiliations_text = f"""
+                <div style='font-size: 11px; color: #666; margin-top: 5px;'>
+                    <strong>{get_text('all_affiliations')}:</strong><br>
+                    {'<br>'.join(affiliations_html)}
+                </div>
+                """
         
-        # Страны
+        # Show ALL countries
         countries_text = ""
-        if author.get('countries') and len(author['countries']) > 0:
-            countries_text = f"<div style='margin-top: 3px; font-size: 11px; color: #666;'><strong>🌍 Страны:</strong> {', '.join(author['countries'][:5])}</div>"
+        if author.get('countries') and len(author.get('countries', [])) > 1:
+            countries_text = f"<div style='font-size: 11px; color: #666; margin-top: 3px;'><strong>{get_text('all_countries')}:</strong> {', '.join(author['countries'])}</div>"
         
         st.markdown(f"""
         <div class="rank-item">
             <span class="rank-number">{i}.</span>
-            <span class="rank-name">{author['display_name']}{orcid_html}</span>
+            <span class="rank-name">{author['display_name']}{orcid_html}{inst_text}{country_text}</span>
             <span class="rank-count">{author['count']} {get_text('html_citations_label')}</span>
             <div class="progress-bar-custom">
                 <div class="progress-fill" style="width: {author['count'] / stats['author_frequency_all']['all_authors'][0]['count'] * 100 if stats['author_frequency_all']['all_authors'] else 0}%;"></div>
@@ -4341,7 +4087,6 @@ def display_geography_section(stats: Dict):
     
     st.markdown(f"### {get_text('geographic_distribution')}")
     
-    # Type 1: Unique countries per reference
     st.markdown(f"#### {get_text('geography_type_1')}")
     st.caption(get_text('geography_type_1_desc'))
     
@@ -4352,7 +4097,6 @@ def display_geography_section(stats: Dict):
         )
         st.dataframe(type1_df, use_container_width=True)
     
-    # Type 2: Authors per country
     st.markdown(f"#### {get_text('geography_type_2')}")
     st.caption(get_text('geography_type_2_desc'))
     
@@ -4363,7 +4107,6 @@ def display_geography_section(stats: Dict):
         )
         st.dataframe(type2_df, use_container_width=True)
     
-    # Type 3: Collaboration patterns
     st.markdown(f"#### {get_text('geography_type_3')}")
     st.caption(get_text('geography_type_3_desc'))
     
@@ -4378,7 +4121,6 @@ def display_geography_section(stats: Dict):
             stats['geography'].get('total_references_with_country', 0)
         )
     
-    # Collaboration matrix
     if stats['geography'].get('collaboration_matrix'):
         st.markdown(f"#### {get_text('collaboration_matrix')}")
         collab_df = pd.DataFrame(stats['geography']['collaboration_matrix'][:15])
@@ -4392,10 +4134,8 @@ def format_authors_with_highlight(authors_list: List[str], highlight_authors_nor
     
     formatted_authors = []
     for author in authors_list:
-        # Normalize the author name for comparison
         norm_author, _ = normalize_func(author)
         
-        # Check if normalized author is in the pre-normalized highlight set
         if norm_author in highlight_authors_norm_set:
             escaped_author = html.escape(author)
             formatted_authors.append(f'<span class="self-citation-author">{escaped_author}</span>')
@@ -4407,20 +4147,12 @@ def format_authors_with_highlight(authors_list: List[str], highlight_authors_nor
 def get_color_for_author(index: int) -> str:
     """Get a color for highlighting author based on index"""
     colors = [
-        "#d9534f",  # red
-        "#5bc0de",  # blue
-        "#5cb85c",  # green
-        "#f0ad4e",  # orange
-        "#9b59b6",  # purple
-        "#e67e22",  # orange-dark
-        "#1abc9c",  # teal
-        "#e74c3c",  # red-dark
-        "#3498db",  # blue-dark
-        "#2ecc71"   # green-dark
+        "#d9534f", "#5bc0de", "#5cb85c", "#f0ad4e", "#9b59b6",
+        "#e67e22", "#1abc9c", "#e74c3c", "#3498db", "#2ecc71"
     ]
     return colors[index % len(colors)]
 
-# ======================== HTML REPORT (ENGLISH, UPDATED WITH NEW TYPES AND REVIEWERS) ========================
+# ======================== HTML REPORT GENERATION (UPDATED WITH REVIEWERS AND AFFILIATIONS) ========================
 def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_authors: Set[str] = None, lang: str = 'en', journal_name: str = '', article_number: str = '', duplicates: List[Dict] = None, primary_color: str = '#667eea', secondary_color: str = '#f39c12', show_reviewers: bool = False, reviewers: List[Dict] = None) -> str:
     """Generate enhanced HTML report with PNG icons (no emojis) and professional design"""
     
@@ -4434,9 +4166,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     import base64
     import os
     
-    # Local function for getting localized text
     def get_text_local(key: str) -> str:
-        """Get localized text by key for HTML report"""
         if lang == 'ru' and key in TEXTS['ru']:
             return TEXTS['ru'][key]
         elif key in TEXTS['en']:
@@ -4444,7 +4174,6 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         else:
             return key
     
-    # Load logo
     logo_base64 = ""
     try:
         with open("logo.png", "rb") as img_file:
@@ -4452,32 +4181,19 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     except FileNotFoundError:
         pass
     
-    # Load all icons as base64
     icons = {}
-    
     icon_files = [
-        ("overview", "icon_overview.png"),
-        ("identifier", "icon_identifier.png"),
-        ("authors", "icon_authors.png"),
-        ("journals", "icon_journals.png"),
-        ("publishers", "icon_publishers.png"),
-        ("yearly", "icon_yearly.png"),
-        ("concepts", "icon_concepts.png"),
-        ("geography", "icon_geography.png"),
-        ("collaborations", "icon_collaborations.png"),
-        ("diversity", "icon_diversity.png"),
-        ("classics", "icon_classics.png"),
-        ("selfcitation", "icon_selfcitation.png"),
-        ("crossref", "icon_crossref.png"),
-        ("openalex", "icon_openalex.png"),
-        ("suspicious", "icon_suspicious.png"),
-        ("nondoi", "icon_nondoi.png"),
-        ("duplicates", "duplicates.png"),
-        ("nonjournal", "icon_nonjournal.png"),
-        ("url", "icon_url.png"),
-        ("problems", "icon_problems.png"),
-        ("list", "icon_list.png"),
-        ("reviewers", "icon_reviewers.png"),
+        ("overview", "icon_overview.png"), ("identifier", "icon_identifier.png"),
+        ("authors", "icon_authors.png"), ("journals", "icon_journals.png"),
+        ("publishers", "icon_publishers.png"), ("yearly", "icon_yearly.png"),
+        ("concepts", "icon_concepts.png"), ("geography", "icon_geography.png"),
+        ("collaborations", "icon_collaborations.png"), ("diversity", "icon_diversity.png"),
+        ("classics", "icon_classics.png"), ("selfcitation", "icon_selfcitation.png"),
+        ("crossref", "icon_crossref.png"), ("openalex", "icon_openalex.png"),
+        ("suspicious", "icon_suspicious.png"), ("nondoi", "icon_nondoi.png"),
+        ("duplicates", "duplicates.png"), ("nonjournal", "icon_nonjournal.png"),
+        ("url", "icon_url.png"), ("problems", "icon_problems.png"), ("list", "icon_list.png"),
+        ("reviewers", "icon_reviewers.png")
     ]
     
     for key, filename in icon_files:
@@ -4487,7 +4203,6 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         except FileNotFoundError:
             icons[key] = ""
     
-    # Helper function to create section title with icon
     def make_section_title(icon_key, title_key):
         icon_src = icons.get(icon_key, "")
         title_text = get_text_local(title_key)
@@ -4496,7 +4211,6 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         else:
             return f'<div class="section-title">{title_text}</div>'
     
-    # Set default journal name if not provided
     if not journal_name or journal_name.strip() == '':
         journal_name_display = get_text_local('journal_name_label') + ": Chimica Techno Acta"
     else:
@@ -4506,19 +4220,8 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     if article_number and article_number.strip():
         article_number_display = f'<div><strong>{get_text_local("article_number_label")}:</strong> {html.escape(article_number)}</div>'
     
-    # Determine if we need to show self-citations section
     show_self_citations_section = paper_authors and len(paper_authors) > 0
     
-    # Confidential banner if reviewers section is enabled
-    confidential_banner = ""
-    if show_reviewers:
-        if lang == 'ru':
-            banner_text = get_text_local('confidential_banner_ru')
-        else:
-            banner_text = get_text_local('confidential_banner_en')
-        confidential_banner = f'<div class="confidential-banner">🔒 {banner_text}</div>'
-    
-    # Helper functions for clickable links
     def make_clickable_doi(doi):
         if doi:
             not_found_text = get_text_local('not_found')
@@ -4530,7 +4233,6 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             return f'<a href="{orcid}" target="_blank" class="clickable-link">{html.escape(orcid)}</a>'
         return ''
     
-    # Prepare self-citation authors highlighting with colors
     paper_authors_set = set()
     paper_authors_colors = {}
     normalized_paper_authors_map = {}
@@ -4542,7 +4244,6 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             norm, display = normalize_author_name(author)
             normalized_paper_authors_map[norm] = {'display': display, 'color': get_color_for_author(idx)}
     
-    # Generate authors display for self-citation section header
     authors_header_html = ""
     if show_self_citations_section and paper_authors_set:
         authors_header_parts = []
@@ -4566,7 +4267,6 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
                 formatted_authors.append(html.escape(author))
         return ', '.join(formatted_authors)
     
-    # Generate self-citations section
     self_citations_html = ""
     if show_self_citations_section:
         if stats.get('self_citation_refs'):
@@ -4578,7 +4278,6 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
                 journal_info = f'<div style="font-size: 13px; margin-top: 5px;"><strong>{get_text_local("journal")}:</strong> {html.escape(ref.get("journal", get_text_local("not_found")))}</div>' if ref.get('journal') else ''
                 year_info = f'<div style="font-size: 13px; margin-top: 5px;"><strong>{get_text_local("year")}:</strong> {ref.get("year", get_text_local("not_found"))}</div>' if ref.get('year') else ''
                 
-                # Determine special class for reference type
                 special_class = ""
                 if ref.get('is_retracted', False):
                     special_class = "retracted-reference"
@@ -4602,7 +4301,105 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         else:
             self_citations_html = f'<p>{get_text_local("none_detected")}</p>'
     
-    # Generate duplicates section
+    # Potential Reviewers section HTML
+    reviewers_html = ""
+    if show_reviewers and reviewers:
+        reviewers_html = f"""
+        <div id="reviewers" class="section">
+            {make_section_title("reviewers", "potential_reviewers")}
+        """
+        for i, reviewer in enumerate(reviewers[:30], 1):
+            orcid_profile = reviewer.get('orcid_profile', {})
+            orcid_id = reviewer.get('orcid', '')
+            
+            given_names = orcid_profile.get('given_names', '')
+            family_name = orcid_profile.get('family_name', '')
+            credit_name = orcid_profile.get('credit_name', '')
+            
+            if given_names and family_name:
+                full_name = f"{given_names} {family_name}"
+            elif credit_name:
+                full_name = credit_name
+            else:
+                full_name = reviewer.get('name', 'Unknown')
+            
+            orcid_link = ""
+            if orcid_id:
+                orcid_url = format_orcid_id(orcid_id) if not orcid_id.startswith('http') else orcid_id
+                orcid_link = f'<div class="reviewer-orcid"><strong>ORCID:</strong> <a href="{orcid_url}" target="_blank" style="color: {primary_color};">{orcid_id}</a></div>'
+            
+            country = orcid_profile.get('country', '')
+            if not country and reviewer.get('countries'):
+                country = ', '.join(reviewer['countries'][:3])
+            
+            country_html = f'<div><strong>{get_text_local("orcid_country")}:</strong> {country}</div>' if country else ''
+            
+            affiliations = reviewer.get('affiliations', [])
+            affiliations_html = ""
+            if affiliations:
+                aff_list = []
+                for aff in affiliations[:3]:
+                    if isinstance(aff, dict):
+                        aff_list.append(aff.get('name', ''))
+                    else:
+                        aff_list.append(aff)
+                affiliations_html = f'<div><strong>{get_text_local("reviewer_affiliations")}:</strong><br>{"<br>".join([html.escape(a) for a in aff_list])}</div>'
+            
+            external_ids = orcid_profile.get('external_ids', {})
+            external_ids_html = ""
+            if external_ids:
+                friendly_names = {
+                    'scopus-author-id': 'Scopus Author ID',
+                    'researcher-id': 'ResearcherID (WoS)',
+                    'wos-researcherid': 'Web of Science ResearcherID',
+                    'publons': 'Publons',
+                    'linkedin': 'LinkedIn',
+                    'researchgate': 'ResearchGate',
+                    'google-scholar': 'Google Scholar',
+                }
+                id_links = []
+                for id_type, id_info in external_ids.items():
+                    display_name = friendly_names.get(id_type, id_type.replace('-', ' ').title())
+                    id_url = id_info.get('url', '')
+                    if id_url:
+                        id_links.append(f'<a href="{id_url}" target="_blank" class="external-id-link">{display_name}</a>')
+                if id_links:
+                    external_ids_html = f'<div class="reviewer-section-title">{get_text_local("orcid_other_ids")}:</div><div>{" ".join(id_links)}</div>'
+            
+            researcher_urls = orcid_profile.get('researcher_urls', [])
+            websites_html = ""
+            if researcher_urls:
+                url_links = []
+                for url_info in researcher_urls[:5]:
+                    url_name = url_info.get('name', 'Website')
+                    url_value = url_info.get('url', '')
+                    if url_value:
+                        url_links.append(f'<a href="{url_value}" target="_blank" class="external-id-link">{url_name}</a>')
+                if url_links:
+                    websites_html = f'<div class="reviewer-section-title">{get_text_local("orcid_websites")}:</div><div>{" ".join(url_links)}</div>'
+            
+            pub_html = f'<div style="margin-top: 12px; font-size: 12px; color: #666;"><strong>{get_text_local("reviewer_from_reference")}:</strong> {reviewer.get("doi", "N/A")}<br><strong>{get_text_local("year")}:</strong> {reviewer.get("publication_year", "Unknown")}</div>'
+            
+            keywords = orcid_profile.get('keywords', [])
+            keywords_html = ""
+            if keywords:
+                keywords_str = ', '.join(keywords[:5])
+                keywords_html = f'<div><strong>Research interests:</strong> {keywords_str}</div>'
+            
+            reviewers_html += f"""
+            <div class="reviewer-card">
+                <div class="reviewer-name">{i}. {full_name}</div>
+                {orcid_link}
+                {country_html}
+                {affiliations_html}
+                {keywords_html}
+                {external_ids_html}
+                {websites_html}
+                {pub_html}
+            </div>
+            """
+        reviewers_html += "</div>"
+    
     duplicates_html = ""
     if duplicates and len(duplicates) > 0:
         duplicates_html = f"""
@@ -4623,7 +4420,6 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             """
         duplicates_html += "</div>"
     
-    # Generate Non-journal Sources with DOI section
     non_journal_sources_html = ""
     if stats.get('non_journal_sources_with_doi'):
         non_journal_sources_html = f"""
@@ -4656,12 +4452,6 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             """
         non_journal_sources_html += "</div>"
     
-    # Generate Potential Reviewers section
-    reviewers_html = ""
-    if show_reviewers and reviewers:
-        reviewers_html = generate_reviewers_html(reviewers, lang)
-    
-    # Generate full reference list with color coding for different types
     full_references_html = ""
     duplicate_indices = set()
     if duplicates:
@@ -4676,7 +4466,6 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         doi_info = f'<div style="font-size: 13px; margin-top: 5px;"><strong>{get_text_local("doi_found")}:</strong> {make_clickable_doi(result.get("doi"))}</div>' if result.get('doi') else ''
         status_icon = "⚠" if result.get('is_suspicious_doi') else ("✓" if result.get('doi') else "✗")
         
-        # Determine color class based on priority (from highest to lowest priority)
         color_class = ""
         if result.get('is_retracted', False):
             color_class = "retracted-reference"
@@ -4694,14 +4483,9 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             color_class = "preprint-reference"
         elif not result.get('doi') and not result.get('crossref_status') and not result.get('openalex_status'):
             color_class = "notfound-reference"
-        elif result.get('doi') and result.get('crossref_status') and result.get('openalex_status'):
-            color_class = "normal-article"
-        elif result.get('doi'):
-            color_class = "normal-article"
         else:
-            color_class = "notfound-reference"
+            color_class = "normal-article"
         
-        # Badge for special types
         special_badge = ""
         if result.get('is_retracted', False):
             special_badge = f'<span class="badge-danger" style="margin-left: 10px;">{get_text_local("retracted")}</span>'
@@ -4727,7 +4511,6 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         </div>
         """
     
-    # Build sidebar navigation with PNG icons (updated with reviewers section)
     sidebar_items = [
         ("overview", "html_overview", icons["overview"]),
         ("identifiers", "html_identifier_coverage", icons["identifier"]),
@@ -4745,11 +4528,11 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     if show_self_citations_section:
         sidebar_items.append(("selfcitations", "html_self_citations", icons["selfcitation"]))
     
+    if show_reviewers and reviewers:
+        sidebar_items.append(("reviewers", "potential_reviewers", icons.get("reviewers", "")))
+    
     if duplicates and len(duplicates) > 0:
         sidebar_items.append(("duplicates", "duplicate_references_title", icons.get("duplicates", icons["list"])))
-    
-    if show_reviewers and reviewers:
-        sidebar_items.append(("potential_reviewers", "potential_reviewers", icons.get("reviewers", icons["list"])))
     
     sidebar_items.extend([
         ("crossref_only", "html_crossref_only", icons["crossref"]),
@@ -4781,7 +4564,6 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             '''
     sidebar_html += '</div>\n'
     
-    # Format metrics for overview section
     total_references = stats['total_references']
     total_with_doi = stats['total_with_doi']
     total_with_doi_percent = stats.get('total_with_doi_percent', 0)
@@ -4792,11 +4574,9 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     total_citations_sum = stats.get('total_citations_sum', 0)
     avg_citations = stats.get('avg_citations', 0)
     
-    # Get identifier coverage stats
     identifier_stats = stats['identifier_coverage']['stats']
     identifier_percents = stats['identifier_coverage_percents']
     
-    # Format citation classics
     citation_classics_html = ""
     if stats['citation_classics']:
         for i, classic in enumerate(stats['citation_classics']):
@@ -4812,10 +4592,13 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     else:
         citation_classics_html = f'<p>{get_text_local("no_citation_classics")}</p>'
     
-    # Get current date only (without time)
     current_date = datetime.now().strftime('%d.%m.%Y')
-
-    # Build HTML content
+    
+    confidential_banner_html = ""
+    if show_reviewers:
+        banner_text = get_text_local('reviewer_confidential_banner')
+        confidential_banner_html = f'<div class="confidential-banner">⚠️ {banner_text}</div>'
+    
     html_content = f"""<!DOCTYPE html>
 <html lang="{lang}">
 <head>
@@ -5030,115 +4813,15 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         .badge-book {{ background: #bbecde; color: #0e6b5e; }}
         .badge-proceedings {{ background: #fff2c9; color: #b26b00; }}
         
-        /* Color coding for different reference types in full list */
-        .normal-article {{
-            background: #e8f5e9 !important;
-            border-left: 3px solid #4caf50 !important;
-        }}
-        .notfound-reference {{
-            background: #e9ecef !important;
-            border-left: 3px solid #6c757d !important;
-        }}
-        .suspicious-reference {{
-            background: #f8d7da !important;
-            border-left: 3px solid #dc3545 !important;
-        }}
-        .duplicate-reference {{
-            background: #ffe5cc !important;
-            border-left: 3px solid #fd7e14 !important;
-        }}
-        .ebook-reference {{
-            background: #d4f1e9 !important;
-            border-left: 3px solid #0e6b5e !important;
-        }}
-        .repository-reference {{
-            background: #e2d5f8 !important;
-            border-left: 3px solid #5e2a9e !important;
-        }}
-        .preprint-reference {{
-            background: #e2d5f8 !important;
-            border-left: 3px solid #5e2a9e !important;
-        }}
-        .proceedings-reference {{
-            background: #fff2c9 !important;
-            border-left: 3px solid #b26b00 !important;
-        }}
-        .retracted-reference {{
-            background: #f8d7da !important;
-            border-left: 3px solid #dc3545 !important;
-        }}
-        
-        /* Reviewer card styles */
-        .reviewer-card {{
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            transition: all 0.3s;
-            border-left: 4px solid {primary_color};
-        }}
-        
-        .reviewer-card:hover {{
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }}
-        
-        .reviewer-name {{
-            font-size: 18px;
-            font-weight: 600;
-            color: {primary_color};
-            margin-bottom: 8px;
-        }}
-        
-        .reviewer-orcid {{
-            font-size: 13px;
-            margin-bottom: 8px;
-        }}
-        
-        .reviewer-country {{
-            font-size: 13px;
-            color: #666;
-            margin-bottom: 8px;
-        }}
-        
-        .reviewer-section-title {{
-            font-weight: 600;
-            margin-top: 12px;
-            margin-bottom: 8px;
-            font-size: 14px;
-            color: #333;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 4px;
-        }}
-        
-        .external-id-item {{
-            font-size: 12px;
-            margin-bottom: 6px;
-            padding-left: 8px;
-        }}
-        
-        .reviewer-website {{
-            font-size: 12px;
-            margin-bottom: 6px;
-        }}
-        
-        .confidential-banner {{
-            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
-            color: white;
-            padding: 15px 20px;
-            border-radius: 10px;
-            margin-bottom: 25px;
-            text-align: center;
-            font-weight: bold;
-            border: 2px solid #ffd32a;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        }}
-        
-        .confidential-banner::before {{
-            content: "🔒 ";
-            font-size: 20px;
-        }}
+        .normal-article {{ background: #e8f5e9 !important; border-left: 3px solid #4caf50 !important; }}
+        .notfound-reference {{ background: #e9ecef !important; border-left: 3px solid #6c757d !important; }}
+        .suspicious-reference {{ background: #f8d7da !important; border-left: 3px solid #dc3545 !important; }}
+        .duplicate-reference {{ background: #ffe5cc !important; border-left: 3px solid #fd7e14 !important; }}
+        .ebook-reference {{ background: #d4f1e9 !important; border-left: 3px solid #0e6b5e !important; }}
+        .repository-reference {{ background: #e2d5f8 !important; border-left: 3px solid #5e2a9e !important; }}
+        .preprint-reference {{ background: #e2d5f8 !important; border-left: 3px solid #5e2a9e !important; }}
+        .proceedings-reference {{ background: #fff2c9 !important; border-left: 3px solid #b26b00 !important; }}
+        .retracted-reference {{ background: #f8d7da !important; border-left: 3px solid #dc3545 !important; }}
         
         .footer {{
             text-align: center;
@@ -5186,16 +4869,60 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             margin-top: 5px;
         }}
         
-        /* Special styling for expander content */
-        .ebook-reference .full-text-container,
-        .repository-reference .full-text-container,
-        .preprint-reference .full-text-container,
-        .proceedings-reference .full-text-container,
-        .suspicious-reference .full-text-container,
-        .duplicate-reference .full-text-container,
-        .notfound-reference .full-text-container,
-        .retracted-reference .full-text-container {{
-            background: rgba(255,255,255,0.7);
+        .reviewer-card {{
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-left: 4px solid {primary_color};
+            transition: transform 0.2s;
+        }}
+        .reviewer-card:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }}
+        .reviewer-name {{
+            font-size: 18px;
+            font-weight: 600;
+            color: {primary_color};
+            margin-bottom: 8px;
+        }}
+        .reviewer-orcid {{
+            font-family: monospace;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }}
+        .reviewer-section-title {{
+            font-weight: 600;
+            margin-top: 12px;
+            margin-bottom: 6px;
+            font-size: 13px;
+            color: #555;
+        }}
+        .external-id-link {{
+            display: inline-block;
+            background: #f0f0f0;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            margin: 3px;
+            text-decoration: none;
+            color: #333;
+            transition: all 0.2s;
+        }}
+        .external-id-link:hover {{
+            background: {primary_color};
+            color: white;
+        }}
+        .confidential-banner {{
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            border-left: 4px solid #dc3545;
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            color: #856404;
         }}
         
         @media print {{
@@ -5213,8 +4940,6 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     {sidebar_html}
     
     <div class="main-content">
-        {confidential_banner}
-        
         <div class="header">
             <div style="display: flex; justify-content: center; margin-bottom: 15px;">
                 <img src="data:image/png;base64,{logo_base64}" style="height: 150px; width: auto;" alt="Logo">
@@ -5228,125 +4953,46 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             </div>
         </div>
         
-        <!-- OVERVIEW SECTION -->
+        {confidential_banner_html}
+        
         <div id="overview" class="section">
             {make_section_title("overview", "html_overview")}
             <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-number">{total_references}</div>
-                    <div class="stat-percent">(100.0%)</div>
-                    <div class="stat-label">{get_text_local('total_references')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{total_with_doi}</div>
-                    <div class="stat-percent">({total_with_doi_percent:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('doi_found')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{last_5_years}</div>
-                    <div class="stat-percent">({last_5_years_percent:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('last_5_years_metric')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{self_citations_count}</div>
-                    <div class="stat-percent">({self_citations_percent:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('self_citations')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{total_citations_sum}</div>
-                    <div class="stat-label">{get_text_local('total_citations')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{avg_citations:.1f}</div>
-                    <div class="stat-label">{get_text_local('avg_citations')}</div>
-                </div>
+                <div class="stat-card"><div class="stat-number">{total_references}</div><div class="stat-percent">(100.0%)</div><div class="stat-label">{get_text_local('total_references')}</div></div>
+                <div class="stat-card"><div class="stat-number">{total_with_doi}</div><div class="stat-percent">({total_with_doi_percent:.1f}%)</div><div class="stat-label">{get_text_local('doi_found')}</div></div>
+                <div class="stat-card"><div class="stat-number">{last_5_years}</div><div class="stat-percent">({last_5_years_percent:.1f}%)</div><div class="stat-label">{get_text_local('last_5_years_metric')}</div></div>
+                <div class="stat-card"><div class="stat-number">{self_citations_count}</div><div class="stat-percent">({self_citations_percent:.1f}%)</div><div class="stat-label">{get_text_local('self_citations')}</div></div>
+                <div class="stat-card"><div class="stat-number">{total_citations_sum}</div><div class="stat-label">{get_text_local('total_citations')}</div></div>
+                <div class="stat-card"><div class="stat-number">{avg_citations:.1f}</div><div class="stat-label">{get_text_local('avg_citations')}</div></div>
             </div>
         </div>
         
-        <!-- IDENTIFIER COVERAGE SECTION (UPDATED - NO DUPLICATION) -->
         <div id="identifiers" class="section">
             {make_section_title("identifier", "html_identifier_coverage")}
             <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-number">{identifier_stats['has_doi']}</div>
-                    <div class="stat-percent">({identifier_percents['has_doi']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('doi_found')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{identifier_stats['has_url']}</div>
-                    <div class="stat-percent">({identifier_percents['has_url']:.1f}%)</div>
-                    <div class="stat-label">URL</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{identifier_stats['is_preprint_repository']}</div>
-                    <div class="stat-percent">({identifier_percents['preprint_repository']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('preprint_repository_count')} (arXiv + OpenAlex)</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{identifier_stats['has_pmid']}</div>
-                    <div class="stat-percent">({identifier_percents['has_pmid']:.1f}%)</div>
-                    <div class="stat-label">PMID</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{identifier_stats['is_ebook_platform']}</div>
-                    <div class="stat-percent">({identifier_percents['ebook_platform']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('ebook')} (with DOI)</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{identifier_stats['is_book_no_doi']}</div>
-                    <div class="stat-percent">({identifier_percents['book_no_doi']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('books_count')} (ISBN only)</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{identifier_stats['is_proceedings']}</div>
-                    <div class="stat-percent">({identifier_percents['proceedings']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('proceedings_count')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{identifier_stats['is_retracted']}</div>
-                    <div class="stat-percent">({identifier_percents['retracted']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('retracted_count')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{identifier_stats['has_none']}</div>
-                    <div class="stat-percent">({identifier_percents['has_none']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('no_identifier')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{identifier_stats['multiple']}</div>
-                    <div class="stat-percent">({identifier_percents['multiple']:.1f}%)</div>
-                    <div class="stat-label">Multiple identifiers</div>
-                </div>
+                <div class="stat-card"><div class="stat-number">{identifier_stats['has_doi']}</div><div class="stat-percent">({identifier_percents['has_doi']:.1f}%)</div><div class="stat-label">{get_text_local('doi_found')}</div></div>
+                <div class="stat-card"><div class="stat-number">{identifier_stats['has_url']}</div><div class="stat-percent">({identifier_percents['has_url']:.1f}%)</div><div class="stat-label">URL</div></div>
+                <div class="stat-card"><div class="stat-number">{identifier_stats['is_preprint_repository']}</div><div class="stat-percent">({identifier_percents['preprint_repository']:.1f}%)</div><div class="stat-label">{get_text_local('preprint_repository_count')}</div></div>
+                <div class="stat-card"><div class="stat-number">{identifier_stats['has_pmid']}</div><div class="stat-percent">({identifier_percents['has_pmid']:.1f}%)</div><div class="stat-label">PMID</div></div>
+                <div class="stat-card"><div class="stat-number">{identifier_stats['is_ebook_platform']}</div><div class="stat-percent">({identifier_percents['ebook_platform']:.1f}%)</div><div class="stat-label">{get_text_local('ebook')} (with DOI)</div></div>
+                <div class="stat-card"><div class="stat-number">{identifier_stats['is_book_no_doi']}</div><div class="stat-percent">({identifier_percents['book_no_doi']:.1f}%)</div><div class="stat-label">{get_text_local('books_count')} (ISBN only)</div></div>
+                <div class="stat-card"><div class="stat-number">{identifier_stats['is_proceedings']}</div><div class="stat-percent">({identifier_percents['proceedings']:.1f}%)</div><div class="stat-label">{get_text_local('proceedings_count')}</div></div>
+                <div class="stat-card"><div class="stat-number">{identifier_stats['is_retracted']}</div><div class="stat-percent">({identifier_percents['retracted']:.1f}%)</div><div class="stat-label">{get_text_local('retracted_count')}</div></div>
+                <div class="stat-card"><div class="stat-number">{identifier_stats['has_none']}</div><div class="stat-percent">({identifier_percents['has_none']:.1f}%)</div><div class="stat-label">{get_text_local('no_identifier')}</div></div>
+                <div class="stat-card"><div class="stat-number">{identifier_stats['multiple']}</div><div class="stat-percent">({identifier_percents['multiple']:.1f}%)</div><div class="stat-label">Multiple identifiers</div></div>
             </div>
             <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-number">{stats['doi_status']['both']}</div>
-                    <div class="stat-percent">({stats['doi_status_percents']['both']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('status_both')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{stats['doi_status']['crossref_only']}</div>
-                    <div class="stat-percent">({stats['doi_status_percents']['crossref_only']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('status_crossref_only')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{stats['doi_status']['openalex_only']}</div>
-                    <div class="stat-percent">({stats['doi_status_percents']['openalex_only']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('status_openalex_only')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{stats['doi_status']['none']}</div>
-                    <div class="stat-percent">({stats['doi_status_percents']['none']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('status_none')}</div>
-                </div>
+                <div class="stat-card"><div class="stat-number">{stats['doi_status']['both']}</div><div class="stat-percent">({stats['doi_status_percents']['both']:.1f}%)</div><div class="stat-label">{get_text_local('status_both')}</div></div>
+                <div class="stat-card"><div class="stat-number">{stats['doi_status']['crossref_only']}</div><div class="stat-percent">({stats['doi_status_percents']['crossref_only']:.1f}%)</div><div class="stat-label">{get_text_local('status_crossref_only')}</div></div>
+                <div class="stat-card"><div class="stat-number">{stats['doi_status']['openalex_only']}</div><div class="stat-percent">({stats['doi_status_percents']['openalex_only']:.1f}%)</div><div class="stat-label">{get_text_local('status_openalex_only')}</div></div>
+                <div class="stat-card"><div class="stat-number">{stats['doi_status']['none']}</div><div class="stat-percent">({stats['doi_status_percents']['none']:.1f}%)</div><div class="stat-label">{get_text_local('status_none')}</div></div>
             </div>
         </div>
         
-        <!-- AUTHORS SECTION (UPDATED WITH ALL AFFILIATIONS) -->
         <div id="authors" class="section">
             {make_section_title("authors", "html_authors")}
             <div>
-                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(author["display_name"])}</span><span class="rank-count">{author["count"]} {get_text_local("html_citations_label")}</span>' + (f'<div style="font-size: 11px; margin-top: 5px;"><strong>{get_text_local("orcid_label")}:</strong> {make_clickable_orcid(author["orcid"])}</div>' if author.get("orcid") else '') + (f'<div style="font-size: 11px; margin-top: 5px;"><strong>{get_text_local("institution_label")}:</strong> {html.escape(author["primary_institution"][:50])}</div>' if author.get("primary_institution") else '') + (f'<div style="font-size: 11px; margin-top: 5px;"><strong>{get_text_local("country_label")}:</strong> {", ".join(author["countries"][:5])}</div>' if author.get("countries") else '') + (f'<div style="font-size: 11px; margin-top: 5px;"><strong>{get_text_local("all_affiliations")}:</strong><br>' + '<br>'.join([f'• {html.escape(aff["name"][:80])} ({aff["country"] if aff["country"] else get_text_local("not_found")})' for aff in author.get("affiliations", [])[:5]]) + '</div>' if author.get("affiliations") else '') + (f'<div style="font-size: 10px; color: #999; margin-top: 5px;">{author.get("num_affiliations", 1)} {get_text_local("num_affiliations")}, {author.get("num_countries", 1)} {get_text_local("num_countries")}</div>' if author.get("num_affiliations", 1) > 1 or author.get("num_countries", 1) > 1 else '') + '<div class="progress-bar"><div class="progress-fill" style="width: ' + str(min(100, author["count"] / stats["author_frequency_all"]["all_authors"][0]["count"] * 100 if stats["author_frequency_all"]["all_authors"] else 0)) + '%;"></div></div></div>' for i, author in enumerate(stats["author_frequency_all"]["all_authors"][:30])])}
+                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(author["display_name"])}</span><span class="rank-count">{author["count"]} {get_text_local("html_citations_label")}</span>' + (f'<div style="font-size: 11px; color: #667eea;">{get_text_local("orcid_label")}: {make_clickable_orcid(author["orcid"])}</div>' if author.get("orcid") else '') + (f'<div style="font-size: 11px; color: #666;"><strong>{get_text_local("institution_label")}:</strong> {html.escape(author["institution"][:50])}</div>' if author.get("institution") else '') + (f'<div style="font-size: 11px; color: #666;"><strong>{get_text_local("country_label")}:</strong> {", ".join(author["countries"])}</div>' if author.get("countries") else '') + (f'<div style="font-size: 11px; color: #666; margin-top: 5px;"><strong>{get_text_local("all_affiliations")}:</strong><br>' + '<br>'.join([html.escape(aff["name"]) for aff in author.get("affiliations", [])[:3]]) + '</div>' if author.get("affiliations") else '') + '<div class="progress-bar"><div class="progress-fill" style="width: ' + str(min(100, author["count"] / stats["author_frequency_all"]["all_authors"][0]["count"] * 100 if stats["author_frequency_all"]["all_authors"] else 0)) + '%;"></div></div></div>' for i, author in enumerate(stats["author_frequency_all"]["all_authors"][:30])])}
             </div>
             <div style="margin-top: 15px;">
                 <span class="badge badge-info">{get_text_local('unique_authors')}: {stats['author_frequency_all']['unique_authors']}</span>
@@ -5355,280 +5001,137 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             </div>
         </div>
         
-        <!-- JOURNALS SECTION -->
         <div id="journals" class="section">
             {make_section_title("journals", "html_journals")}
-            <table>
-                <thead>
-                    <tr><th>{get_text_local('html_rank')}</th><th>{get_text_local('journal')}</th><th>{get_text_local('html_count')}</th><th>{get_text_local('html_percentage')}</th></tr>
-                </thead>
-                <tbody>
-                    {''.join([f'<tr><td>{i+1}</td><td>{html.escape(journal["journal"])}</td><td>{journal["count"]}</td><td>{journal["percentage"]:.1f}%</td></tr>' for i, journal in enumerate(stats["journal_frequency_all"]["all_journals"])])}
-                </tbody>
-            </table>
-            <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_text_local('unique_journals')}: {stats['journal_frequency_all']['unique_journals']}</span>
-                <span class="badge badge-info">{get_text_local('shannon_journals')}: {stats['shannon_index']['journals']}</span>
-            </div>
+            <table><thead><tr><th>{get_text_local('html_rank')}</th><th>{get_text_local('journal')}</th><th>{get_text_local('html_count')}</th><th>{get_text_local('html_percentage')}</th></tr></thead>
+            <tbody>{''.join([f'<tr><td>{i+1}</td><td>{html.escape(journal["journal"])}</td><td>{journal["count"]}</td><td>{journal["percentage"]:.1f}%</td></tr>' for i, journal in enumerate(stats["journal_frequency_all"]["all_journals"])])}</tbody></table>
+            <div style="margin-top: 15px;"><span class="badge badge-info">{get_text_local('unique_journals')}: {stats['journal_frequency_all']['unique_journals']}</span><span class="badge badge-info">{get_text_local('shannon_journals')}: {stats['shannon_index']['journals']}</span></div>
         </div>
         
-        <!-- PUBLISHERS SECTION -->
         <div id="publishers" class="section">
             {make_section_title("publishers", "html_publishers")}
-            <table>
-                <thead>
-                    <tr><th>{get_text_local('html_rank')}</th><th>{get_text_local('publisher')}</th><th>{get_text_local('html_count')}</th><th>{get_text_local('html_percentage')}</th></tr>
-                </thead>
-                <tbody>
-                    {''.join([f'<tr><td>{i+1}</td><td>{html.escape(publisher["publisher"])}</td><td>{publisher["count"]}</td><td>{publisher["percentage"]:.1f}%</td></tr>' for i, publisher in enumerate(stats["publisher_frequency"]["all_publishers"])])}
-                </tbody>
-            </table>
-            <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_text_local('unique_publishers_metric')}: {stats['publisher_frequency']['unique_publishers']}</span>
-                <span class="badge badge-info">{get_text_local('shannon_publishers')}: {stats['shannon_index']['publishers']}</span>
-            </div>
+            <table><thead><tr><th>{get_text_local('html_rank')}</th><th>{get_text_local('publisher')}</th><th>{get_text_local('html_count')}</th><th>{get_text_local('html_percentage')}</th></tr></thead>
+            <tbody>{''.join([f'<tr><td>{i+1}</td><td>{html.escape(publisher["publisher"])}</td><td>{publisher["count"]}</td><td>{publisher["percentage"]:.1f}%</td></tr>' for i, publisher in enumerate(stats["publisher_frequency"]["all_publishers"])])}</tbody></table>
+            <div style="margin-top: 15px;"><span class="badge badge-info">{get_text_local('unique_publishers_metric')}: {stats['publisher_frequency']['unique_publishers']}</span><span class="badge badge-info">{get_text_local('shannon_publishers')}: {stats['shannon_index']['publishers']}</span></div>
         </div>
         
-        <!-- YEARLY STATISTICS -->
         <div id="yearly" class="section">
             {make_section_title("yearly", "html_yearly")}
             <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-number">{stats['yearly_stats']['last_year']}</div>
-                    <div class="stat-percent">({stats['yearly_stats']['last_year_percent']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('last_year')} ({stats['yearly_stats']['last_completed_year']})</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{stats['yearly_stats']['last_3_years']}</div>
-                    <div class="stat-percent">({stats['yearly_stats']['last_3_years_percent']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('last_3_years')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{stats['yearly_stats']['last_5_years']}</div>
-                    <div class="stat-percent">({stats['yearly_stats']['last_5_years_percent']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('last_5_years_metric')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{stats['yearly_stats']['last_10_years']}</div>
-                    <div class="stat-percent">({stats['yearly_stats']['last_10_years_percent']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('last_10_years')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{stats['yearly_stats']['unknown_year']}</div>
-                    <div class="stat-label">{get_text_local('references_with_unknown_year')}</div>
-                </div>
+                <div class="stat-card"><div class="stat-number">{stats['yearly_stats']['last_year']}</div><div class="stat-percent">({stats['yearly_stats']['last_year_percent']:.1f}%)</div><div class="stat-label">{get_text_local('last_year')} ({stats['yearly_stats']['last_completed_year']})</div></div>
+                <div class="stat-card"><div class="stat-number">{stats['yearly_stats']['last_3_years']}</div><div class="stat-percent">({stats['yearly_stats']['last_3_years_percent']:.1f}%)</div><div class="stat-label">{get_text_local('last_3_years')}</div></div>
+                <div class="stat-card"><div class="stat-number">{stats['yearly_stats']['last_5_years']}</div><div class="stat-percent">({stats['yearly_stats']['last_5_years_percent']:.1f}%)</div><div class="stat-label">{get_text_local('last_5_years_metric')}</div></div>
+                <div class="stat-card"><div class="stat-number">{stats['yearly_stats']['last_10_years']}</div><div class="stat-percent">({stats['yearly_stats']['last_10_years_percent']:.1f}%)</div><div class="stat-label">{get_text_local('last_10_years')}</div></div>
+                <div class="stat-card"><div class="stat-number">{stats['yearly_stats']['unknown_year']}</div><div class="stat-label">{get_text_local('references_with_unknown_year')}</div></div>
             </div>
-            <div>
-                <h4>{get_text_local('distribution_by_year')}:</h4>
-                {''.join([f'<div class="rank-item"><span class="rank-name">{year}</span><span class="rank-count">{stats["yearly_stats"]["yearly_counts"][year]} {get_text_local("references_count")} ({stats["yearly_stats"]["yearly_percentages"][year]:.1f}%)</span><div class="progress-bar"><div class="progress-fill" style="width: {stats["yearly_stats"]["yearly_percentages"][year]}%;"></div></div></div>' for year in sorted(stats["yearly_stats"]["yearly_counts"].keys(), reverse=True)])}
-            </div>
-            <div style="margin-top: 15px;">
-                <h4>{get_text_local('cumulative_percentage')}:</h4>
-                {''.join([f'<div class="rank-item"><span class="rank-name">{year}</span><span class="rank-count">{stats["yearly_stats"]["cumulative_percentages"][year]:.1f}% {get_text_local("cumulative")}</span><div class="progress-bar"><div class="progress-fill" style="width: {stats["yearly_stats"]["cumulative_percentages"][year]}%;"></div></div></div>' for year in sorted(stats["yearly_stats"]["yearly_counts"].keys(), reverse=True)])}
-            </div>
-            <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_text_local('median_age')}: {stats['temporal']['median_age']} {get_text_local('years')}</span>
-                <span class="badge badge-info">{get_text_local('average_age')}: {stats['temporal']['average_age']:.1f} {get_text_local('years')}</span>
-            </div>
+            <div><h4>{get_text_local('distribution_by_year')}:</h4>{''.join([f'<div class="rank-item"><span class="rank-name">{year}</span><span class="rank-count">{stats["yearly_stats"]["yearly_counts"][year]} {get_text_local("references_count")} ({stats["yearly_stats"]["yearly_percentages"][year]:.1f}%)</span><div class="progress-bar"><div class="progress-fill" style="width: {stats["yearly_stats"]["yearly_percentages"][year]}%;"></div></div></div>' for year in sorted(stats["yearly_stats"]["yearly_counts"].keys(), reverse=True)])}</div>
+            <div style="margin-top: 15px;"><h4>{get_text_local('cumulative_percentage')}:</h4>{''.join([f'<div class="rank-item"><span class="rank-name">{year}</span><span class="rank-count">{stats["yearly_stats"]["cumulative_percentages"][year]:.1f}% {get_text_local("cumulative")}</span><div class="progress-bar"><div class="progress-fill" style="width: {stats["yearly_stats"]["cumulative_percentages"][year]}%;"></div></div></div>' for year in sorted(stats["yearly_stats"]["yearly_counts"].keys(), reverse=True)])}</div>
+            <div style="margin-top: 15px;"><span class="badge badge-info">{get_text_local('median_age')}: {stats['temporal']['median_age']} {get_text_local('years')}</span><span class="badge badge-info">{get_text_local('average_age')}: {stats['temporal']['average_age']:.1f} {get_text_local('years')}</span></div>
         </div>
         
-        <!-- CONCEPTS SECTION -->
         <div id="concepts" class="section">
             {make_section_title("concepts", "html_concepts")}
-            <div class="concepts-grid">
-                {''.join([f'<div class="concept-card"><div class="concept-name">{html.escape(concept[0])}</div><div class="concept-score">{get_text_local("html_frequency")}: {concept[1]}</div></div>' for concept in stats['concepts']['concepts'][:12]])}
-            </div>
-            <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_text_local('unique_concepts')}: {stats['concepts']['unique_concepts']}</span>
-            </div>
+            <div class="concepts-grid">{''.join([f'<div class="concept-card"><div class="concept-name">{html.escape(concept[0])}</div><div class="concept-score">{get_text_local("html_frequency")}: {concept[1]}</div></div>' for concept in stats['concepts']['concepts'][:12]])}</div>
+            <div style="margin-top: 15px;"><span class="badge badge-info">{get_text_local('unique_concepts')}: {stats['concepts']['unique_concepts']}</span></div>
         </div>
         
-        <!-- GEOGRAPHY SECTION - THREE TYPES -->
         <div id="geography" class="section">
             {make_section_title("geography", "html_geography")}
-            
-            <!-- Type 1: Unique countries per reference -->
             <h4>{get_text_local('geography_type_1')}</h4>
             <p style="font-size: 12px; color: #666; margin-bottom: 10px;">{get_text_local('geography_type_1_desc')}</p>
-            <div>
-                {''.join([f'<div class="rank-item"><span class="rank-name">{html.escape(country)}</span><span class="rank-count">{count} {get_text_local("references_count")}</span><div class="progress-bar"><div class="progress-fill" style="width: {count / max(stats["geography"]["type1_unique_countries_per_reference"].values()) * 100 if stats["geography"]["type1_unique_countries_per_reference"] else 0}%;"></div></div></div>' for country, count in list(stats['geography']['type1_unique_countries_per_reference'].items())[:15]])}
-            </div>
-            
-            <!-- Type 2: Authors per country -->
+            <div>{''.join([f'<div class="rank-item"><span class="rank-name">{html.escape(country)}</span><span class="rank-count">{count} {get_text_local("references_count")}</span><div class="progress-bar"><div class="progress-fill" style="width: {count / max(stats["geography"]["type1_unique_countries_per_reference"].values()) * 100 if stats["geography"]["type1_unique_countries_per_reference"] else 0}%;"></div></div></div>' for country, count in list(stats['geography']['type1_unique_countries_per_reference'].items())[:15]])}</div>
             <h4 style="margin-top: 25px;">{get_text_local('geography_type_2')}</h4>
             <p style="font-size: 12px; color: #666; margin-bottom: 10px;">{get_text_local('geography_type_2_desc')}</p>
-            <div>
-                {''.join([f'<div class="rank-item"><span class="rank-name">{html.escape(country)}</span><span class="rank-count">{count} {get_text_local("html_authors_count")}</span><div class="progress-bar"><div class="progress-fill" style="width: {count / max(stats["geography"]["type2_authors_per_country"].values()) * 100 if stats["geography"]["type2_authors_per_country"] else 0}%;"></div></div></div>' for country, count in list(stats['geography']['type2_authors_per_country'].items())[:15]])}
-            </div>
-            
-            <!-- Type 3: Collaboration patterns -->
+            <div>{''.join([f'<div class="rank-item"><span class="rank-name">{html.escape(country)}</span><span class="rank-count">{count} {get_text_local("html_authors_count")}</span><div class="progress-bar"><div class="progress-fill" style="width: {count / max(stats["geography"]["type2_authors_per_country"].values()) * 100 if stats["geography"]["type2_authors_per_country"] else 0}%;"></div></div></div>' for country, count in list(stats['geography']['type2_authors_per_country'].items())[:15]])}</div>
             <h4 style="margin-top: 25px;">{get_text_local('geography_type_3')}</h4>
             <p style="font-size: 12px; color: #666; margin-bottom: 10px;">{get_text_local('geography_type_3_desc')}</p>
             <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
-                <div class="stat-card">
-                    <div class="stat-number">{stats['geography']['single_country_count']}</div>
-                    <div class="stat-label">{get_text_local('single_country')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{stats['geography']['international_count']}</div>
-                    <div class="stat-label">{get_text_local('international_collab')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{stats['geography']['total_references_with_country']}</div>
-                    <div class="stat-label">{get_text_local('total_references')} (with country)</div>
-                </div>
+                <div class="stat-card"><div class="stat-number">{stats['geography']['single_country_count']}</div><div class="stat-label">{get_text_local('single_country')}</div></div>
+                <div class="stat-card"><div class="stat-number">{stats['geography']['international_count']}</div><div class="stat-label">{get_text_local('international_collab')}</div></div>
+                <div class="stat-card"><div class="stat-number">{stats['geography']['total_references_with_country']}</div><div class="stat-label">{get_text_local('total_references')} (with country)</div></div>
             </div>
-            
             <h5 style="margin-top: 20px;">{get_text_local('collaboration_matrix')}:</h5>
-            <div>
-                {''.join([f'<div class="rank-item"><span class="rank-name">{collab["country1"]} + {collab["country2"]}</span><span class="rank-count">{collab["count"]} {get_text_local("references_count")}</span><div class="progress-bar"><div class="progress-fill" style="width: {collab["count"] / max([c["count"] for c in stats["geography"]["collaboration_matrix"]]) * 100 if stats["geography"]["collaboration_matrix"] else 0}%;"></div></div></div>' for collab in stats['geography']['collaboration_matrix'][:15]])}
-            </div>
+            <div>{''.join([f'<div class="rank-item"><span class="rank-name">{collab["country1"]} + {collab["country2"]}</span><span class="rank-count">{collab["count"]} {get_text_local("references_count")}</span><div class="progress-bar"><div class="progress-fill" style="width: {collab["count"] / max([c["count"] for c in stats["geography"]["collaboration_matrix"]]) * 100 if stats["geography"]["collaboration_matrix"] else 0}%;"></div></div></div>' for collab in stats['geography']['collaboration_matrix'][:15]])}</div>
         </div>
         
-        <!-- COLLABORATION SECTION -->
         <div id="collaboration" class="section">
             {make_section_title("collaborations", "html_collaborations")}
-            <div>
-                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(collab["author1"])} + {html.escape(collab["author2"])}</span><span class="rank-count">{collab["count"]} {get_text_local("html_joint_works")}</span></div>' for i, collab in enumerate(stats["collaboration"]["top_collaborations"][:8])])}
-            </div>
-            <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_text_local('core_authors_label')}: {', '.join([f"{html.escape(author[0])} ({author[1]} {get_text_local('html_connections')})" for author in stats['collaboration']['core_authors'][:5]])}</span>
-            </div>
+            <div>{''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(collab["author1"])} + {html.escape(collab["author2"])}</span><span class="rank-count">{collab["count"]} {get_text_local("html_joint_works")}</span></div>' for i, collab in enumerate(stats["collaboration"]["top_collaborations"][:8])])}</div>
+            <div style="margin-top: 15px;"><span class="badge badge-info">{get_text_local('core_authors_label')}: {', '.join([f"{html.escape(author[0])} ({author[1]} {get_text_local('html_connections')})" for author in stats['collaboration']['core_authors'][:5]])}</span></div>
         </div>
         
-        <!-- DIVERSITY SECTION -->
         <div id="diversity" class="section">
             {make_section_title("diversity", "html_diversity")}
             <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-number">{stats['shannon_index']['authors']}</div>
-                    <div class="stat-label">{get_text_local('shannon_authors')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{stats['shannon_index']['journals']}</div>
-                    <div class="stat-label">{get_text_local('shannon_journals')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{stats['shannon_index']['publishers']}</div>
-                    <div class="stat-label">{get_text_local('shannon_publishers')}</div>
-                </div>
+                <div class="stat-card"><div class="stat-number">{stats['shannon_index']['authors']}</div><div class="stat-label">{get_text_local('shannon_authors')}</div></div>
+                <div class="stat-card"><div class="stat-number">{stats['shannon_index']['journals']}</div><div class="stat-label">{get_text_local('shannon_journals')}</div></div>
+                <div class="stat-card"><div class="stat-number">{stats['shannon_index']['publishers']}</div><div class="stat-label">{get_text_local('shannon_publishers')}</div></div>
             </div>
         </div>
         
-        <!-- CITATION CLASSICS SECTION -->
         <div id="classics" class="section">
             {make_section_title("classics", "html_classics")}
             {citation_classics_html}
         </div>
         
-        <!-- SELF-CITATIONS SECTION -->
         {f'''
         <div id="selfcitations" class="section">
             {make_section_title("selfcitation", "html_self_citations")}
             {authors_header_html}
             {self_citations_html}
-            <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_text_local('html_total_self_citations')}: {self_citations_count} ({self_citations_percent:.1f}%)</span>
-            </div>
+            <div style="margin-top: 15px;"><span class="badge badge-info">{get_text_local('html_total_self_citations')}: {self_citations_count} ({self_citations_percent:.1f}%)</span></div>
         </div>
         ''' if show_self_citations_section else ''}
         
-        <!-- DUPLICATES SECTION -->
-        {duplicates_html}
-        
-        <!-- POTENTIAL REVIEWERS SECTION -->
         {reviewers_html}
         
-        <!-- ONLY CROSSREF SECTION -->
+        {duplicates_html}
+        
         <div id="crossref_only" class="section">
             {make_section_title("crossref", "html_crossref_only")}
             {''.join([f'<div class="rank-item"><div>{html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('crossref_only_refs', [])[:20]]) if stats.get('crossref_only_refs') else f'<p>{get_text_local("no_crossref_only")}</p>'}
         </div>
         
-        <!-- ONLY OPENALEX SECTION -->
         <div id="openalex_only" class="section">
             {make_section_title("openalex", "html_openalex_only")}
             {''.join([f'<div class="rank-item"><div>{html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('openalex_only_refs', [])[:20]]) if stats.get('openalex_only_refs') else f'<p>{get_text_local("no_openalex_only")}</p>'}
         </div>
         
-        <!-- SUSPICIOUS DOIS SECTION -->
         <div id="suspicious_doi" class="section">
             {make_section_title("suspicious", "html_suspicious_doi")}
             <div style="margin-bottom: 15px; font-size: 13px; color: #666;">{get_text_local('suspicious_dois_hint')}</div>
-            
-            <!-- Repository sources (not invalid) -->
             {f'''
-            <div style="margin-top: 10px; margin-bottom: 15px;">
-                <h4>{get_text_local("repository")} {get_text_local("references")}:</h4>
-                <div style="font-size: 12px; color: #5e2a9e; margin-bottom: 10px;">{get_text_local("html_repository_note")}</div>
-                {''.join([f'<div class="rank-item repository-reference"><span class="badge-repository">{get_text_local("repository")}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div>' if ref.get("doi") else '') + '</div>' for ref in stats.get('repository_refs', [])[:20]])}
-            </div>
+            <div style="margin-top: 10px; margin-bottom: 15px;"><h4>{get_text_local("repository")} {get_text_local("references")}:</h4><div style="font-size: 12px; color: #5e2a9e; margin-bottom: 10px;">{get_text_local("html_repository_note")}</div>{''.join([f'<div class="rank-item repository-reference"><span class="badge-repository">{get_text_local("repository")}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div>' if ref.get("doi") else '') + '</div>' for ref in stats.get('repository_refs', [])[:20]])}</div>
             ''' if stats.get('repository_refs') else ''}
-            
-            <!-- Proceedings sources (not invalid) -->
             {f'''
-            <div style="margin-top: 10px; margin-bottom: 15px;">
-                <h4>{get_text_local("proceedings")} {get_text_local("references")}:</h4>
-                <div style="font-size: 12px; color: #b26b00; margin-bottom: 10px;">{get_text_local("html_proceedings_note")}</div>
-                {''.join([f'<div class="rank-item proceedings-reference"><span class="badge-proceedings">{get_text_local("proceedings")}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div>' if ref.get("doi") else '') + '</div>' for ref in stats.get('proceedings_refs', [])[:20]])}
-            </div>
+            <div style="margin-top: 10px; margin-bottom: 15px;"><h4>{get_text_local("proceedings")} {get_text_local("references")}:</h4><div style="font-size: 12px; color: #b26b00; margin-bottom: 10px;">{get_text_local("html_proceedings_note")}</div>{''.join([f'<div class="rank-item proceedings-reference"><span class="badge-proceedings">{get_text_local("proceedings")}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div>' if ref.get("doi") else '') + '</div>' for ref in stats.get('proceedings_refs', [])[:20]])}</div>
             ''' if stats.get('proceedings_refs') else ''}
-            
-            <!-- Truly suspicious DOIs -->
-            <div style="margin-top: 10px;">
-                <h4>{get_text_local("suspicious_dois")}:</h4>
-                {''.join([f'<div class="rank-item suspicious-reference"><div class="badge badge-danger">{get_text_local("html_attention")}</div><div>{html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('suspicious_doi_refs', [])[:20]]) if stats.get('suspicious_doi_refs') else f'<p>{get_text_local("no_suspicious_dois")}</p>'}
-            </div>
+            <div style="margin-top: 10px;"><h4>{get_text_local("suspicious_dois")}:</h4>{''.join([f'<div class="rank-item suspicious-reference"><div class="badge badge-danger">{get_text_local("html_attention")}</div><div>{html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('suspicious_doi_refs', [])[:20]]) if stats.get('suspicious_doi_refs') else f'<p>{get_text_local("no_suspicious_dois")}</p>'}</div>
         </div>
         
-        <!-- NON-DOI SOURCES SECTION -->
         <div id="non_doi" class="section">
             {make_section_title("nondoi", "html_non_doi")}
-            
-            <!-- Books with ISBN but no DOI -->
             {f'''
-            <div style="margin-bottom: 15px;">
-                <h4>{get_text_local("books_count")} (ISBN without DOI):</h4>
-                {''.join([f'<div class="rank-item book-reference"><span class="badge-book">{get_text_local("ebook")}</span><div style="margin-top: 8px;">{html.escape(ref)}</div></div>' for ref in stats.get('books_with_isbn_no_doi', [])[:20]])}
-            </div>
+            <div style="margin-bottom: 15px;"><h4>{get_text_local("books_count")} (ISBN without DOI):</h4>{''.join([f'<div class="rank-item book-reference"><span class="badge-book">{get_text_local("ebook")}</span><div style="margin-top: 8px;">{html.escape(ref)}</div></div>' for ref in stats.get('books_with_isbn_no_doi', [])[:20]])}</div>
             ''' if stats.get('books_with_isbn_no_doi') else ''}
-            
-            <!-- Other non-DOI sources -->
-            <div>
-                <h4>{get_text_local("other")} {get_text_local("non_doi_sources")}:</h4>
-                {''.join([f'<div class="rank-item notfound-reference">{html.escape(ref)}</div>' for ref in stats['identifier_coverage']['references_without_doi'][:20]]) if stats['identifier_coverage']['references_without_doi'] else f'<p>{get_text_local("all_have_doi")}</p>'}
-            </div>
+            <div><h4>{get_text_local("other")} {get_text_local("non_doi_sources")}:</h4>{''.join([f'<div class="rank-item notfound-reference">{html.escape(ref)}</div>' for ref in stats['identifier_coverage']['references_without_doi'][:20]]) if stats['identifier_coverage']['references_without_doi'] else f'<p>{get_text_local("all_have_doi")}</p>'}</div>
         </div>
         
-        <!-- NON-JOURNAL SOURCES WITH DOI SECTION -->
         {non_journal_sources_html}
         
-        <!-- URL SOURCES SECTION -->
         <div id="url_sources" class="section">
             {make_section_title("url", "html_url_sources")}
             {''.join([f'<div class="rank-item">{html.escape(ref)}</div>' for ref in stats['identifier_coverage']['references_with_only_url'][:20]]) if stats['identifier_coverage']['references_with_only_url'] else f'<p>{get_text_local("no_url_only")}</p>'}
         </div>
         
-        <!-- PROBLEMS SECTION (includes retractions) -->
         <div id="problems" class="section">
             {make_section_title("problems", "html_problems")}
-            
-            <!-- Retracted articles -->
             {f'''
-            <div style="margin-bottom: 20px;">
-                <h4>{get_text_local("retracted_count")}:</h4>
-                {''.join([f'<div class="rank-item retracted-reference"><span class="badge-danger" style="background: #f8d7da; color: #721c24;">{get_text_local("retracted")}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div>' if ref.get("doi") else '') + '</div>' for ref in stats.get('retracted_refs', [])[:20]]) if stats.get('retracted_refs') else f'<p>{get_text_local("none_detected")}</p>'}
-            </div>
+            <div style="margin-bottom: 20px;"><h4>{get_text_local("retracted_count")}:</h4>{''.join([f'<div class="rank-item retracted-reference"><span class="badge-danger" style="background: #f8d7da; color: #721c24;">{get_text_local("retracted")}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div>' if ref.get("doi") else '') + '</div>' for ref in stats.get('retracted_refs', [])[:20]]) if stats.get('retracted_refs') else f'<p>{get_text_local("none_detected")}</p>'}</div>
             ''' if stats.get('retracted_refs') else ''}
-            
-            <!-- Other problematic references -->
-            <div>
-                <h4>{get_text_local("other")} {get_text_local("problematic_refs")}:</h4>
-                {''.join([f'<div class="rank-item"><span class="badge badge-warning">{html.escape(ref["problems"])}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div></div>' for ref in stats['problematic_refs'][:10]]) if stats['problematic_refs'] else f'<p>{get_text_local("no_problematic")}</p>'}
-            </div>
+            <div><h4>{get_text_local("other")} {get_text_local("problematic_refs")}:</h4>{''.join([f'<div class="rank-item"><span class="badge badge-warning">{html.escape(ref["problems"])}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div></div>' for ref in stats['problematic_refs'][:10]]) if stats['problematic_refs'] else f'<p>{get_text_local("no_problematic")}</p>'}</div>
         </div>
         
-        <!-- FULL REFERENCE LIST SECTION -->
         <div id="full_reference_list" class="section">
             {make_section_title("list", "full_reference_list_title")}
             {full_references_html}
@@ -5645,9 +5148,9 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     
     return html_content
 
-# ======================== UI INTERFACE (ENGLISH, UPDATED WITH NEW FILTERS AND REVIEWERS) ========================
+# ======================== UI INTERFACE (UPDATED LAYOUT) ========================
 def main():
-    # Language selector in sidebar (before anything else)
+    # Language selector in sidebar (first)
     with st.sidebar:
         st.markdown(f"## {get_text('language')}")
         lang_option = st.selectbox(
@@ -5660,120 +5163,8 @@ def main():
             st.session_state.language = lang_option
             st.rerun()
         st.markdown("---")
-
-        # ========== NEW: COLOR THEME SELECTOR ==========
-        st.markdown(f"## 🎨 Color Theme")
         
-        # Initialize color theme in session state
-        if 'primary_color' not in st.session_state:
-            st.session_state.primary_color = '#667eea'
-        if 'secondary_color' not in st.session_state:
-            st.session_state.secondary_color = '#f39c12'
-        
-        # Predefined theme options
-        preset_themes = {
-            "Default (Blue-Purple)": {"primary": "#667eea", "secondary": "#9b59b6"},   # пурпурный/фиолетовый
-            "Emerald (Green-Teal)": {"primary": "#2ecc71", "secondary": "#27ae60"},     # темно-зеленый
-            "Sunset (Orange-Coral)": {"primary": "#e74c3c", "secondary": "#c0392b"},   # темно-красный
-            "Ocean (Deep Blue)": {"primary": "#3498db", "secondary": "#2980b9"},        # темно-синий
-            "Royal (Purple-Pink)": {"primary": "#9b59b6", "secondary": "#e84393"},     # розовый
-            "Forest (Dark Green)": {"primary": "#27ae60", "secondary": "#2ecc71"},     # светло-зеленый
-            "Cherry (Red-Pink)": {"primary": "#e84393", "secondary": "#9b59b6"},       # фиолетовый
-            "Amber (Yellow-Orange)": {"primary": "#f39c12", "secondary": "#e67e22"},   # оранжевый
-        }
-        
-        # Theme selector with radio buttons or selectbox
-        theme_option = st.selectbox(
-            "🎨 Preset themes",
-            options=list(preset_themes.keys()),
-            index=0
-        )
-        
-        # Option to use preset or custom
-        use_preset = st.checkbox("Use preset theme", value=True)
-        
-        if use_preset:
-            selected_theme = preset_themes[theme_option]
-            st.session_state.primary_color = selected_theme["primary"]
-            st.session_state.secondary_color = selected_theme["secondary"]
-        else:
-            # Custom color picker
-            selected_color = st.color_picker(
-                "🎨 Pick your primary color",
-                value=st.session_state.primary_color,
-                help="Choose any color. Complementary color will be auto-generated!"
-            )
-            st.session_state.primary_color = selected_color
-            # Для кастомного цвета генерируем комплементарный автоматически
-            st.session_state.secondary_color = get_complementary_color(selected_color)
-        
-        # Use secondary color from session state
-        complementary = st.session_state.secondary_color
-        
-        # Display color preview
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(
-                f'<div style="text-align: center;">'
-                f'<div class="color-preview" style="background: {st.session_state.primary_color};"></div>'
-                f'<div style="font-size: 11px; margin-top: 5px;">Primary</div>'
-                f'</div>',
-                unsafe_allow_html=True
-            )
-        with col2:
-            st.markdown(
-                f'<div style="text-align: center;">'
-                f'<div class="color-preview" style="background: {complementary};"></div>'
-                f'<div style="font-size: 11px; margin-top: 5px;">Complementary</div>'
-                f'</div>',
-                unsafe_allow_html=True
-            )
-        
-        # Show gradient preview
-        st.markdown(
-            f'<div class="complementary-preview" style="height: 8px; width: 100%; margin: 10px 0;"></div>',
-            unsafe_allow_html=True
-        )
-        
-        # Show theme info
-        st.markdown(
-            f'<div class="theme-info">'
-            f'✨ Complementary color automatically selected<br>'
-            f'🎨 Gradient: Primary → Complementary'
-            f'</div>',
-            unsafe_allow_html=True
-        )
-        
-        # Apply theme on color change
-        secondary = st.session_state.get('secondary_color', get_complementary_color(st.session_state.primary_color))
-        apply_theme_css(st.session_state.primary_color, secondary)
-        
-        st.markdown("---")
-        
-        # ========== NEW: POTENTIAL REVIEWERS TOGGLE ==========
-        st.markdown(f"## 👥 {get_text('propose_reviewers')}")
-        show_reviewers_toggle = st.checkbox(
-            get_text('propose_reviewers'),
-            value=st.session_state.get('show_potential_reviewers', False),
-            key="show_reviewers_toggle"
-        )
-        st.session_state.show_potential_reviewers = show_reviewers_toggle
-        
-        if show_reviewers_toggle:
-            st.info("🔍 When enabled, a 'Potential Reviewers' section will appear with candidates from cited works (last 4 years, no affiliation conflicts)")
-        
-        st.markdown("---")
-    
-    st.image("logo.png", width=250)
-    st.markdown("---")
-    st.markdown(f"### {get_text('app_subtitle')}")
-    st.markdown("---")
-    
-    with st.sidebar:
-        st.markdown(f"## {get_text('settings')}")
-        batch_size = st.slider(get_text('batch_size'), 10, 100, 50, help=get_text('batch_size_help'))
-        
-        st.markdown("---")
+        # Paper authors (second)
         st.markdown(f"## {get_text('paper_authors')}")
         st.markdown(f"*{get_text('paper_authors_help')}*")
         st.markdown(get_text('format_hint'))
@@ -5794,6 +5185,8 @@ def main():
                 st.warning(get_text('authors_warning'))
         
         st.markdown("---")
+        
+        # Journal name (third)
         st.markdown(f"## {get_text('journal_name_label')}")
         journal_name_input = st.text_input(
             get_text('journal_name_label'),
@@ -5806,6 +5199,9 @@ def main():
         else:
             st.session_state.journal_name = ""
         
+        st.markdown("---")
+        
+        # Article number (fourth)
         st.markdown(f"## {get_text('article_number_label')}")
         article_number_input = st.text_input(
             get_text('article_number_label'),
@@ -5819,6 +5215,76 @@ def main():
             st.session_state.article_number = ""
         
         st.markdown("---")
+        
+        # Propose potential reviewers (fifth)
+        st.markdown(f"## {get_text('propose_reviewers')}")
+        show_reviewers = st.checkbox(
+            get_text('propose_reviewers'),
+            value=st.session_state.get('show_reviewers', False),
+            help=get_text('propose_reviewers_help')
+        )
+        st.session_state.show_reviewers = show_reviewers
+        
+        st.markdown("---")
+        
+        # Color Theme (sixth)
+        st.markdown(f"## 🎨 Color Theme")
+        
+        if 'primary_color' not in st.session_state:
+            st.session_state.primary_color = '#667eea'
+        if 'secondary_color' not in st.session_state:
+            st.session_state.secondary_color = '#f39c12'
+        
+        preset_themes = {
+            "Default (Blue-Purple)": {"primary": "#667eea", "secondary": "#9b59b6"},
+            "Emerald (Green-Teal)": {"primary": "#2ecc71", "secondary": "#27ae60"},
+            "Sunset (Orange-Coral)": {"primary": "#e74c3c", "secondary": "#c0392b"},
+            "Ocean (Deep Blue)": {"primary": "#3498db", "secondary": "#2980b9"},
+            "Royal (Purple-Pink)": {"primary": "#9b59b6", "secondary": "#e84393"},
+            "Forest (Dark Green)": {"primary": "#27ae60", "secondary": "#2ecc71"},
+            "Cherry (Red-Pink)": {"primary": "#e84393", "secondary": "#9b59b6"},
+            "Amber (Yellow-Orange)": {"primary": "#f39c12", "secondary": "#e67e22"},
+        }
+        
+        theme_option = st.selectbox("🎨 Preset themes", options=list(preset_themes.keys()), index=0)
+        use_preset = st.checkbox("Use preset theme", value=True)
+        
+        if use_preset:
+            selected_theme = preset_themes[theme_option]
+            st.session_state.primary_color = selected_theme["primary"]
+            st.session_state.secondary_color = selected_theme["secondary"]
+        else:
+            selected_color = st.color_picker("🎨 Pick your primary color", value=st.session_state.primary_color)
+            st.session_state.primary_color = selected_color
+            st.session_state.secondary_color = get_complementary_color(selected_color)
+        
+        complementary = st.session_state.secondary_color
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f'<div style="text-align: center;"><div class="color-preview" style="background: {st.session_state.primary_color};"></div><div style="font-size: 11px; margin-top: 5px;">Primary</div></div>', unsafe_allow_html=True)
+        with col2:
+            st.markdown(f'<div style="text-align: center;"><div class="color-preview" style="background: {complementary};"></div><div style="font-size: 11px; margin-top: 5px;">Complementary</div></div>', unsafe_allow_html=True)
+        
+        st.markdown(f'<div class="complementary-preview" style="height: 8px; width: 100%; margin: 10px 0;"></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="theme-info">✨ Complementary color automatically selected<br>🎨 Gradient: Primary → Complementary</div>', unsafe_allow_html=True)
+        
+        secondary = st.session_state.get('secondary_color', get_complementary_color(st.session_state.primary_color))
+        apply_theme_css(st.session_state.primary_color, secondary)
+        
+        st.markdown("---")
+        
+        # Settings (seventh)
+        st.markdown(f"## {get_text('settings')}")
+        batch_size = st.slider(get_text('batch_size'), 10, 100, 50, help=get_text('batch_size_help'))
+        
+        st.markdown("---")
+    
+    # Main content
+    st.image("logo.png", width=250)
+    st.markdown("---")
+    st.markdown(f"### {get_text('app_subtitle')}")
+    st.markdown("---")
     
     tab1, tab2, tab3 = st.tabs([get_text('tab_upload'), get_text('tab_analytics'), get_text('tab_report')])
     
@@ -5831,11 +5297,7 @@ def main():
         references_text = ""
         
         if input_method == get_text('text_paste'):
-            references_text = st.text_area(
-                get_text('text_paste'),
-                height=400,
-                placeholder=get_text('paste_placeholder')
-            )
+            references_text = st.text_area(get_text('text_paste'), height=400, placeholder=get_text('paste_placeholder'))
         else:
             uploaded_file = st.file_uploader(get_text('file_upload'), type=['txt'])
             if uploaded_file:
@@ -5857,7 +5319,6 @@ def main():
                 else:
                     with st.spinner(get_text('searching_duplicates')):
                         duplicates = find_duplicate_references(references)
-                        duplicates = find_duplicate_references(references)
                         if duplicates:
                             st.warning(get_text('found_duplicates').format(len(duplicates)))
                             with st.expander(get_text('view_duplicates')):
@@ -5875,8 +5336,7 @@ def main():
                     st.session_state['analysis_started'] = True
                     
                     with st.spinner(get_text('analysis_started')):
-                        # Use the optimized analysis function
-                        results = analyze_all_references(references, batch_size, paper_authors if paper_authors else None)
+                        results = analyze_all_references_with_new_affiliations(references, batch_size, paper_authors if paper_authors else None)
                         st.session_state['results'] = results
                         st.session_state['analysis_complete'] = True
                     
@@ -5895,115 +5355,59 @@ def main():
             
             with st.spinner(get_text('analysis_started')):
                 stats = generate_advanced_statistics(results)
-            
-            # ========== GENERATE POTENTIAL REVIEWERS IF TOGGLED ==========
-            reviewers = []
-            if st.session_state.get('show_potential_reviewers', False):
-                with st.spinner(get_text('fetching_orcid_profiles')):
-                    # Get normalized paper authors for self-citation check
-                    paper_authors_norm = set()
-                    for author in paper_authors:
-                        norm, _ = normalize_author_name(author)
-                        paper_authors_norm.add(norm)
-                    
-                    # Get paper affiliations from stats
-                    paper_affiliations = set(stats.get('paper_affiliations', []))
-                    
-                    # Get candidates
-                    candidates = get_reviewer_candidates(results, paper_authors_norm, paper_affiliations)
-                    
-                    # Filter by affiliation (max 3 per affiliation)
-                    filtered_candidates = filter_reviewers_by_affiliation(candidates, max_per_affiliation=3)
-                    
+                
+                # Get potential reviewers if enabled
+                reviewers = []
+                paper_author_affiliations = set()
+                
+                # First, collect affiliations of paper authors
+                # We need to get this from somewhere - the paper authors themselves
+                # Since we don't have the target paper's data, we'll use the affiliations
+                # from the paper_authors set (which are just names, not affiliations)
+                # For now, we'll use a placeholder - this should be handled differently
+                # In a real scenario, you would have the target paper's data
+                # For the purpose of this code, we'll assume we need to get affiliations from
+                # somewhere else, but since we don't have that, we'll use the paper_authors set
+                # as a fallback for name-based filtering only
+                
+                if st.session_state.get('show_reviewers', False) and paper_authors:
+                    # Get potential reviewers
+                    reviewers = get_potential_reviewers(results, paper_authors, set())
                     # Fetch ORCID profiles
-                    reviewers = fetch_orcid_profiles_parallel(filtered_candidates)
-                    
-                    if reviewers:
-                        st.success(f"✅ Found {len(reviewers)} potential reviewers")
-                    else:
-                        st.info(get_text('none_detected'))
+                    reviewers = fetch_orcid_profiles_for_reviewers(reviewers)
             
-            # Display metrics with percentages
             st.markdown('<div class="stats-grid">', unsafe_allow_html=True)
             col1, col2, col3, col4 = st.columns(4)
             with col1:
                 total_percent = 100.0
-                st.markdown(f"""
-                <div class="metric-card">
-                    <div class="metric-number">{stats['total_references']}</div>
-                    <div class="metric-label">{get_text('total_references')}</div>
-                    <div style="font-size: 11px; color: #155724; background-color: #d4edda; padding: 2px 8px; border-radius: 12px; margin-top: 5px; display: inline-block;">({total_percent:.1f}%)</div>
-                </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f'<div class="metric-card"><div class="metric-number">{stats["total_references"]}</div><div class="metric-label">{get_text("total_references")}</div><div style="font-size: 11px; color: #155724; background-color: #d4edda; padding: 2px 8px; border-radius: 12px; margin-top: 5px; display: inline-block;">({total_percent:.1f}%)</div></div>', unsafe_allow_html=True)
             with col2:
                 doi_percent = stats.get('total_with_doi_percent', 0)
-                st.markdown(f"""
-                <div class="metric-card">
-                    <div class="metric-number">{stats['total_with_doi']} ({stats['total_with_doi']/stats['total_references']*100 if stats['total_references'] > 0 else 0:.0f}%)</div>
-                    <div class="metric-label">{get_text('doi_found')}</div>
-                    <div style="font-size: 11px; color: #155724; background-color: #d4edda; padding: 2px 8px; border-radius: 12px; margin-top: 5px; display: inline-block;">({doi_percent:.1f}%)</div>
-                </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f'<div class="metric-card"><div class="metric-number">{stats["total_with_doi"]} ({stats["total_with_doi"]/stats["total_references"]*100 if stats["total_references"] > 0 else 0:.0f}%)</div><div class="metric-label">{get_text("doi_found")}</div><div style="font-size: 11px; color: #155724; background-color: #d4edda; padding: 2px 8px; border-radius: 12px; margin-top: 5px; display: inline-block;">({doi_percent:.1f}%)</div></div>', unsafe_allow_html=True)
             with col3:
                 last5_percent = stats['yearly_stats']['last_5_years_percent']
-                st.markdown(f"""
-                <div class="metric-card">
-                    <div class="metric-number">{stats['yearly_stats']['last_5_years']}</div>
-                    <div class="metric-label">{get_text('last_5_years')}</div>
-                    <div style="font-size: 11px; color: #155724; background-color: #d4edda; padding: 2px 8px; border-radius: 12px; margin-top: 5px; display: inline-block;">({last5_percent:.1f}%)</div>
-                </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f'<div class="metric-card"><div class="metric-number">{stats["yearly_stats"]["last_5_years"]}</div><div class="metric-label">{get_text("last_5_years")}</div><div style="font-size: 11px; color: #155724; background-color: #d4edda; padding: 2px 8px; border-radius: 12px; margin-top: 5px; display: inline-block;">({last5_percent:.1f}%)</div></div>', unsafe_allow_html=True)
             with col4:
                 self_cit_percent = stats['self_citations_percent']
-                st.markdown(f"""
-                <div class="metric-card">
-                    <div class="metric-number">{stats['self_citations_count']}</div>
-                    <div class="metric-label">{get_text('self_citations')}</div>
-                    <div style="font-size: 11px; color: #155724; background-color: #d4edda; padding: 2px 8px; border-radius: 12px; margin-top: 5px; display: inline-block;">({self_cit_percent:.1f}%)</div>
-                </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f'<div class="metric-card"><div class="metric-number">{stats["self_citations_count"]}</div><div class="metric-label">{get_text("self_citations")}</div><div style="font-size: 11px; color: #155724; background-color: #d4edda; padding: 2px 8px; border-radius: 12px; margin-top: 5px; display: inline-block;">({self_cit_percent:.1f}%)</div></div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
             
             col5, col6, col7, col8 = st.columns(4)
             with col5:
-                st.markdown(f"""
-                <div class="metric-card">
-                    <div class="metric-number">{stats.get('total_citations_sum', 0)}</div>
-                    <div class="metric-label">{get_text('total_citations')}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f'<div class="metric-card"><div class="metric-number">{stats.get("total_citations_sum", 0)}</div><div class="metric-label">{get_text("total_citations")}</div></div>', unsafe_allow_html=True)
             with col6:
-                st.markdown(f"""
-                <div class="metric-card">
-                    <div class="metric-number">{stats.get('avg_citations', 0):.1f}</div>
-                    <div class="metric-label">{get_text('avg_citations')}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f'<div class="metric-card"><div class="metric-number">{stats.get("avg_citations", 0):.1f}</div><div class="metric-label">{get_text("avg_citations")}</div></div>', unsafe_allow_html=True)
             with col7:
-                st.markdown(f"""
-                <div class="metric-card">
-                    <div class="metric-number">{stats['orcid_coverage']['coverage_percent']:.1f}%</div>
-                    <div class="metric-label">{get_text('orcid_coverage')}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f'<div class="metric-card"><div class="metric-number">{stats["orcid_coverage"]["coverage_percent"]:.1f}%</div><div class="metric-label">{get_text("orcid_coverage")}</div></div>', unsafe_allow_html=True)
             with col8:
-                st.markdown(f"""
-                <div class="metric-card">
-                    <div class="metric-number">{stats['publisher_frequency']['unique_publishers']}</div>
-                    <div class="metric-label">{get_text('unique_publishers')}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f'<div class="metric-card"><div class="metric-number">{stats["publisher_frequency"]["unique_publishers"]}</div><div class="metric-label">{get_text("unique_publishers")}</div></div>', unsafe_allow_html=True)
             
             st.markdown("---")
-            
-            # Custom tabs implementation with buttons
             st.markdown(f"### {get_text('analysis_sections')}")
             
-            # Initialize session state for active tab if not exists
             if 'active_tab' not in st.session_state:
                 st.session_state.active_tab = "metrics"
             
-            # Define tabs configuration
             tabs_config = [
                 {"id": "metrics", "icon": "📊", "title": get_text('total_references'), "subtitle": get_text('html_overview')},
                 {"id": "identifiers", "icon": "🔍", "title": get_text('identifier_coverage'), "subtitle": get_text('html_identifier_coverage')},
@@ -6021,31 +5425,24 @@ def main():
                 {"id": "suspicious", "icon": "🔍", "title": get_text('suspicious_dois'), "subtitle": get_text('html_suspicious_doi')},
                 {"id": "non_doi", "icon": "📄", "title": get_text('non_doi_sources'), "subtitle": get_text('html_non_doi')},
                 {"id": "url_sources", "icon": "🔗", "title": get_text('url_sources'), "subtitle": get_text('html_url_sources')},
-                {"id": "problems", "icon": "⚠️", "title": get_text('problematic_refs'), "subtitle": get_text('html_problems')}
+                {"id": "problems", "icon": "⚠️", "title": get_text('problematic_refs'), "subtitle": get_text('html_problems')},
             ]
             
-            # Add potential reviewers tab if enabled
-            if st.session_state.get('show_potential_reviewers', False) and reviewers:
-                tabs_config.append({"id": "reviewers", "icon": "👥", "title": get_text('potential_reviewers'), "subtitle": get_text('html_reviewers')})
+            if st.session_state.get('show_reviewers', False):
+                tabs_config.insert(11, {"id": "reviewers", "icon": "👥", "title": get_text('potential_reviewers'), "subtitle": "Potential reviewers"})
             
-            # Create buttons in rows of 6
             cols_per_row = 6
             for i in range(0, len(tabs_config), cols_per_row):
                 cols = st.columns(cols_per_row)
                 for j, col in enumerate(cols):
                     if i + j < len(tabs_config):
                         tab = tabs_config[i + j]
-                        if col.button(
-                            f"{tab['icon']}\n{tab['title']}\n{tab['subtitle']}",
-                            key=f"tab_{tab['id']}",
-                            use_container_width=True
-                        ):
+                        if col.button(f"{tab['icon']}\n{tab['title']}\n{tab['subtitle']}", key=f"tab_{tab['id']}", use_container_width=True):
                             st.session_state.active_tab = tab["id"]
                             st.rerun()
             
             st.markdown("---")
             
-            # Display content based on active tab
             active_tab = st.session_state.active_tab
             
             if active_tab == "metrics":
@@ -6059,7 +5456,6 @@ def main():
                         {"Status": get_text('status_none'), "Count": stats['doi_status']['none'], "Percentage": f"{stats['doi_status_percents']['none']:.1f}%"}
                     ])
                     st.dataframe(doi_data, use_container_width=True)
-                
                 with col2:
                     st.markdown(f"### {get_text('citation_metrics')}")
                     st.metric(get_text('total_citations'), stats.get('total_citations_sum', 0))
@@ -6103,34 +5499,17 @@ def main():
             
             elif active_tab == "yearly":
                 st.markdown(f"### {get_text('yearly_stats')}")
-                
-                # Display yearly summary cards with Last Year FIRST
                 col1, col2, col3, col4, col5 = st.columns(5)
                 with col1:
-                    st.metric(
-                        f"Last Year ({stats['yearly_stats']['last_completed_year']})", 
-                        f"{stats['yearly_stats']['last_year']} ({stats['yearly_stats']['last_year_percent']:.1f}%)"
-                    )
+                    st.metric(f"Last Year ({stats['yearly_stats']['last_completed_year']})", f"{stats['yearly_stats']['last_year']} ({stats['yearly_stats']['last_year_percent']:.1f}%)")
                 with col2:
-                    st.metric(
-                        get_text('last_3_years'), 
-                        f"{stats['yearly_stats']['last_3_years']} ({stats['yearly_stats']['last_3_years_percent']:.1f}%)"
-                    )
+                    st.metric(get_text('last_3_years'), f"{stats['yearly_stats']['last_3_years']} ({stats['yearly_stats']['last_3_years_percent']:.1f}%)")
                 with col3:
-                    st.metric(
-                        get_text('last_5_years_metric'), 
-                        f"{stats['yearly_stats']['last_5_years']} ({stats['yearly_stats']['last_5_years_percent']:.1f}%)"
-                    )
+                    st.metric(get_text('last_5_years_metric'), f"{stats['yearly_stats']['last_5_years']} ({stats['yearly_stats']['last_5_years_percent']:.1f}%)")
                 with col4:
-                    st.metric(
-                        get_text('last_10_years'), 
-                        f"{stats['yearly_stats']['last_10_years']} ({stats['yearly_stats']['last_10_years_percent']:.1f}%)"
-                    )
+                    st.metric(get_text('last_10_years'), f"{stats['yearly_stats']['last_10_years']} ({stats['yearly_stats']['last_10_years_percent']:.1f}%)")
                 with col5:
-                    st.metric(
-                        get_text('references_with_unknown_year'), 
-                        stats['yearly_stats']['unknown_year']
-                    )
+                    st.metric(get_text('references_with_unknown_year'), stats['yearly_stats']['unknown_year'])
                 
                 st.markdown(f"#### {get_text('distribution_by_year')}")
                 years_df = pd.DataFrame(list(stats['yearly_stats']['yearly_counts'].items()), columns=["Year", "Count"])
@@ -6140,14 +5519,8 @@ def main():
                 st.markdown(f"#### {get_text('detailed_yearly_data')}")
                 yearly_data = []
                 for year in sorted(stats['yearly_stats']['yearly_counts'].keys(), reverse=True):
-                    yearly_data.append({
-                        "Year": year,
-                        "Count": stats['yearly_stats']['yearly_counts'][year],
-                        "Percentage": f"{stats['yearly_stats']['yearly_percentages'][year]:.1f}%",
-                        "Cumulative %": f"{stats['yearly_stats']['cumulative_percentages'][year]:.1f}%"
-                    })
+                    yearly_data.append({"Year": year, "Count": stats['yearly_stats']['yearly_counts'][year], "Percentage": f"{stats['yearly_stats']['yearly_percentages'][year]:.1f}%", "Cumulative %": f"{stats['yearly_stats']['cumulative_percentages'][year]:.1f}%"})
                 st.dataframe(pd.DataFrame(yearly_data), use_container_width=True)
-                
                 st.markdown(f"**{get_text('references_with_known_year')}:** {stats['yearly_stats']['total_with_year']}")
             
             elif active_tab == "concepts":
@@ -6164,7 +5537,6 @@ def main():
                     st.markdown(f"#### {get_text('top_author_pairs')}")
                     for i, collab in enumerate(stats['collaboration']['top_collaborations'][:10], 1):
                         st.markdown(f"{i}. **{collab['author1']}** + **{collab['author2']}** — {collab['count']} {get_text('html_joint_works')}")
-                    
                     st.markdown(f"#### {get_text('core_authors')}")
                     for author, connections in stats['collaboration']['core_authors'][:10]:
                         st.markdown(f"• **{author}** — {connections} {get_text('html_connections')}")
@@ -6188,16 +5560,23 @@ def main():
                             st.markdown(f"**{get_text('journal')}:** {classic['journal']}")
                             st.markdown(f"**{get_text('year')}:** {classic['year']}")
                             if classic.get('doi'):
-                                # Make DOI clickable
                                 st.markdown(f"**DOI:** <a href='https://doi.org/{classic['doi']}' target='_blank' style='color: #667eea; text-decoration: none;'>{classic['doi']}</a>", unsafe_allow_html=True)
                 else:
                     st.info(get_text('no_citation_classics'))
+            
+            elif active_tab == "reviewers" and st.session_state.get('show_reviewers', False):
+                st.markdown(f"### {get_text('potential_reviewers')}")
+                if reviewers:
+                    for i, reviewer in enumerate(reviewers[:30], 1):
+                        display_reviewer_card(reviewer, i)
+                    st.info(f"Showing {min(len(reviewers), 30)} potential reviewers (max 30, max 3 per affiliation)")
+                else:
+                    st.info("No potential reviewers found matching the criteria (not self-cited, different affiliation, recent publication)")
             
             elif active_tab == "crossref_only":
                 st.markdown(f"### {get_text('crossref_only')}")
                 if stats.get('crossref_only_refs'):
                     for ref in stats['crossref_only_refs'][:20]:
-                        # Make DOI clickable
                         doi_link = f"<a href='https://doi.org/{ref['doi']}' target='_blank' style='color: #667eea; text-decoration: none;'>{ref['doi']}</a>"
                         st.warning(f"📄 {ref['text']}\n\nDOI: {doi_link}", unsafe_allow_html=True)
                 else:
@@ -6207,7 +5586,6 @@ def main():
                 st.markdown(f"### {get_text('openalex_only')}")
                 if stats.get('openalex_only_refs'):
                     for ref in stats['openalex_only_refs'][:20]:
-                        # Make DOI clickable
                         doi_link = f"<a href='https://doi.org/{ref['doi']}' target='_blank' style='color: #667eea; text-decoration: none;'>{ref['doi']}</a>"
                         st.info(f"📄 {ref['text']}\n\nDOI: {doi_link}", unsafe_allow_html=True)
                 else:
@@ -6216,24 +5594,18 @@ def main():
             elif active_tab == "suspicious":
                 st.markdown(f"### {get_text('suspicious_dois')}")
                 st.markdown(get_text('suspicious_dois_hint'))
-                
-                # Show repository sources if any
                 if stats.get('repository_refs'):
                     st.markdown(f"#### {get_text('repository')} {get_text('references')}")
                     st.caption(get_text('html_repository_note'))
                     for ref in stats['repository_refs'][:20]:
                         doi_link = f"<a href='https://doi.org/{ref['doi']}' target='_blank' style='color: #667eea; text-decoration: none;'>{ref['doi']}</a>" if ref.get('doi') else get_text('not_found')
                         st.info(f"📚 {ref['text']}\n\nDOI: {doi_link}", unsafe_allow_html=True)
-                
-                # Show proceedings sources if any
                 if stats.get('proceedings_refs'):
                     st.markdown(f"#### {get_text('proceedings')} {get_text('references')}")
                     st.caption(get_text('html_proceedings_note'))
                     for ref in stats['proceedings_refs'][:20]:
                         doi_link = f"<a href='https://doi.org/{ref['doi']}' target='_blank' style='color: #667eea; text-decoration: none;'>{ref['doi']}</a>" if ref.get('doi') else get_text('not_found')
                         st.warning(f"📊 {ref['text']}\n\nDOI: {doi_link}", unsafe_allow_html=True)
-                
-                # Show truly suspicious DOIs
                 if stats.get('suspicious_doi_refs'):
                     st.markdown(f"#### {get_text('suspicious_dois')}")
                     for ref in stats['suspicious_doi_refs'][:20]:
@@ -6244,18 +5616,13 @@ def main():
             
             elif active_tab == "non_doi":
                 st.markdown(f"### {get_text('non_doi_sources')}")
-                
-                # Show books with ISBN but no DOI
                 if stats.get('books_with_isbn_no_doi'):
                     st.markdown(f"#### {get_text('books_count')} (ISBN without DOI)")
                     for ref in stats['books_with_isbn_no_doi'][:20]:
                         st.markdown(f"<div class='rank-item book-reference'><span class='badge-book'>{get_text('ebook')}</span><div style='margin-top: 8px;'>{html.escape(ref)}</div></div>", unsafe_allow_html=True)
-                
-                # Show other non-DOI sources
                 if stats['identifier_coverage']['references_without_doi']:
                     st.markdown(f"#### {get_text('other')} {get_text('non_doi_sources')}")
                     for ref in stats['identifier_coverage']['references_without_doi'][:20]:
-                        # Skip books with ISBN no DOI as they are already shown
                         if not any(book_ref == ref for book_ref in stats.get('books_with_isbn_no_doi', [])):
                             st.text(ref)
                 elif not stats.get('books_with_isbn_no_doi'):
@@ -6271,155 +5638,78 @@ def main():
             
             elif active_tab == "problems":
                 st.markdown(f"### {get_text('problematic_refs')}")
-                
-                # Show retracted articles
                 if stats.get('retracted_refs'):
                     st.markdown(f"#### {get_text('retracted_count')}")
                     for ref in stats['retracted_refs'][:20]:
                         doi_link = f"<a href='https://doi.org/{ref['doi']}' target='_blank' style='color: #667eea; text-decoration: none;'>{ref['doi']}</a>" if ref.get('doi') else get_text('not_found')
                         st.error(f"⚠️ {get_text('retracted')}: {ref['text']}\n\nDOI: {doi_link}", unsafe_allow_html=True)
-                
-                # Show other problematic references
                 if stats['problematic_refs']:
                     st.markdown(f"#### {get_text('other')} {get_text('problematic_refs')}")
                     for ref in stats['problematic_refs'][:15]:
                         st.warning(f"**{ref['problems']}**\n\n{ref['text']}")
-                
                 if not stats['problematic_refs'] and not stats.get('retracted_refs'):
                     st.success(get_text('no_problematic'))
-            
-            elif active_tab == "reviewers" and reviewers:
-                display_potential_reviewers_section(reviewers)
             
             st.markdown("---")
             st.markdown(f"### {get_text('full_reference_list')}")
             
-            # Initialize filter states in session state if not exists
             if 'filter_states' not in st.session_state:
                 st.session_state.filter_states = {
-                    'doi_only': False,
-                    'non_doi_only': False,
-                    'url_only': False,
-                    'crossref_only': False,
-                    'openalex_only': False,
-                    'problematic_only': False,
-                    'self_cited_only': False,
-                    'preprint_repository_only': False,
-                    'books_only': False,
-                    'proceedings_only': False,
-                    'retracted_only': False
+                    'doi_only': False, 'non_doi_only': False, 'url_only': False,
+                    'crossref_only': False, 'openalex_only': False, 'problematic_only': False,
+                    'self_cited_only': False, 'preprint_repository_only': False,
+                    'books_only': False, 'proceedings_only': False, 'retracted_only': False
                 }
             
-            # Function to handle filter changes
             def toggle_filter(filter_name, is_checked):
                 if is_checked:
-                    # Disable all other filters
                     for key in st.session_state.filter_states:
                         st.session_state.filter_states[key] = False
                     st.session_state.filter_states[filter_name] = True
                 else:
                     st.session_state.filter_states[filter_name] = False
             
-            # Check if we have any references of each type to show dynamic filters
             has_preprint_repository = any(r.get('is_repository', False) for r in results)
             has_books = any(r.get('is_ebook', False) or (r.get('identifiers', {}).get('isbn') and not r.get('doi')) for r in results)
             has_proceedings = any(r.get('is_proceedings', False) for r in results)
             has_retracted = any(r.get('is_retracted', False) for r in results)
             
-            # Display dynamic filters (only show if there are relevant references)
             col_filter1, col_filter2, col_filter3, col_filter4 = st.columns(4)
             with col_filter1:
-                doi_only = st.checkbox(
-                    get_text('only_with_doi'),
-                    value=st.session_state.filter_states['doi_only'],
-                    key="filter_doi_only",
-                    on_change=lambda: toggle_filter('doi_only', st.session_state.filter_doi_only)
-                )
+                doi_only = st.checkbox(get_text('only_with_doi'), value=st.session_state.filter_states['doi_only'], key="filter_doi_only", on_change=lambda: toggle_filter('doi_only', st.session_state.filter_doi_only))
             with col_filter2:
-                non_doi_only = st.checkbox(
-                    get_text('only_non_doi'),
-                    value=st.session_state.filter_states['non_doi_only'],
-                    key="filter_non_doi_only",
-                    on_change=lambda: toggle_filter('non_doi_only', st.session_state.filter_non_doi_only)
-                )
+                non_doi_only = st.checkbox(get_text('only_non_doi'), value=st.session_state.filter_states['non_doi_only'], key="filter_non_doi_only", on_change=lambda: toggle_filter('non_doi_only', st.session_state.filter_non_doi_only))
             with col_filter3:
-                url_only = st.checkbox(
-                    get_text('url_links'),
-                    value=st.session_state.filter_states['url_only'],
-                    key="filter_url_only",
-                    on_change=lambda: toggle_filter('url_only', st.session_state.filter_url_only)
-                )
+                url_only = st.checkbox(get_text('url_links'), value=st.session_state.filter_states['url_only'], key="filter_url_only", on_change=lambda: toggle_filter('url_only', st.session_state.filter_url_only))
             with col_filter4:
-                crossref_only = st.checkbox(
-                    get_text('only_crossref'),
-                    value=st.session_state.filter_states['crossref_only'],
-                    key="filter_crossref_only",
-                    on_change=lambda: toggle_filter('crossref_only', st.session_state.filter_crossref_only)
-                )
+                crossref_only = st.checkbox(get_text('only_crossref'), value=st.session_state.filter_states['crossref_only'], key="filter_crossref_only", on_change=lambda: toggle_filter('crossref_only', st.session_state.filter_crossref_only))
             
             col_filter5, col_filter6, col_filter7, col_filter8 = st.columns(4)
             with col_filter5:
-                openalex_only = st.checkbox(
-                    get_text('only_openalex'),
-                    value=st.session_state.filter_states['openalex_only'],
-                    key="filter_openalex_only",
-                    on_change=lambda: toggle_filter('openalex_only', st.session_state.filter_openalex_only)
-                )
+                openalex_only = st.checkbox(get_text('only_openalex'), value=st.session_state.filter_states['openalex_only'], key="filter_openalex_only", on_change=lambda: toggle_filter('openalex_only', st.session_state.filter_openalex_only))
             with col_filter6:
-                problematic_only = st.checkbox(
-                    get_text('problematic_only'),
-                    value=st.session_state.filter_states['problematic_only'],
-                    key="filter_problematic_only",
-                    on_change=lambda: toggle_filter('problematic_only', st.session_state.filter_problematic_only)
-                )
+                problematic_only = st.checkbox(get_text('problematic_only'), value=st.session_state.filter_states['problematic_only'], key="filter_problematic_only", on_change=lambda: toggle_filter('problematic_only', st.session_state.filter_problematic_only))
             with col_filter7:
-                self_cited_only = st.checkbox(
-                    get_text('self_cited_only'),
-                    value=st.session_state.filter_states['self_cited_only'],
-                    key="filter_self_cited_only",
-                    on_change=lambda: toggle_filter('self_cited_only', st.session_state.filter_self_cited_only)
-                )
+                self_cited_only = st.checkbox(get_text('self_cited_only'), value=st.session_state.filter_states['self_cited_only'], key="filter_self_cited_only", on_change=lambda: toggle_filter('self_cited_only', st.session_state.filter_self_cited_only))
             with col_filter8:
                 search_term = st.text_input(get_text('search_in_text'), placeholder=get_text('search_placeholder'))
             
-            # NEW: Second row of dynamic filters (only show if there are references of that type)
             col_filter9, col_filter10, col_filter11, col_filter12 = st.columns(4)
             with col_filter9:
                 if has_preprint_repository:
-                    preprint_repo_only = st.checkbox(
-                        get_text('only_preprint_repository'),
-                        value=st.session_state.filter_states['preprint_repository_only'],
-                        key="filter_preprint_repo_only",
-                        on_change=lambda: toggle_filter('preprint_repository_only', st.session_state.filter_preprint_repo_only)
-                    )
+                    preprint_repo_only = st.checkbox(get_text('only_preprint_repository'), value=st.session_state.filter_states['preprint_repository_only'], key="filter_preprint_repo_only", on_change=lambda: toggle_filter('preprint_repository_only', st.session_state.filter_preprint_repo_only))
             with col_filter10:
                 if has_books:
-                    books_only = st.checkbox(
-                        get_text('only_books'),
-                        value=st.session_state.filter_states['books_only'],
-                        key="filter_books_only",
-                        on_change=lambda: toggle_filter('books_only', st.session_state.filter_books_only)
-                    )
+                    books_only = st.checkbox(get_text('only_books'), value=st.session_state.filter_states['books_only'], key="filter_books_only", on_change=lambda: toggle_filter('books_only', st.session_state.filter_books_only))
             with col_filter11:
                 if has_proceedings:
-                    proceedings_only = st.checkbox(
-                        get_text('only_proceedings'),
-                        value=st.session_state.filter_states['proceedings_only'],
-                        key="filter_proceedings_only",
-                        on_change=lambda: toggle_filter('proceedings_only', st.session_state.filter_proceedings_only)
-                    )
+                    proceedings_only = st.checkbox(get_text('only_proceedings'), value=st.session_state.filter_states['proceedings_only'], key="filter_proceedings_only", on_change=lambda: toggle_filter('proceedings_only', st.session_state.filter_proceedings_only))
             with col_filter12:
                 if has_retracted:
-                    retracted_only = st.checkbox(
-                        get_text('only_retracted'),
-                        value=st.session_state.filter_states['retracted_only'],
-                        key="filter_retracted_only",
-                        on_change=lambda: toggle_filter('retracted_only', st.session_state.filter_retracted_only)
-                    )
+                    retracted_only = st.checkbox(get_text('only_retracted'), value=st.session_state.filter_states['retracted_only'], key="filter_retracted_only", on_change=lambda: toggle_filter('retracted_only', st.session_state.filter_retracted_only))
             
             filtered_results = results
             
-            # Apply filters based on session state
             if st.session_state.filter_states['doi_only']:
                 filtered_results = [r for r in filtered_results if r['doi']]
             if st.session_state.filter_states['non_doi_only']:
@@ -6434,7 +5724,6 @@ def main():
                 filtered_results = [r for r in filtered_results if r['is_retracted'] or r['is_preprint'] or r['crossmark_issues'] or r.get('is_suspicious_doi')]
             if st.session_state.filter_states['self_cited_only']:
                 filtered_results = [r for r in filtered_results if r['is_self_citation']]
-            # NEW filters
             if st.session_state.filter_states['preprint_repository_only']:
                 filtered_results = [r for r in filtered_results if r.get('is_repository', False) or r.get('type') == 'posted_content']
             if st.session_state.filter_states['books_only']:
@@ -6448,7 +5737,6 @@ def main():
             
             st.markdown(get_text('showing').format(len(filtered_results), len(results)))
             
-            # Prepare self-citation authors highlighting for the full reference list
             paper_authors_set = set()
             normalized_paper_authors = set()
             if paper_authors:
@@ -6457,11 +5745,9 @@ def main():
                     norm, _ = normalize_author_name(author)
                     normalized_paper_authors.add(norm)
             
-            # Function to format authors with highlight for self-citations in the full list
             def format_authors_with_highlight_streamlit(authors_list, highlight_set, normalize_func):
                 if not authors_list:
                     return ""
-                
                 formatted_authors = []
                 for author in authors_list:
                     norm_author, _ = normalize_func(author)
@@ -6469,10 +5755,8 @@ def main():
                         formatted_authors.append(f'<span style="color: #d9534f; font-weight: bold; background-color: #f8d7da; padding: 2px 4px; border-radius: 3px;">{html.escape(author)}</span>')
                     else:
                         formatted_authors.append(html.escape(author))
-                
                 return ', '.join(formatted_authors)
             
-            # Display filtered results with special styling for ebooks, repositories, proceedings
             for i, result in enumerate(filtered_results[:50]):
                 if result.get('is_suspicious_doi'):
                     status_icon = "⚠️"
@@ -6499,7 +5783,6 @@ def main():
                 
                 badges_html = ' '.join(problems_badges)
                 
-                # Determine special class for expander styling
                 special_class = ""
                 if result.get('is_ebook', False):
                     special_class = "ebook-reference"
@@ -6508,24 +5791,17 @@ def main():
                 elif result.get('is_proceedings', False):
                     special_class = "proceedings-reference"
                 
-                # Format authors with highlighting if this is a self-citation
                 if result['is_self_citation'] and normalized_paper_authors:
-                    authors_display_html = format_authors_with_highlight_streamlit(
-                        result['authors_display'], 
-                        normalized_paper_authors, 
-                        normalize_author_name
-                    )
+                    authors_display_html = format_authors_with_highlight_streamlit(result['authors_display'], normalized_paper_authors, normalize_author_name)
                 else:
                     authors_display_html = ', '.join([html.escape(a) for a in result['authors_display'][:5]]) if result['authors_display'] else ""
                 
-                # Make DOI clickable
                 doi_display = ""
                 if result['doi']:
                     doi_display = f'<a href="https://doi.org/{result["doi"]}" target="_blank" style="color: #667eea; text-decoration: none;">{result["doi"]}</a>'
                 else:
                     doi_display = get_text('not_found')
                 
-                # Use custom CSS class for expander if needed (via markdown wrapper)
                 expander_label = f"{status_icon} {result['original_text'][:150]}..."
                 if special_class:
                     expander_label = f"{status_icon} <span class='{special_class}' style='display: inline-block; padding: 2px 8px; border-radius: 12px;'>{result['original_text'][:130]}...</span>"
@@ -6568,68 +5844,33 @@ def main():
             journal_name = st.session_state.get('journal_name', '')
             article_number = st.session_state.get('article_number', '')
             duplicates = st.session_state.get('duplicates', [])
-            show_reviewers = st.session_state.get('show_potential_reviewers', False)
+            show_reviewers_flag = st.session_state.get('show_reviewers', False)
             
-            # Generate statistics
             stats = generate_advanced_statistics(results)
             
-            # Generate reviewers if needed
             reviewers = []
-            if show_reviewers:
-                with st.spinner(get_text('fetching_orcid_profiles')):
-                    # Get normalized paper authors
-                    paper_authors_norm = set()
-                    for author in paper_authors:
-                        norm, _ = normalize_author_name(author)
-                        paper_authors_norm.add(norm)
-                    
-                    # Get paper affiliations
-                    paper_affiliations = set(stats.get('paper_affiliations', []))
-                    
-                    # Get candidates
-                    candidates = get_reviewer_candidates(results, paper_authors_norm, paper_affiliations)
-                    
-                    # Filter by affiliation
-                    filtered_candidates = filter_reviewers_by_affiliation(candidates, max_per_affiliation=3)
-                    
-                    # Fetch ORCID profiles
-                    reviewers = fetch_orcid_profiles_parallel(filtered_candidates)
+            if show_reviewers_flag and paper_authors:
+                reviewers = get_potential_reviewers(results, paper_authors, set())
+                reviewers = fetch_orcid_profiles_for_reviewers(reviewers)
             
             st.markdown(f"### {get_text('export_report')}")
             st.markdown(get_text('download_html'))
-
-            # Get current theme colors
+            
             primary_color = st.session_state.get('primary_color', '#667eea')
             secondary_color = st.session_state.get('secondary_color', get_complementary_color(primary_color))
             
-            # Generate HTML report with duplicates and new types and reviewers
             html_report = generate_html_report_advanced(
-                results, 
-                stats, 
-                paper_authors, 
-                st.session_state.language, 
-                journal_name, 
-                article_number, 
-                duplicates,
-                primary_color,
-                secondary_color,
-                show_reviewers,
-                reviewers
+                results, stats, paper_authors, st.session_state.language,
+                journal_name, article_number, duplicates, primary_color, secondary_color,
+                show_reviewers_flag, reviewers
             )
             
-            # Generate filename from journal abbreviation and article number (no datetime)
             def get_journal_abbreviation(journal_name: str) -> str:
-                """Get journal abbreviation from full name"""
-                abbreviations = {
-                    'chimica techno acta': 'CTA',
-                    'materials reports energy': 'MRE',
-                    # Add more abbreviations as needed
-                }
+                abbreviations = {'chimica techno acta': 'CTA', 'materials reports energy': 'MRE'}
                 journal_lower = journal_name.lower().strip()
                 for full, abbr in abbreviations.items():
                     if full in journal_lower:
                         return abbr
-                # Fallback: take first letters of each word (max 3-4 letters)
                 words = re.findall(r'[A-Za-z][a-z]*', journal_name)
                 if words:
                     abbr = ''.join(word[0].upper() for word in words[:3])
@@ -6637,38 +5878,27 @@ def main():
                 return "JRNL"
             
             def sanitize_filename(s: str) -> str:
-                # Remove special characters, replace spaces and punctuation with underscores
                 s = re.sub(r'[^a-z0-9]+', '_', s.lower().strip())
-                # Remove leading/trailing underscores
                 s = s.strip('_')
                 return s if s else "report"
             
-            # Get journal abbreviation
             if journal_name and journal_name.strip():
                 journal_abbr = get_journal_abbreviation(journal_name)
             else:
-                journal_abbr = "CTA"  # default
+                journal_abbr = "CTA"
             
-            # Sanitize article number for filename
             if article_number and article_number.strip():
                 num_part = sanitize_filename(article_number)
-                # Keep only alphanumeric and dash for article number
                 num_part = re.sub(r'[^a-z0-9\-]', '', num_part)
                 file_name = f"{journal_abbr}_{num_part}.html"
             else:
                 file_name = f"{journal_abbr}.html"
             
-            st.download_button(
-                label=get_text('download_html'),
-                data=html_report.encode('utf-8'),
-                file_name=file_name,
-                mime="text/html"
-            )
+            st.download_button(label=get_text('download_html'), data=html_report.encode('utf-8'), file_name=file_name, mime="text/html")
             
             st.markdown("---")
             st.markdown(f"### {get_text('text_export')}")
             
-            # Prepare text export with comprehensive data (updated with new types and reviewers)
             copy_text = f"""
     === COMPREHENSIVE REFERENCE LIST ANALYSIS ===
     Journal: {journal_name if journal_name else 'Chimica Techno Acta'}
@@ -6758,13 +5988,18 @@ def main():
     {chr(10).join([f"- {ref['problems']}: {ref['text'][:100]}..." for ref in stats['problematic_refs'][:5]]) if stats['problematic_refs'] else "No problematic references detected"}
     """
             
-            # Add potential reviewers section to text export if enabled
-            if show_reviewers and reviewers:
-                copy_text += f"""
-    
-    === POTENTIAL REVIEWERS ===
-    {chr(10).join([f"{i+1}. {r['display_name']}" + (f" (ORCID: {r['orcid']})" if r.get('orcid') else "") + f" - {len(r['candidate_articles'])} cited articles, latest: {r['latest_year']}" for i, r in enumerate(reviewers[:30])]) if reviewers else "No potential reviewers found"}
-    """
+            if show_reviewers_flag and reviewers:
+                copy_text += "\n\n=== POTENTIAL REVIEWERS ===\n"
+                for i, reviewer in enumerate(reviewers[:30], 1):
+                    orcid_info = f" (ORCID: {reviewer.get('orcid', 'N/A')})" if reviewer.get('orcid') else ""
+                    copy_text += f"{i}. {reviewer.get('name', 'Unknown')}{orcid_info}\n"
+                    copy_text += f"   Publication: {reviewer.get('doi', 'N/A')} ({reviewer.get('publication_year', 'Unknown')})\n"
+                    if reviewer.get('affiliations'):
+                        aff_list = [aff if isinstance(aff, str) else aff.get('name', '') for aff in reviewer['affiliations'][:3]]
+                        copy_text += f"   Affiliations: {', '.join(aff_list)}\n"
+                    if reviewer.get('countries'):
+                        copy_text += f"   Countries: {', '.join(reviewer['countries'][:3])}\n"
+                    copy_text += "\n"
             
             st.text_area(get_text('text_export'), copy_text, height=400)
             
