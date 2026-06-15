@@ -5605,7 +5605,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         <div id="full_reference_list" class="section">
             {make_section_title("list", "full_reference_list_title")}
             {full_references_html}
-            {f'<p style="margin-top: 15px; color: #666;">{get_text_local("showing_first").format(300, len(results))}</p>' if len(results) > 300 else ''}
+            {f'<p style="margin-top: 15px; color: #666;">{get_text_local("showing_first").format(500, len(results))}</p>' if len(results) > 500 else ''}
         </div>
         
         <div class="footer">
