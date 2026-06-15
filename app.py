@@ -303,6 +303,78 @@ def apply_theme_css(base_color: str, accent_color: str = None):
             font-size: 12px;
             text-align: center;
         }}
+        
+        /* Reviewer card styles */
+        .reviewer-card {{
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+            border-left: 4px solid var(--primary);
+        }}
+        
+        .reviewer-card:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }}
+        
+        .reviewer-name {{
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 8px;
+        }}
+        
+        .reviewer-orcid {{
+            font-size: 13px;
+            margin-bottom: 8px;
+        }}
+        
+        .reviewer-country {{
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 8px;
+        }}
+        
+        .reviewer-section-title {{
+            font-weight: 600;
+            margin-top: 12px;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #333;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 4px;
+        }}
+        
+        .external-id-item {{
+            font-size: 12px;
+            margin-bottom: 6px;
+            padding-left: 8px;
+        }}
+        
+        .reviewer-website {{
+            font-size: 12px;
+            margin-bottom: 6px;
+        }}
+        
+        .confidential-banner {{
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            text-align: center;
+            font-weight: bold;
+            border: 2px solid #ffd32a;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }}
+        
+        .confidential-banner::before {{
+            content: "🔒 ";
+            font-size: 20px;
+        }}
     </style>
     """
     st.markdown(theme_css, unsafe_allow_html=True)
@@ -561,6 +633,27 @@ TEXTS = {
         'references_count': "references",
         'percent_sign': "%",
         'cumulative': "cumulative",
+        
+        # New strings for Potential Reviewers
+        'propose_reviewers': "🔍 Propose potential reviewers",
+        'potential_reviewers': "👥 Potential Reviewers",
+        'reviewer_confidential_banner': "CONFIDENTIAL: This report is intended for editorial use only and must not be shared with reviewers or authors.",
+        'fetching_orcid_profiles': "🔍 Fetching ORCID profiles for potential reviewers...",
+        'orcid_profile_not_public': "ORCID profile is not public or not found",
+        'orcid_other_ids': "Other identifiers",
+        'orcid_websites': "Websites & social links",
+        'orcid_country': "Country",
+        'all_affiliations': "All affiliations",
+        'all_countries': "All countries",
+        'num_affiliations': "Number of affiliations",
+        'num_countries': "Number of countries",
+        'affiliation': "Affiliation",
+        'confidential_banner_en': "CONFIDENTIAL: This report is intended for editorial use only and must not be shared with reviewers or authors.",
+        'confidential_banner_ru': "КОНФИДЕНЦИАЛЬНО: Этот отчет предназначен только для редакционного использования и не подлежит распространению среди рецензентов или авторов.",
+        'orcid_loading_error': "Error loading ORCID profile",
+        'reviewer_affiliations': "Affiliations in cited works",
+        'reviewer_candidate': "Candidate",
+        'reviewer_articles_count': "cited articles",
     },
     'ru': {
         # General UI
@@ -806,6 +899,27 @@ TEXTS = {
         'references_count': "ссылок",
         'percent_sign': "%",
         'cumulative': "накоплено",
+        
+        # New strings for Potential Reviewers
+        'propose_reviewers': "🔍 Предложить потенциальных рецензентов",
+        'potential_reviewers': "👥 Потенциальные рецензенты",
+        'reviewer_confidential_banner': "КОНФИДЕНЦИАЛЬНО: Этот отчет предназначен только для редакционного использования и не подлежит распространению среди рецензентов или авторов.",
+        'fetching_orcid_profiles': "🔍 Загрузка профилей ORCID для потенциальных рецензентов...",
+        'orcid_profile_not_public': "Профиль ORCID не публичен или не найден",
+        'orcid_other_ids': "Другие идентификаторы",
+        'orcid_websites': "Веб-сайты и профили",
+        'orcid_country': "Страна",
+        'all_affiliations': "Все аффилиации",
+        'all_countries': "Все страны",
+        'num_affiliations': "Количество аффилиаций",
+        'num_countries': "Количество стран",
+        'affiliation': "Аффилиация",
+        'confidential_banner_en': "CONFIDENTIAL: This report is intended for editorial use only and must not be shared with reviewers or authors.",
+        'confidential_banner_ru': "КОНФИДЕНЦИАЛЬНО: Этот отчет предназначен только для редакционного использования и не подлежит распространению среди рецензентов или авторов.",
+        'orcid_loading_error': "Ошибка загрузки профиля ORCID",
+        'reviewer_affiliations': "Аффилиации в цитируемых работах",
+        'reviewer_candidate': "Кандидат",
+        'reviewer_articles_count': "цитируемых статей",
     }
 }
 
@@ -830,11 +944,19 @@ if 'language' not in st.session_state:
 if 'bad_dois' not in st.session_state:
     st.session_state.bad_dois = set()
 
+# Initialize ORCID cache in session state for potential reviewers
+if 'orcid_cache' not in st.session_state:
+    st.session_state.orcid_cache = {}
+
 # Initialize journal and article number in session state
 if 'journal_name' not in st.session_state:
     st.session_state.journal_name = ''
 if 'article_number' not in st.session_state:
     st.session_state.article_number = ''
+
+# Initialize potential reviewers toggle in session state
+if 'show_potential_reviewers' not in st.session_state:
+    st.session_state.show_potential_reviewers = False
 
 # ======================== COUNTRY CODES MAPPING ========================
 COUNTRY_CODES = {
@@ -911,6 +1033,739 @@ COUNTRY_CODES = {
     'Turkmenistan': 'TM', 'Turkmenistan': 'TM',
     'Mongolia': 'MN', 'Mongolia': 'MN',
 }
+
+# ======================== NEW FUNCTIONS FOR AFFILIATIONS (FROM EXAMPLE CODE) ========================
+
+def extract_country_from_affiliation_string(affiliation_string: str) -> str:
+    """
+    Extract country from affiliation string (fallback method when country_code is not available)
+    This is a simplified version from the working example code
+    """
+    if not affiliation_string or not isinstance(affiliation_string, str):
+        return ""
+    
+    affiliation_string = affiliation_string.strip()
+    
+    # Known countries mapping (expanded from example)
+    known_countries = {
+        'usa': 'US', 'united states': 'US', 'america': 'US',
+        'uk': 'GB', 'united kingdom': 'GB', 'great britain': 'GB',
+        'china': 'CN', 'pr china': 'CN', "people's republic of china": 'CN',
+        'germany': 'DE', 'deutschland': 'DE',
+        'france': 'FR', 'japan': 'JP', 'canada': 'CA',
+        'australia': 'AU', 'russia': 'RU', 'россия': 'RU', 'russian federation': 'RU',
+        'india': 'IN', 'brazil': 'BR', 'italy': 'IT',
+        'spain': 'ES', 'south korea': 'KR', 'korea': 'KR',
+        'netherlands': 'NL', 'switzerland': 'CH', 'sweden': 'SE',
+        'norway': 'NO', 'denmark': 'DK', 'finland': 'FI',
+        'belgium': 'BE', 'poland': 'PL', 'portugal': 'PT',
+        'greece': 'GR', 'turkey': 'TR', 'israel': 'IL',
+        'singapore': 'SG', 'taiwan': 'TW', 'hong kong': 'HK',
+        'mexico': 'MX', 'argentina': 'AR', 'chile': 'CL',
+        'colombia': 'CO', 'ukraine': 'UA', 'czech republic': 'CZ',
+        'hungary': 'HU', 'romania': 'RO', 'bulgaria': 'BG',
+        'serbia': 'RS', 'croatia': 'HR', 'slovakia': 'SK',
+        'slovenia': 'SI', 'lithuania': 'LT', 'latvia': 'LV',
+        'estonia': 'EE', 'ireland': 'IE', 'new zealand': 'NZ',
+        'south africa': 'ZA', 'egypt': 'EG', 'saudi arabia': 'SA',
+        'uae': 'AE', 'united arab emirates': 'AE', 'qatar': 'QA',
+        'iran': 'IR', 'pakistan': 'PK', 'bangladesh': 'BD',
+        'vietnam': 'VN', 'thailand': 'TH', 'malaysia': 'MY',
+        'indonesia': 'ID', 'philippines': 'PH', 'kazakhstan': 'KZ',
+        'belarus': 'BY', 'uzbekistan': 'UZ', 'azerbaijan': 'AZ',
+        'georgia': 'GE', 'armenia': 'AM', 'moldova': 'MD'
+    }
+    
+    aff_lower = affiliation_string.lower()
+    
+    # Search for known country names
+    for country_name, country_code in known_countries.items():
+        if re.search(r'\b' + re.escape(country_name) + r'\b', aff_lower):
+            return country_code
+    
+    # If not found, try to take the last part after comma (common pattern)
+    parts = [p.strip() for p in affiliation_string.split(',')]
+    if len(parts) > 1:
+        last_part = parts[-1]
+        # Check if it's not too short and not just digits
+        if len(last_part) > 2 and not last_part.isdigit():
+            # Convert to uppercase for consistency
+            return last_part.upper()
+    
+    return ""
+
+def extract_authors_with_affiliations_from_openalex(openalex_data: Dict) -> List[Dict]:
+    """
+    Extract authors with ALL their affiliations and countries from OpenAlex.
+    This follows the logic from the working example code.
+    Preserves FULL affiliation names without cleaning.
+    """
+    authors = []
+    
+    if not openalex_data or 'authorships' not in openalex_data:
+        return authors
+    
+    for authorship in openalex_data.get('authorships', []):
+        author_info = authorship.get('author', {})
+        author_name = author_info.get('display_name', '')
+        orcid = author_info.get('orcid', '')
+        
+        if not author_name:
+            continue
+        
+        # Get institutions (affiliations) for this author
+        institutions = authorship.get('institutions', [])
+        affiliations_list = []
+        countries_set = set()
+        
+        for inst in institutions:
+            affiliation_name = inst.get('display_name', '')
+            if not affiliation_name:
+                continue
+            
+            # Get country: priority to country_code, then parse from name
+            country_code = inst.get('country_code', '')
+            country = country_code if country_code and country_code != 'XX' else ''
+            
+            if not country:
+                country = extract_country_from_affiliation_string(affiliation_name)
+            
+            affiliations_list.append({
+                'name': affiliation_name,  # FULL name, NOT cleaned
+                'country': country
+            })
+            if country:
+                countries_set.add(country)
+        
+        # Normalize author name for comparison
+        compare_name, display_name = normalize_author_name(author_name)
+        
+        # Format ORCID URL if present
+        formatted_orcid = format_orcid_id(orcid) if orcid else ''
+        
+        authors.append({
+            'display_name': display_name,
+            'compare_name': compare_name,
+            'raw_name': author_name,
+            'orcid': formatted_orcid,
+            'affiliations': affiliations_list,           # Full list of {name, country}
+            'countries': list(countries_set),           # Unique countries
+            'institutions': [aff['name'] for aff in affiliations_list],  # Just names
+            'primary_institution': affiliations_list[0]['name'] if affiliations_list else '',
+            'primary_country': list(countries_set)[0] if countries_set else ''
+        })
+    
+    return authors
+
+def extract_authors_from_crossref_simple(crossref_data: Dict) -> List[Dict]:
+    """
+    Extract authors from Crossref with affiliations (simplified, no aggressive cleaning).
+    Used as fallback when OpenAlex data is not available.
+    """
+    authors = []
+    
+    if not crossref_data or 'author' not in crossref_data:
+        return authors
+    
+    for author in crossref_data.get('author', []):
+        given = author.get('given', '')
+        family = author.get('family', '')
+        orcid = author.get('ORCID', None)
+        
+        if not family:
+            continue
+        
+        raw_name = f"{given} {family}".strip() if given else family
+        compare_name, display_name = normalize_author_name(raw_name)
+        
+        # Extract affiliations from Crossref (without aggressive cleaning)
+        affiliations_list = []
+        countries_set = set()
+        
+        if 'affiliation' in author and author['affiliation']:
+            for aff in author['affiliation']:
+                aff_name = aff.get('name', '')
+                if aff_name:
+                    # Store FULL name as is, no cleaning
+                    country = extract_country_from_affiliation_string(aff_name)
+                    affiliations_list.append({
+                        'name': aff_name,
+                        'country': country
+                    })
+                    if country:
+                        countries_set.add(country)
+        
+        # Format ORCID URL if present
+        formatted_orcid = format_orcid_id(orcid) if orcid else ''
+        
+        authors.append({
+            'display_name': display_name,
+            'compare_name': compare_name,
+            'raw_name': raw_name,
+            'orcid': formatted_orcid,
+            'affiliations': affiliations_list,
+            'countries': list(countries_set),
+            'institutions': [aff['name'] for aff in affiliations_list],
+            'primary_institution': affiliations_list[0]['name'] if affiliations_list else '',
+            'primary_country': list(countries_set)[0] if countries_set else ''
+        })
+    
+    return authors
+
+def merge_authors_from_all_results(results: List[Dict]) -> List[Dict]:
+    """
+    Merge authors from all results, collecting ALL unique affiliations and countries.
+    This follows the logic from the working example code.
+    """
+    merged = defaultdict(lambda: {
+        'display_name': '',
+        'compare_name': '',
+        'orcid': '',
+        'count': 0,
+        'affiliations': set(),  # set of tuples (name, country)
+        'countries': set(),
+        'articles': set()
+    })
+    
+    for result in results:
+        doi = result.get('doi', 'unknown')
+        for author in result.get('authors', []):
+            compare_name = author.get('compare_name', '')
+            if not compare_name:
+                continue
+            
+            data = merged[compare_name]
+            
+            # Set display name if not set yet
+            if not data['display_name']:
+                data['display_name'] = author.get('display_name', '')
+                data['compare_name'] = compare_name
+            
+            # Set ORCID if not set and available
+            if not data['orcid'] and author.get('orcid'):
+                data['orcid'] = author['orcid']
+            
+            # Increment count
+            data['count'] += 1
+            
+            # Track articles
+            data['articles'].add(doi)
+            
+            # Collect all affiliations (as tuples for set)
+            for aff in author.get('affiliations', []):
+                aff_tuple = (aff['name'], aff.get('country', ''))
+                data['affiliations'].add(aff_tuple)
+                if aff.get('country'):
+                    data['countries'].add(aff['country'])
+    
+    # Convert to list format
+    result_list = []
+    for compare_name, data in merged.items():
+        # Convert affiliations set to list of dicts
+        affiliations_list = [{'name': name, 'country': country} for name, country in data['affiliations']]
+        countries_list = sorted(list(data['countries']))
+        
+        result_list.append({
+            'display_name': data['display_name'],
+            'compare_name': compare_name,
+            'orcid': data['orcid'],
+            'count': data['count'],
+            'affiliations': affiliations_list,
+            'countries': countries_list,
+            'primary_institution': affiliations_list[0]['name'] if affiliations_list else '',
+            'primary_country': countries_list[0] if countries_list else '',
+            'num_affiliations': len(affiliations_list),
+            'num_countries': len(countries_list),
+            'articles': list(data['articles'])[:5]  # Limit to 5 for display
+        })
+    
+    # Sort by count descending
+    result_list.sort(key=lambda x: x['count'], reverse=True)
+    return result_list
+
+# ======================== NEW FUNCTIONS FOR POTENTIAL REVIEWERS ========================
+
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=5))
+def fetch_orcid_profile(orcid_id: str) -> Optional[Dict]:
+    """
+    Fetch ORCID profile data from ORCID API.
+    Uses the same logic as in the example code.
+    """
+    # Clean ORCID ID
+    orcid_clean = orcid_id.strip().replace('https://orcid.org/', '').replace('http://orcid.org/', '')
+    
+    # Validate format
+    parts = orcid_clean.split('-')
+    if len(parts) != 4 or not all(len(part) == 4 for part in parts):
+        return None
+    
+    url = f"https://pub.orcid.org/v3.0/{orcid_clean}"
+    headers = {'Accept': 'application/json'}
+    
+    try:
+        response = requests.get(url, headers=headers, timeout=15)
+        if response.status_code == 200:
+            return response.json()
+        elif response.status_code == 404:
+            return None
+        else:
+            return None
+    except requests.exceptions.RequestException:
+        return None
+
+def extract_orcid_personal_info(profile_data: Dict) -> Dict:
+    """
+    Extract personal information from ORCID profile.
+    Follows the logic from the example code.
+    """
+    if not profile_data or 'person' not in profile_data:
+        return {}
+    
+    person = profile_data.get('person', {})
+    if person is None:
+        return {}
+    
+    info = {}
+    
+    # Name section
+    name = person.get('name')
+    if name and isinstance(name, dict):
+        given_names = name.get('given-names')
+        info['given_names'] = given_names.get('value', '') if given_names and isinstance(given_names, dict) else ''
+        
+        family_name = name.get('family-name')
+        info['family_name'] = family_name.get('value', '') if family_name and isinstance(family_name, dict) else ''
+        
+        credit_name = name.get('credit-name')
+        info['credit_name'] = credit_name.get('value', '') if credit_name and isinstance(credit_name, dict) else ''
+    else:
+        info['given_names'] = ''
+        info['family_name'] = ''
+        info['credit_name'] = ''
+    
+    # Other names
+    other_names = person.get('other-names')
+    if other_names and isinstance(other_names, dict):
+        other_names_list = other_names.get('other-name', [])
+        info['other_names'] = [n.get('content', '') for n in other_names_list if isinstance(n, dict)] if other_names_list else []
+    else:
+        info['other_names'] = []
+    
+    # Biography
+    bio = person.get('biography')
+    info['biography'] = bio.get('value', '') if bio and isinstance(bio, dict) else ''
+    
+    # Country
+    addresses = person.get('addresses')
+    if addresses and isinstance(addresses, dict):
+        address_list = addresses.get('address', [])
+        if address_list and len(address_list) > 0:
+            first_address = address_list[0]
+            if isinstance(first_address, dict):
+                country = first_address.get('country')
+                info['country'] = country.get('value', '') if country and isinstance(country, dict) else ''
+            else:
+                info['country'] = ''
+        else:
+            info['country'] = ''
+    else:
+        info['country'] = ''
+    
+    # Keywords
+    keywords = person.get('keywords')
+    if keywords and isinstance(keywords, dict):
+        keyword_list = keywords.get('keyword', [])
+        info['keywords'] = [k.get('content', '') for k in keyword_list if isinstance(k, dict)] if keyword_list else []
+    else:
+        info['keywords'] = []
+    
+    # Researcher URLs
+    researcher_urls = person.get('researcher-urls')
+    if researcher_urls and isinstance(researcher_urls, dict):
+        url_list = researcher_urls.get('researcher-url', [])
+        info['researcher_urls'] = []
+        for url_item in url_list:
+            if isinstance(url_item, dict):
+                url_name = url_item.get('url-name', '')
+                url_value = url_item.get('url', {}).get('value', '')
+                if url_value:
+                    info['researcher_urls'].append({'name': url_name, 'url': url_value})
+    else:
+        info['researcher_urls'] = []
+    
+    # External identifiers with hyperlinks
+    external_ids = person.get('external-identifiers')
+    info['external_ids'] = {}
+    
+    # Define URL patterns for common external ID types
+    id_url_patterns = {
+        'scopus-author-id': 'https://www.scopus.com/authid/detail.uri?authorId={}',
+        'researcher-id': 'http://www.researcherid.com/rid/{}',
+        'publons': 'https://publons.com/researcher/{}',
+        'loop': 'https://loop.frontiersin.org/people/{}',
+        'linkedin': 'https://www.linkedin.com/in/{}/',
+        'researchgate': 'https://www.researchgate.net/profile/{}',
+        'google-scholar': 'https://scholar.google.com/citations?user={}',
+        'wos-researcherid': 'https://www.webofscience.com/wos/author/rid/{}',
+        'arxiv': 'https://arxiv.org/a/{}',
+        'ssrn': 'https://papers.ssrn.com/sol3/cf_dev/AbsByAuth.cfm?per_id={}',
+        'orcid': 'https://orcid.org/{}',
+    }
+    
+    if external_ids and isinstance(external_ids, dict):
+        ext_id_list = external_ids.get('external-identifier', [])
+        for ext_id in ext_id_list:
+            if isinstance(ext_id, dict):
+                id_type = ext_id.get('external-id-type', '').lower()
+                id_value = ext_id.get('external-id-value', '')
+                id_url = ext_id.get('external-id-url', {}).get('value', '')
+                
+                if id_type and id_value:
+                    if id_url:
+                        info['external_ids'][id_type] = {'value': id_value, 'url': id_url}
+                    elif id_type in id_url_patterns:
+                        url = id_url_patterns[id_type].format(id_value)
+                        info['external_ids'][id_type] = {'value': id_value, 'url': url}
+                    else:
+                        info['external_ids'][id_type] = {'value': id_value, 'url': None}
+    
+    return info
+
+def get_reviewer_candidates(results: List[Dict], paper_authors: Set[str], paper_affiliations: Set[str]) -> List[Dict]:
+    """
+    Get potential reviewer candidates from cited works.
+    Criteria:
+    1. Not a self-citation (author not in paper_authors)
+    2. No affiliation overlap with paper_affiliations
+    3. Publication year >= current_year - 4
+    """
+    current_year = datetime.now().year
+    min_year = current_year - 4
+    
+    # Collect all authors from results with their metadata
+    candidates = {}  # key: compare_name, value: candidate info
+    
+    for result in results:
+        year = result.get('year')
+        if not year or not isinstance(year, (int, float)) or year < min_year:
+            continue
+        
+        for author in result.get('authors', []):
+            compare_name = author.get('compare_name', '')
+            if not compare_name:
+                continue
+            
+            # Skip self-citations
+            if compare_name in paper_authors:
+                continue
+            
+            # Get author affiliations for this work
+            author_affiliations = set()
+            for aff in author.get('affiliations', []):
+                aff_name = aff.get('name', '')
+                if aff_name:
+                    author_affiliations.add(aff_name.lower())
+            
+            # Check for affiliation overlap with paper
+            has_overlap = False
+            for paper_aff in paper_affiliations:
+                if paper_aff.lower() in author_affiliations or any(paper_aff.lower() in aff for aff in author_affiliations):
+                    has_overlap = True
+                    break
+            
+            if has_overlap:
+                continue
+            
+            # Candidate passes all filters
+            if compare_name not in candidates:
+                candidates[compare_name] = {
+                    'display_name': author.get('display_name', ''),
+                    'compare_name': compare_name,
+                    'orcid': author.get('orcid', ''),
+                    'affiliations': author.get('affiliations', []),
+                    'countries': author.get('countries', []),
+                    'candidate_articles': [],
+                    'latest_year': year,
+                    'total_citations': 0
+                }
+            
+            # Add this article to candidate's record
+            candidates[compare_name]['candidate_articles'].append({
+                'doi': result.get('doi', ''),
+                'year': year,
+                'journal': result.get('journal', ''),
+                'title': result.get('openalex_data', {}).get('title', '') or result.get('crossref_data', {}).get('title', [''])[0]
+            })
+            
+            # Update latest year
+            if year > candidates[compare_name]['latest_year']:
+                candidates[compare_name]['latest_year'] = year
+            
+            # Add citations count
+            candidates[compare_name]['total_citations'] += result.get('citations_count', 0)
+    
+    # Convert to list and sort by latest_year desc, then by total_citations desc
+    candidate_list = list(candidates.values())
+    candidate_list.sort(key=lambda x: (-x['latest_year'], -x['total_citations']))
+    
+    return candidate_list
+
+def filter_reviewers_by_affiliation(candidates: List[Dict], max_per_affiliation: int = 3) -> List[Dict]:
+    """
+    Filter candidates to ensure no more than max_per_affiliation from the same affiliation.
+    Priority given to candidates with ORCID.
+    """
+    # Group candidates by primary affiliation
+    affiliation_groups = defaultdict(list)
+    
+    for candidate in candidates:
+        # Get primary affiliation (first one)
+        primary_aff = ''
+        if candidate.get('affiliations'):
+            primary_aff = candidate['affiliations'][0].get('name', '').lower()
+        if not primary_aff:
+            primary_aff = 'unknown'
+        
+        affiliation_groups[primary_aff].append(candidate)
+    
+    # Sort within each group: ORCID first, then by latest_year
+    filtered_candidates = []
+    for aff, group in affiliation_groups.items():
+        # Sort: has ORCID first (True > False), then by latest_year desc
+        group.sort(key=lambda x: (x['orcid'] != '', x['latest_year']), reverse=True)
+        filtered_candidates.extend(group[:max_per_affiliation])
+    
+    # Re-sort final list by latest_year desc
+    filtered_candidates.sort(key=lambda x: -x['latest_year'])
+    
+    return filtered_candidates[:30]  # Limit to top 30
+
+def fetch_orcid_profiles_parallel(candidates: List[Dict], progress_callback=None) -> List[Dict]:
+    """
+    Fetch ORCID profiles for candidates in parallel with progress bar.
+    Uses caching in session_state.
+    """
+    if not candidates:
+        return candidates
+    
+    results = []
+    total = len(candidates)
+    
+    # Check which candidates need fetching
+    to_fetch = []
+    for candidate in candidates:
+        orcid = candidate.get('orcid', '')
+        if orcid and orcid not in st.session_state.orcid_cache:
+            to_fetch.append(candidate)
+        elif orcid and orcid in st.session_state.orcid_cache:
+            candidate['orcid_profile'] = st.session_state.orcid_cache[orcid]
+            results.append(candidate)
+        else:
+            candidate['orcid_profile'] = None
+            results.append(candidate)
+    
+    if to_fetch:
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            future_to_candidate = {}
+            for i, candidate in enumerate(to_fetch):
+                orcid = candidate.get('orcid', '')
+                if orcid:
+                    future = executor.submit(fetch_orcid_profile, orcid)
+                    future_to_candidate[future] = (i, candidate)
+            
+            completed = 0
+            for future in as_completed(future_to_candidate):
+                i, candidate = future_to_candidate[future]
+                try:
+                    profile = future.result(timeout=20)
+                    orcid = candidate.get('orcid', '')
+                    if profile:
+                        personal_info = extract_orcid_personal_info(profile)
+                        candidate['orcid_profile'] = personal_info
+                        st.session_state.orcid_cache[orcid] = personal_info
+                    else:
+                        candidate['orcid_profile'] = None
+                        st.session_state.orcid_cache[orcid] = None
+                except Exception:
+                    candidate['orcid_profile'] = None
+                
+                completed += 1
+                progress_bar.progress(completed / total)
+                status_text.text(f"{get_text('fetching_orcid_profiles')} {completed}/{total}")
+                
+                results.append(candidate)
+        
+        progress_bar.empty()
+        status_text.empty()
+    
+    # Sort results by latest_year desc
+    results.sort(key=lambda x: -x.get('latest_year', 0))
+    
+    return results
+
+def display_potential_reviewers_section(candidates: List[Dict]):
+    """
+    Display potential reviewers section in the Streamlit interface.
+    """
+    if not candidates:
+        st.info(get_text('none_detected'))
+        return
+    
+    st.markdown(f"### {get_text('potential_reviewers')}")
+    st.markdown(f"*{len(candidates)} {get_text('reviewer_candidate').lower()}s found*")
+    
+    for i, candidate in enumerate(candidates, 1):
+        with st.expander(f"{i}. {candidate['display_name']} ({len(candidate['candidate_articles'])} {get_text('reviewer_articles_count')})"):
+            # Name and ORCID
+            st.markdown(f"**{get_text('orcid_label')}:** ", unsafe_allow_html=True)
+            if candidate.get('orcid'):
+                orcid_url = candidate['orcid']
+                if not orcid_url.startswith('http'):
+                    orcid_url = f"https://orcid.org/{orcid_url}"
+                st.markdown(f'<a href="{orcid_url}" target="_blank">{candidate["orcid"]}</a>', unsafe_allow_html=True)
+            else:
+                st.markdown(get_text('not_found'))
+            
+            # Country from ORCID profile or from affiliations
+            orcid_profile = candidate.get('orcid_profile')
+            if orcid_profile and orcid_profile.get('country'):
+                st.markdown(f"**{get_text('orcid_country')}:** {orcid_profile['country']}")
+            elif candidate.get('countries'):
+                st.markdown(f"**{get_text('orcid_country')}:** {', '.join(candidate['countries'][:3])}")
+            
+            # Affiliations from cited works
+            if candidate.get('affiliations'):
+                st.markdown(f"**{get_text('reviewer_affiliations')}:**")
+                for aff in candidate['affiliations'][:5]:
+                    st.markdown(f"- {aff['name']} ({aff['country'] if aff['country'] else get_text('not_found')})")
+            
+            # ORCID Profile: External IDs
+            if orcid_profile and orcid_profile.get('external_ids'):
+                st.markdown(f"**{get_text('orcid_other_ids')}:**")
+                friendly_names = {
+                    'scopus-author-id': 'Scopus Author ID',
+                    'researcher-id': 'ResearcherID (Web of Science)',
+                    'wos-researcherid': 'Web of Science ResearcherID',
+                    'publons': 'Publons',
+                    'loop': 'Loop',
+                    'linkedin': 'LinkedIn',
+                    'researchgate': 'ResearchGate',
+                    'google-scholar': 'Google Scholar',
+                    'arxiv': 'arXiv',
+                    'ssrn': 'SSRN',
+                }
+                for id_type, id_info in orcid_profile['external_ids'].items():
+                    display_name = friendly_names.get(id_type, id_type.replace('-', ' ').title())
+                    if id_info.get('url'):
+                        st.markdown(f"- **{display_name}:** <a href='{id_info['url']}' target='_blank'>{id_info['value'][:30]}...</a>", unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"- **{display_name}:** {id_info['value'][:30]}...")
+            
+            # ORCID Profile: Websites
+            if orcid_profile and orcid_profile.get('researcher_urls'):
+                st.markdown(f"**{get_text('orcid_websites')}:**")
+                for url_info in orcid_profile['researcher_urls'][:5]:
+                    st.markdown(f"- <a href='{url_info['url']}' target='_blank'>{url_info['name']}</a>", unsafe_allow_html=True)
+            
+            # Cited articles
+            st.markdown(f"**Cited articles (last 4 years):**")
+            for article in candidate['candidate_articles'][:5]:
+                title = article.get('title', 'No title')[:100]
+                doi = article.get('doi', '')
+                year = article.get('year', 'Unknown')
+                journal = article.get('journal', 'Unknown journal')
+                st.markdown(f"- {title} ({year}) - {journal}")
+                if doi:
+                    st.markdown(f"  DOI: <a href='https://doi.org/{doi}' target='_blank'>{doi}</a>", unsafe_allow_html=True)
+
+def generate_reviewers_html(candidates: List[Dict], lang: str = 'en') -> str:
+    """
+    Generate HTML for potential reviewers section.
+    """
+    if not candidates:
+        return f'<p>{get_text("none_detected")}</p>'
+    
+    html_parts = []
+    html_parts.append(f'<div class="section" id="potential_reviewers">')
+    html_parts.append(f'<div class="section-title">{get_text("potential_reviewers")}</div>')
+    html_parts.append(f'<p><strong>{len(candidates)} candidates found</strong></p>')
+    
+    for i, candidate in enumerate(candidates, 1):
+        orcid_profile = candidate.get('orcid_profile')
+        
+        html_parts.append(f'''
+        <div class="reviewer-card">
+            <div class="reviewer-name">{i}. {candidate['display_name']}</div>
+        ''')
+        
+        # ORCID
+        if candidate.get('orcid'):
+            orcid_url = candidate['orcid']
+            if not orcid_url.startswith('http'):
+                orcid_url = f"https://orcid.org/{orcid_url}"
+            html_parts.append(f'<div class="reviewer-orcid"><strong>{get_text("orcid_label")}:</strong> <a href="{orcid_url}" target="_blank">{candidate["orcid"]}</a></div>')
+        else:
+            html_parts.append(f'<div class="reviewer-orcid"><strong>{get_text("orcid_label")}:</strong> {get_text("not_found")}</div>')
+        
+        # Country
+        if orcid_profile and orcid_profile.get('country'):
+            html_parts.append(f'<div class="reviewer-country"><strong>{get_text("orcid_country")}:</strong> {orcid_profile["country"]}</div>')
+        elif candidate.get('countries'):
+            html_parts.append(f'<div class="reviewer-country"><strong>{get_text("orcid_country")}:</strong> {", ".join(candidate["countries"][:3])}</div>')
+        
+        # Affiliations
+        if candidate.get('affiliations'):
+            html_parts.append(f'<div class="reviewer-section-title">{get_text("reviewer_affiliations")}</div>')
+            for aff in candidate['affiliations'][:5]:
+                html_parts.append(f'<div class="external-id-item">• {aff["name"]} ({aff["country"] if aff["country"] else get_text("not_found")})</div>')
+        
+        # External IDs
+        if orcid_profile and orcid_profile.get('external_ids'):
+            html_parts.append(f'<div class="reviewer-section-title">{get_text("orcid_other_ids")}</div>')
+            friendly_names = {
+                'scopus-author-id': 'Scopus Author ID',
+                'researcher-id': 'ResearcherID (Web of Science)',
+                'wos-researcherid': 'Web of Science ResearcherID',
+                'publons': 'Publons',
+                'loop': 'Loop',
+                'linkedin': 'LinkedIn',
+                'researchgate': 'ResearchGate',
+                'google-scholar': 'Google Scholar',
+                'arxiv': 'arXiv',
+                'ssrn': 'SSRN',
+            }
+            for id_type, id_info in orcid_profile['external_ids'].items():
+                display_name = friendly_names.get(id_type, id_type.replace('-', ' ').title())
+                if id_info.get('url'):
+                    html_parts.append(f'<div class="external-id-item">• <strong>{display_name}:</strong> <a href="{id_info["url"]}" target="_blank">{id_info["value"][:40]}...</a></div>')
+                else:
+                    html_parts.append(f'<div class="external-id-item">• <strong>{display_name}:</strong> {id_info["value"][:40]}...</div>')
+        
+        # Websites
+        if orcid_profile and orcid_profile.get('researcher_urls'):
+            html_parts.append(f'<div class="reviewer-section-title">{get_text("orcid_websites")}</div>')
+            for url_info in orcid_profile['researcher_urls'][:5]:
+                html_parts.append(f'<div class="reviewer-website">• <a href="{url_info["url"]}" target="_blank">{url_info["name"]}</a></div>')
+        
+        # Cited articles
+        html_parts.append(f'<div class="reviewer-section-title">Cited articles (last 4 years):</div>')
+        for article in candidate['candidate_articles'][:5]:
+            title = article.get('title', 'No title')[:100]
+            doi = article.get('doi', '')
+            year = article.get('year', 'Unknown')
+            journal = article.get('journal', 'Unknown journal')
+            html_parts.append(f'<div class="external-id-item">• {title} ({year}) - {journal}')
+            if doi:
+                html_parts.append(f'<br><span style="font-size: 11px;">DOI: <a href="https://doi.org/{doi}" target="_blank">{doi}</a></span>')
+            html_parts.append('</div>')
+        
+        html_parts.append('</div>')
+    
+    html_parts.append('</div>')
+    return '\n'.join(html_parts)
 
 # ======================== COLORED PROGRESS BAR ========================
 def update_colored_progress(progress_percent: float, success_rate: float = None, data_density: float = None):
@@ -1352,92 +2207,6 @@ def fetch_openalex_concepts(work_id: str) -> List[Dict]:
 
 # ======================== HELPER FUNCTIONS FOR AUTHOR PROCESSING ========================
 
-def clean_affiliation(affiliation: str) -> str:
-    """
-    Clean affiliation string from extra information like department names,
-    laboratory names, postal codes, etc.
-    Returns cleaned affiliation (primary institution name only)
-    """
-    if not affiliation or not isinstance(affiliation, str):
-        return ""
-    
-    # Remove patterns that indicate sub-units
-    patterns_to_remove = [
-        r',\s*[A-Z]{2}$',  # Country codes at the end
-        r',\s*[A-Z]{2}\s*\d+',  # Country codes with postal codes
-        r',\s*USA$', r',\s*United States$',
-        r',\s*UK$', r',\s*United Kingdom$',
-        r',\s*China$', r',\s*Россия$', r',\s*Russia$',
-        r'\s*\([^)]*[Dd]epartment[^)]*\)',  # Department in parentheses
-        r'\s*\[[^\]]*[Ll]aboratory[^\]]*\]',  # Laboratory in brackets
-        r'\s*\([^)]*[Ll]aboratory[^)]*\)',  # Laboratory in parentheses
-        r'\s*,\s*[Dd]epartment\s+of\s+[^,]+',  # Department of X
-        r'\s*,\s*[Ll]aboratory\s+of\s+[^,]+',  # Laboratory of X
-        r'\s*,\s*[Ii]nstitute\s+of\s+[^,]+',  # Institute of X (keep main)
-        r'\s*,\s*[Cc]enter\s+for\s+[^,]+',  # Center for X
-        r'\s*,\s*[Ff]aculty\s+of\s+[^,]+',  # Faculty of X
-        r'\s*,\s*[Ss]chool\s+of\s+[^,]+',  # School of X
-        r'\b\d{5,6}(-\d{4})?\b',  # Postal codes
-        r',\s*[A-Z][a-z]+\s+[A-Z][a-z]+\s+[A-Z][a-z]+',  # Multiple words after comma
-    ]
-    
-    clean_aff = affiliation
-    for pattern in patterns_to_remove:
-        clean_aff = re.sub(pattern, '', clean_aff, flags=re.IGNORECASE)
-    
-    # Remove extra commas and spaces
-    clean_aff = re.sub(r',\s*,', ',', clean_aff)
-    clean_aff = clean_aff.strip(' ,;')
-    
-    # If after cleaning we have multiple parts separated by commas, take only the first part
-    if ',' in clean_aff:
-        parts = clean_aff.split(',')
-        clean_aff = parts[0].strip()
-    
-    # If affiliation is too short after cleaning, return original
-    if len(clean_aff) < 3:
-        return affiliation
-    
-    return clean_aff
-
-def get_country_from_affiliation(affiliation: str) -> str:
-    """
-    Extract country code from affiliation string (fallback method)
-    Used when structured country_code is not available from API
-    """
-    if not affiliation or not isinstance(affiliation, str):
-        return ""
-    
-    affiliation_lower = affiliation.lower()
-    
-    # Check for country names in the COUNTRY_CODES mapping
-    for country_name, country_code in COUNTRY_CODES.items():
-        country_lower = country_name.lower()
-        pattern = r'\b' + re.escape(country_lower) + r'\b'
-        if re.search(pattern, affiliation_lower):
-            return country_code
-    
-    # Check for country codes as separate words
-    for country_name, country_code in COUNTRY_CODES.items():
-        if len(country_code) == 2:
-            if re.search(r'\b' + re.escape(country_code) + r'\b', affiliation, re.IGNORECASE):
-                return country_code
-    
-    # Check for Russian variants
-    russian_variants = {
-        'россия': 'RU', 'рф': 'RU', 'российская': 'RU', 'russia': 'RU', 'russian': 'RU',
-        'украина': 'UA', 'беларусь': 'BY', 'казахстан': 'KZ',
-        'china': 'CN', 'chinese': 'CN', 'beijing': 'CN', 'shanghai': 'CN',
-        'usa': 'US', 'united states': 'US', 'america': 'US',
-        'germany': 'DE', 'deutschland': 'DE', 'france': 'FR', 'japan': 'JP',
-    }
-    
-    for variant, code in russian_variants.items():
-        if re.search(r'\b' + re.escape(variant) + r'\b', affiliation_lower):
-            return code
-    
-    return ""
-
 def format_orcid_id(orcid: str) -> str:
     """Format ORCID ID to full URL"""
     if not orcid or not isinstance(orcid, str):
@@ -1522,259 +2291,6 @@ def normalize_author_name(name: str) -> Tuple[str, str]:
     # Fallback: return original as-is
     return name.lower(), name
 
-def extract_authors_from_crossref(data: Dict) -> List[Dict]:
-    """
-    Extract authors from Crossref with improved affiliation handling.
-    Uses structured data from API.
-    """
-    authors = []
-    
-    if 'author' not in data or not data['author']:
-        return authors
-    
-    for author in data['author']:
-        given = author.get('given', '')
-        family = author.get('family', '')
-        orcid = author.get('ORCID', None)
-        
-        if not family:
-            continue
-        
-        raw_name = f"{given} {family}".strip() if given else family
-        compare_name, display_name = normalize_author_name(raw_name)
-        
-        # Extract affiliations from Crossref
-        affiliations = []
-        
-        if 'affiliation' in author and author['affiliation']:
-            for aff in author['affiliation']:
-                aff_name = aff.get('name', '')
-                if aff_name:
-                    # Clean affiliation by removing department/laboratory info
-                    clean_aff = clean_affiliation(aff_name)
-                    if clean_aff:
-                        affiliations.append(clean_aff)
-        
-        # Remove duplicates while preserving order
-        affiliations = list(dict.fromkeys(affiliations))
-        
-        # Determine primary affiliation (first one after cleaning)
-        primary_affiliation = affiliations[0] if affiliations else ''
-        
-        # Determine country from affiliation (fallback for Crossref)
-        # Note: Crossref doesn't provide country_code directly, so we need to infer
-        country = ''
-        if primary_affiliation:
-            country = get_country_from_affiliation(primary_affiliation)
-        
-        author_info = {
-            'compare_name': compare_name,
-            'display_name': display_name,
-            'raw_name': raw_name,
-            'orcid': orcid,
-            'family': family,
-            'given': given,
-            'country': country,
-            'countries': [country] if country else [],
-            'institution': primary_affiliation,
-            'institutions': affiliations,
-            'affiliations': affiliations
-        }
-        
-        authors.append(author_info)
-    
-    return authors
-
-def extract_authors_from_openalex(data: Dict) -> List[Dict]:
-    """
-    Extract authors from OpenAlex with PROPER institution and country extraction.
-    Uses structured fields from API - country_code is the PRIMARY source.
-    """
-    authors = []
-    
-    if 'authorships' not in data or not data['authorships']:
-        return authors
-    
-    for authorship in data['authorships']:
-        author_data = authorship.get('author', {})
-        display_name_raw = author_data.get('display_name', '')
-        orcid = author_data.get('orcid', None)
-        
-        if not display_name_raw:
-            continue
-        
-        # CRITICAL: Extract from structured institutions field
-        institutions = authorship.get('institutions', [])
-        
-        # Clean institution names and collect country codes
-        clean_institution_names = []
-        country_codes = []
-        
-        for inst in institutions:
-            # Get clean institution name from display_name
-            inst_name = inst.get('display_name', '')
-            if inst_name:
-                clean_inst_name = clean_affiliation(inst_name)
-                if clean_inst_name:
-                    clean_institution_names.append(clean_inst_name)
-            
-            # PRIMARY SOURCE: Get country code from structured field
-            country_code = inst.get('country_code', '')
-            if country_code and country_code != 'XX':  # 'XX' means unknown
-                country_codes.append(country_code)
-        
-        # Remove duplicates while preserving order
-        clean_institution_names = list(dict.fromkeys(clean_institution_names))
-        country_codes = list(dict.fromkeys(country_codes))
-        
-        # Determine primary country (first institution's country)
-        primary_country = country_codes[0] if country_codes else ''
-        
-        # Determine primary institution (first one after cleaning)
-        primary_institution = clean_institution_names[0] if clean_institution_names else ''
-        
-        # Normalize author name
-        compare_name, display_name = normalize_author_name(display_name_raw)
-        
-        # Format ORCID URL if present
-        formatted_orcid = format_orcid_id(orcid) if orcid else ''
-        
-        author_info = {
-            'compare_name': compare_name,
-            'display_name': display_name,
-            'raw_name': display_name_raw,
-            'orcid': formatted_orcid,
-            # Country information - directly from API (CRITICAL for geography)
-            'country': primary_country,
-            'countries': country_codes,  # All countries this author is affiliated with
-            # Institution information
-            'institution': primary_institution,
-            'institutions': clean_institution_names,
-            'affiliations': clean_institution_names,  # Alias for compatibility
-            # Raw data for debugging (not used for analysis)
-            'raw_affiliations': authorship.get('raw_affiliation_strings', [])
-        }
-        
-        authors.append(author_info)
-    
-    return authors
-
-def merge_authors(authors_list: List[Dict]) -> List[Dict]:
-    """
-    Merge duplicate authors using NORMALIZED NAME as primary key,
-    then ORCID as secondary key for cross-referencing.
-    This matches the logic from the working reference code.
-    """
-    # First, merge by normalized name (compare_name)
-    name_merged = {}
-    
-    for author in authors_list:
-        compare_name = author.get('compare_name', '')
-        if not compare_name:
-            continue
-        
-        if compare_name not in name_merged:
-            # Create new merged author
-            name_merged[compare_name] = {
-                'display_name': author.get('display_name', 'Unknown'),
-                'compare_name': compare_name,
-                'orcid': author.get('orcid', ''),
-                'count': 1,
-                'countries': set(),
-                'institutions': set(),
-                'affiliations': set()
-            }
-            
-            # Add countries
-            countries = author.get('countries', [])
-            if isinstance(countries, list):
-                for c in countries:
-                    if c:
-                        name_merged[compare_name]['countries'].add(c)
-            elif author.get('country'):
-                name_merged[compare_name]['countries'].add(author['country'])
-            
-            # Add institutions
-            institutions = author.get('institutions', [])
-            if isinstance(institutions, list):
-                for inst in institutions:
-                    if inst:
-                        clean_inst = clean_affiliation(inst)
-                        if clean_inst:
-                            name_merged[compare_name]['institutions'].add(clean_inst)
-                            name_merged[compare_name]['affiliations'].add(clean_inst)
-            
-            affiliations = author.get('affiliations', [])
-            if isinstance(affiliations, list):
-                for aff in affiliations:
-                    if aff:
-                        clean_aff = clean_affiliation(aff)
-                        if clean_aff:
-                            name_merged[compare_name]['affiliations'].add(clean_aff)
-        else:
-            # Merge into existing author
-            existing = name_merged[compare_name]
-            existing['count'] += 1
-            
-            # Merge countries
-            countries = author.get('countries', [])
-            if isinstance(countries, list):
-                for c in countries:
-                    if c:
-                        existing['countries'].add(c)
-            elif author.get('country'):
-                existing['countries'].add(author['country'])
-            
-            # Merge institutions
-            institutions = author.get('institutions', [])
-            if isinstance(institutions, list):
-                for inst in institutions:
-                    if inst:
-                        clean_inst = clean_affiliation(inst)
-                        if clean_inst:
-                            existing['institutions'].add(clean_inst)
-                            existing['affiliations'].add(clean_inst)
-            
-            affiliations = author.get('affiliations', [])
-            if isinstance(affiliations, list):
-                for aff in affiliations:
-                    if aff:
-                        clean_aff = clean_affiliation(aff)
-                        if clean_aff:
-                            existing['affiliations'].add(clean_aff)
-            
-            # Update ORCID if missing (but don't create new entry)
-            if not existing.get('orcid') and author.get('orcid'):
-                existing['orcid'] = author['orcid']
-    
-    # Convert to list format
-    result = []
-    for compare_name, author in name_merged.items():
-        # Get primary country
-        countries_list = sorted(list(author['countries']))
-        primary_country = countries_list[0] if countries_list else ''
-        
-        # Get primary institution
-        institutions_list = sorted(list(author['institutions']))
-        primary_institution = institutions_list[0] if institutions_list else ''
-        
-        result.append({
-            'display_name': author['display_name'],
-            'compare_name': author['compare_name'],
-            'orcid': author.get('orcid', ''),
-            'count': author['count'],
-            'country': primary_country,
-            'countries': countries_list,
-            'institution': primary_institution,
-            'institutions': list(author['institutions']),
-            'affiliations': sorted(list(author['affiliations']))[:10]
-        })
-    
-    # Sort by count descending
-    result.sort(key=lambda x: x['count'], reverse=True)
-    
-    return result
-
 # ======================== DUPLICATE DETECTION ========================
 def find_duplicate_references(references: List[str], threshold: float = 0.85) -> List[Dict]:
     """Find duplicate references in literature list - ONLY Full DOI match"""
@@ -1854,151 +2370,79 @@ def analyze_geographic_distribution(results: List[Dict]) -> Dict:
     # Track per-reference data
     reference_countries = []  # List of country sets per reference
     
-    def extract_country_from_affiliation(affiliation: str) -> str:
-        """Extract country code from affiliation string (same as working code)"""
-        if not affiliation or not isinstance(affiliation, str):
-            return ""
+    def extract_country(affiliation_string):
+        """Extract country from affiliation string (same as working code)"""
+        if not affiliation_string:
+            return "N/A"
         
-        affiliation_lower = affiliation.lower()
+        affiliation_string = affiliation_string.strip()
         
-        # First check for explicit country mentions
-        for country_name, country_code in COUNTRY_CODES.items():
-            country_lower = country_name.lower()
-            pattern = r'\b' + re.escape(country_lower) + r'\b'
-            if re.search(pattern, affiliation_lower):
-                return country_code
+        known_countries = [
+            'USA', 'UK', 'China', 'Germany', 'France', 'Japan', 'Canada', 'Australia',
+            'Russia', 'India', 'Brazil', 'Italy', 'Spain', 'South Korea', 'Netherlands',
+            'Switzerland', 'Sweden', 'Belgium', 'Norway', 'Denmark', 'Finland',
+            'United States', 'United Kingdom', 'Китай', 'США', 'Великобритания', 'Германия', 'Франция'
+        ]
         
-        # Check for Russian variants
-        russian_variants = {
-            'россия': 'RU', 'рф': 'RU', 'российская': 'RU', 'russia': 'RU', 'russian': 'RU',
-            'украина': 'UA', 'беларусь': 'BY', 'казахстан': 'KZ',
-            'china': 'CN', 'chinese': 'CN', 'beijing': 'CN', 'shanghai': 'CN',
-            'usa': 'US', 'united states': 'US', 'america': 'US',
-            'germany': 'DE', 'deutschland': 'DE', 'france': 'FR', 'japan': 'JP',
-            'uk': 'GB', 'united kingdom': 'GB', 'great britain': 'GB',
-            'south korea': 'KR', 'korea': 'KR',
-            'netherlands': 'NL', 'switzerland': 'CH', 'sweden': 'SE',
-            'norway': 'NO', 'denmark': 'DK', 'finland': 'FI', 'italy': 'IT',
-            'spain': 'ES', 'brazil': 'BR', 'india': 'IN', 'australia': 'AU',
-            'canada': 'CA', 'france': 'FR', 'germany': 'DE'
-        }
+        parts = [p.strip() for p in affiliation_string.split(',')]
         
-        for variant, code in russian_variants.items():
-            if re.search(r'\b' + re.escape(variant) + r'\b', affiliation_lower):
-                return code
+        for part in reversed(parts):
+            for country in known_countries:
+                if country.lower() in part.lower():
+                    return part
         
-        return ""
-    
-    def get_country_from_institution(institution: Dict) -> str:
-        """Extract country from institution data (OpenAlex structured)"""
-        if not institution or not isinstance(institution, dict):
-            return ""
+        if len(parts) > 1:
+            potential_country = parts[-1]
+            if len(potential_country) > 2 and not potential_country.isdigit():
+                return potential_country
         
-        # PRIMARY: Use country_code field from OpenAlex
-        country_code = institution.get('country_code', '')
-        if country_code and country_code != 'XX':
-            return country_code
-        
-        # SECONDARY: Try to extract from display_name
-        display_name = institution.get('display_name', '')
-        if display_name:
-            country = extract_country_from_affiliation(display_name)
-            if country:
-                return country
-        
-        return ""
-    
-    def get_author_countries_from_openalex(openalex_data: Dict) -> List[str]:
-        """Extract countries for each author from OpenAlex (same as working code)"""
-        countries_for_ref = []
-        
-        if not openalex_data or 'authorships' not in openalex_data:
-            return countries_for_ref
-        
-        for authorship in openalex_data.get('authorships', []):
-            institutions = authorship.get('institutions', [])
-            author_countries = []
-            
-            for institution in institutions:
-                country = get_country_from_institution(institution)
-                if country:
-                    author_countries.append(country)
-            
-            if author_countries:
-                # Use the first country as primary
-                countries_for_ref.append(author_countries[0])
-        
-        return countries_for_ref
-    
-    def get_author_countries_from_crossref(crossref_data: Dict) -> List[str]:
-        """Extract countries from Crossref data via affiliation parsing"""
-        countries = []
-        
-        if not crossref_data or 'author' not in crossref_data:
-            return countries
-        
-        for author in crossref_data.get('author', []):
-            affiliations = author.get('affiliation', [])
-            for aff in affiliations:
-                aff_name = aff.get('name', '')
-                if aff_name:
-                    country = extract_country_from_affiliation(aff_name)
-                    if country:
-                        countries.append(country)
-                        break  # Use first valid country for this author
-        
-        return countries
+        return "Не определена"
     
     for result in results:
         # Collect all countries from authors in this reference
         ref_countries_set = set()
         
-        # FIRST: Try to get from OpenAlex data (most reliable)
+        # Try to get from OpenAlex data (most reliable)
         openalex_data = result.get('openalex_data')
         if openalex_data and isinstance(openalex_data, dict):
-            author_countries = get_author_countries_from_openalex(openalex_data)
-            
-            for country in author_countries:
-                ref_countries_set.add(country)
-                # Type 2: Count each author by their country
-                author_country_counter[country] += 1
+            if 'authorships' in openalex_data:
+                for authorship in openalex_data.get('authorships', []):
+                    institutions = authorship.get('institutions', [])
+                    for institution in institutions:
+                        country_code = institution.get('country_code', '')
+                        if country_code and country_code != 'XX':
+                            ref_countries_set.add(country_code)
+                            author_country_counter[country_code] += 1
+                        else:
+                            affiliation_name = institution.get('display_name', '')
+                            if affiliation_name:
+                                country = extract_country(affiliation_name)
+                                if country and country not in ['N/A', 'Не определена']:
+                                    ref_countries_set.add(country)
+                                    author_country_counter[country] += 1
         
         # SECOND: If OpenAlex didn't provide countries, try Crossref
-        elif not ref_countries_set:
+        if not ref_countries_set:
             crossref_data = result.get('crossref_data')
             if crossref_data and isinstance(crossref_data, dict):
-                author_countries = get_author_countries_from_crossref(crossref_data)
-                
-                for country in author_countries:
-                    ref_countries_set.add(country)
-                    author_country_counter[country] += 1
+                if 'author' in crossref_data:
+                    for author in crossref_data.get('author', []):
+                        if 'affiliation' in author and author['affiliation']:
+                            for aff in author['affiliation']:
+                                aff_name = aff.get('name', '')
+                                if aff_name:
+                                    country = extract_country(aff_name)
+                                    if country and country not in ['N/A', 'Не определена']:
+                                        ref_countries_set.add(country)
+                                        author_country_counter[country] += 1
         
         # THIRD: Fallback to existing author countries from merged authors
         if not ref_countries_set:
             for author in result.get('authors', []):
-                # Try author.get('countries') - from OpenAlex extraction
-                countries = author.get('countries', [])
-                if not countries and author.get('country'):
-                    countries = [author['country']]
-                
-                for country in countries:
-                    if country and country != 'XX':
+                for country in author.get('countries', []):
+                    if country and country not in ['N/A', 'Не определена', '']:
                         ref_countries_set.add(country)
                         author_country_counter[country] += 1
-            
-            # Last resort: try to get country from affiliation
-            if not ref_countries_set:
-                for author in result.get('authors', []):
-                    affiliations = author.get('affiliations', []) or author.get('institutions', [])
-                    for aff in affiliations:
-                        if aff and isinstance(aff, str):
-                            country = extract_country_from_affiliation(aff)
-                            if country:
-                                ref_countries_set.add(country)
-                                author_country_counter[country] += 1
-                                break
-                    if ref_countries_set:
-                        break
         
         if ref_countries_set:
             # Type 1: Count each reference once per unique country
@@ -2392,131 +2836,17 @@ def analyze_journal_frequency_all(results: List[Dict]) -> Dict:
 
 def analyze_author_frequency_all(results: List[Dict]) -> Dict:
     """
-    Analyze author frequency with PROPER merging using NORMALIZED NAME as primary key.
-    This matches the logic from the working reference code.
+    Analyze author frequency with PROPER merging using NORMALIZED name as primary key.
+    Uses the new merge_authors_from_all_results function.
     """
     
-    # Step 1: Collect all author occurrences
-    author_occurrences = []
-    
-    for result in results:
-        for author in result.get('authors', []):
-            if not author.get('compare_name') and author.get('display_name'):
-                compare_name, display_name = normalize_author_name(author['display_name'])
-                author['compare_name'] = compare_name
-                author['display_name'] = display_name
-            
-            if author.get('compare_name'):
-                author_occurrences.append(author)
-    
-    # Step 2: Merge by compare_name (normalized name) - NOT by ORCID
-    merged_authors = {}
-    
-    for author in author_occurrences:
-        compare_name = author.get('compare_name', '')
-        if not compare_name:
-            continue
-        
-        if compare_name not in merged_authors:
-            merged_authors[compare_name] = {
-                'display_name': author.get('display_name', 'Unknown'),
-                'compare_name': compare_name,
-                'orcid': author.get('orcid', ''),
-                'count': 1,
-                'countries': set(),
-                'institutions': set(),
-                'affiliations': set()
-            }
-            
-            # Add countries
-            countries = author.get('countries', [])
-            if isinstance(countries, list):
-                for c in countries:
-                    if c:
-                        merged_authors[compare_name]['countries'].add(c)
-            elif author.get('country'):
-                merged_authors[compare_name]['countries'].add(author['country'])
-            
-            # Add institutions (cleaned)
-            institutions = author.get('institutions', [])
-            if isinstance(institutions, list):
-                for inst in institutions:
-                    if inst:
-                        clean_inst = clean_affiliation(inst)
-                        if clean_inst:
-                            merged_authors[compare_name]['institutions'].add(clean_inst)
-                            merged_authors[compare_name]['affiliations'].add(clean_inst)
-            
-            affiliations = author.get('affiliations', [])
-            if isinstance(affiliations, list):
-                for aff in affiliations:
-                    if aff:
-                        clean_aff = clean_affiliation(aff)
-                        if clean_aff:
-                            merged_authors[compare_name]['affiliations'].add(clean_aff)
-        else:
-            existing = merged_authors[compare_name]
-            existing['count'] += 1
-            
-            # Merge countries
-            countries = author.get('countries', [])
-            if isinstance(countries, list):
-                for c in countries:
-                    if c:
-                        existing['countries'].add(c)
-            elif author.get('country'):
-                existing['countries'].add(author['country'])
-            
-            # Merge institutions
-            institutions = author.get('institutions', [])
-            if isinstance(institutions, list):
-                for inst in institutions:
-                    if inst:
-                        clean_inst = clean_affiliation(inst)
-                        if clean_inst:
-                            existing['institutions'].add(clean_inst)
-                            existing['affiliations'].add(clean_inst)
-            
-            affiliations = author.get('affiliations', [])
-            if isinstance(affiliations, list):
-                for aff in affiliations:
-                    if aff:
-                        clean_aff = clean_affiliation(aff)
-                        if clean_aff:
-                            existing['affiliations'].add(clean_aff)
-            
-            # Update ORCID if missing (but don't split into separate entry)
-            if not existing.get('orcid') and author.get('orcid'):
-                existing['orcid'] = author['orcid']
-    
-    # Step 3: Convert to final list format
-    author_list = []
-    for compare_name, author in merged_authors.items():
-        countries_list = sorted(list(author['countries']))
-        primary_country = countries_list[0] if countries_list else ''
-        
-        institutions_list = sorted(list(author['institutions']))
-        primary_institution = institutions_list[0] if institutions_list else ''
-        
-        author_list.append({
-            'display_name': author['display_name'],
-            'compare_name': author['compare_name'],
-            'orcid': author.get('orcid', ''),
-            'count': author['count'],
-            'country': primary_country,
-            'countries': countries_list,
-            'institution': primary_institution,
-            'institutions': list(author['institutions']),
-            'affiliations': sorted(list(author['affiliations']))[:10]
-        })
-    
-    # Step 4: Sort by count descending
-    author_list.sort(key=lambda x: x['count'], reverse=True)
+    # Use the new merge function that preserves all affiliations
+    merged_authors = merge_authors_from_all_results(results)
     
     return {
-        'all_authors': author_list,
-        'unique_authors': len(author_list),
-        'top_20': author_list[:20]
+        'all_authors': merged_authors,
+        'unique_authors': len(merged_authors),
+        'top_20': merged_authors[:20]
     }
 
 def analyze_orcid_coverage(results: List[Dict]) -> Dict:
@@ -2532,8 +2862,8 @@ def analyze_orcid_coverage(results: List[Dict]) -> Dict:
                 authors_with_orcid += 1
                 # Get countries from author
                 countries = author.get('countries', [])
-                if not countries and author.get('country'):
-                    countries = [author['country']]
+                if not countries and author.get('primary_country'):
+                    countries = [author['primary_country']]
                 for country in countries:
                     if country:
                         orcid_by_country[country] += 1
@@ -2845,8 +3175,8 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                 result['crossref_data'] = crossref_data
                 result['crossref_status'] = True
                 
-                # Extract authors from Crossref
-                authors_data = extract_authors_from_crossref(crossref_data)
+                # Extract authors from Crossref using SIMPLE function (no aggressive cleaning)
+                authors_data = extract_authors_from_crossref_simple(crossref_data)
                 result['authors'].extend(authors_data)
                 
                 for auth in authors_data:
@@ -2963,8 +3293,8 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                     result['is_retracted'] = True
                     result['crossmark_issues'].append('⚠️ This article has been RETRACTED')
                 
-                # ========== EXTRACT AUTHORS FROM OPENALEX ==========
-                authors_data = extract_authors_from_openalex(openalex_data)
+                # ========== EXTRACT AUTHORS FROM OPENALEX (NEW VERSION) ==========
+                authors_data = extract_authors_with_affiliations_from_openalex(openalex_data)
                 existing_compare = {a['compare_name'] for a in result['authors']}
                 for auth in authors_data:
                     if auth['compare_name'] not in existing_compare:
@@ -3096,9 +3426,12 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                         result['is_self_citation'] = True
                         break
         
-        # Merge authors (deduplicate)
+        # Merge authors (deduplicate) - use the new merge function
         if result['authors']:
-            result['authors'] = merge_authors(result['authors'])
+            # For a single reference, we don't need full merging, just deduplicate within this reference
+            temp_results_for_merge = [{'authors': result['authors'], 'doi': result.get('doi', '')}]
+            merged_for_ref = merge_authors_from_all_results(temp_results_for_merge)
+            result['authors'] = merged_for_ref
             result['authors_display'] = [a['display_name'] for a in result['authors']]
         
         results.append(result)
@@ -3795,18 +4128,25 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         if has_problem:
             problematic_refs.append({'text': result['original_text'], 'problems': ', '.join(problems)})
     
-    # Enhanced author analysis
+    # Enhanced author analysis (uses new merge function)
     author_data = analyze_author_frequency_all(results)
     sorted_authors = author_data['all_authors']
     
-    # Format top authors for display
+    # Format top authors for display (with ALL affiliations)
     top_authors_formatted = []
     for author in sorted_authors[:20]:
         orcid_str = f" 🔗 ORCID: {author['orcid']}" if author.get('orcid') else ""
-        inst_str = f" 🏛 {author['institution'][:30]}" if author.get('institution') else ""
-        country_str = f" 🌍 {author['country']}" if author.get('country') else ""
+        inst_str = f" 🏛 {author['primary_institution'][:50]}" if author.get('primary_institution') else ""
+        country_str = f" 🌍 {author['primary_country']}" if author.get('primary_country') else ""
+        
+        # Show all affiliations if available
+        all_aff_str = ""
+        if author.get('affiliations') and len(author['affiliations']) > 1:
+            aff_list = [aff['name'][:40] for aff in author['affiliations'][:3]]
+            all_aff_str = f"\n   📍 All affiliations: {', '.join(aff_list)}"
+        
         display = author['display_name']
-        top_authors_formatted.append(f"{display}{orcid_str}{inst_str}{country_str} — {author['count']} {get_text('html_citations_label')}")
+        top_authors_formatted.append(f"{display}{orcid_str}{inst_str}{country_str}{all_aff_str} — {author['count']} {get_text('html_citations_label')}")
     
     # Citation stacking analysis
     total_refs_with_journal = sum(journal_counter.values())
@@ -3847,6 +4187,16 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
     
     # Collect self-citations
     self_citation_refs = [r for r in results if r.get('is_self_citation', False)]
+    
+    # Collect paper affiliations for reviewer filtering
+    paper_affiliations = set()
+    if results:
+        for result in results:
+            if result.get('is_self_citation', False):
+                for author in result.get('authors', []):
+                    for aff in author.get('affiliations', []):
+                        if aff.get('name'):
+                            paper_affiliations.add(aff['name'])
     
     # Calculate percentages
     def calc_percent(count):
@@ -3923,11 +4273,12 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         'citation_classics': citation_classics,
         'total_citations_sum': sum(r.get('citations_count', 0) for r in results),
         'avg_citations': sum(r.get('citations_count', 0) for r in results) / total_references if total_references else 0,
-        'publisher_sources': publisher_sources
+        'publisher_sources': publisher_sources,
+        'paper_affiliations': list(paper_affiliations)
     }
 
 def display_top_authors(stats: Dict):
-    """Display top authors with proper ORCID and affiliation information"""
+    """Display top authors with proper ORCID and affiliation information (showing ALL affiliations)"""
     st.markdown(f"### {get_text('top_authors')}")
     
     for i, author in enumerate(stats['author_frequency_all']['all_authors'][:30], 1):
@@ -3939,17 +4290,30 @@ def display_top_authors(stats: Dict):
                 orcid_url = f"https://orcid.org/{orcid_url}"
             orcid_html = f' 🔗 <a href="{orcid_url}" target="_blank" style="color: #667eea; text-decoration: none;">ORCID</a>'
         
-        # Format institution (cleaned)
-        inst_text = f" 🏛 {author['institution'][:50]}" if author.get('institution') else ""
+        # Format primary institution (if exists)
+        inst_text = f" 🏛 {author['primary_institution'][:50]}" if author.get('primary_institution') else ""
         
-        # Format country (from country_code)
-        country_text = f" 🌍 {author['country']}" if author.get('country') else ""
+        # Format primary country
+        country_text = f" 🌍 {author['primary_country']}" if author.get('primary_country') else ""
         
-        # Format affiliations (if multiple)
+        # Format ALL affiliations (if multiple)
         affiliations_text = ""
         if author.get('affiliations') and len(author['affiliations']) > 1:
-            aff_list = author['affiliations'][:3]
-            affiliations_text = f"<div style='font-size: 11px; color: #666; margin-top: 5px;'><strong>All affiliations:</strong><br>{'<br>'.join([html.escape(aff[:80]) for aff in aff_list])}</div>"
+            aff_list = author['affiliations'][:5]
+            affiliations_text = f"<div style='font-size: 11px; color: #666; margin-top: 5px;'><strong>{get_text('all_affiliations')}:</strong><br>"
+            for aff in aff_list:
+                affiliations_text += f"• {html.escape(aff['name'][:80])} ({aff['country'] if aff['country'] else get_text('not_found')})<br>"
+            affiliations_text += "</div>"
+        
+        # Format ALL countries
+        countries_text = ""
+        if author.get('countries') and len(author['countries']) > 1:
+            countries_text = f"<div style='font-size: 11px; color: #666; margin-top: 3px;'><strong>{get_text('all_countries')}:</strong> {', '.join(author['countries'][:5])}</div>"
+        
+        # Show number of affiliations and countries
+        meta_text = ""
+        if author.get('num_affiliations', 1) > 1 or author.get('num_countries', 1) > 1:
+            meta_text = f"<div style='font-size: 10px; color: #999; margin-top: 3px;'>{author.get('num_affiliations', 1)} {get_text('num_affiliations')}, {author.get('num_countries', 1)} {get_text('num_countries')}</div>"
         
         st.markdown(f"""
         <div class="rank-item">
@@ -3960,6 +4324,8 @@ def display_top_authors(stats: Dict):
                 <div class="progress-fill" style="width: {author['count'] / stats['author_frequency_all']['all_authors'][0]['count'] * 100 if stats['author_frequency_all']['all_authors'] else 0}%;"></div>
             </div>
             {affiliations_text}
+            {countries_text}
+            {meta_text}
         </div>
         """, unsafe_allow_html=True)
 
@@ -4047,8 +4413,8 @@ def get_color_for_author(index: int) -> str:
     ]
     return colors[index % len(colors)]
 
-# ======================== HTML REPORT (ENGLISH, UPDATED WITH NEW TYPES) ========================
-def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_authors: Set[str] = None, lang: str = 'en', journal_name: str = '', article_number: str = '', duplicates: List[Dict] = None, primary_color: str = '#667eea', secondary_color: str = '#f39c12') -> str:
+# ======================== HTML REPORT (ENGLISH, UPDATED WITH NEW TYPES AND REVIEWERS) ========================
+def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_authors: Set[str] = None, lang: str = 'en', journal_name: str = '', article_number: str = '', duplicates: List[Dict] = None, primary_color: str = '#667eea', secondary_color: str = '#f39c12', show_reviewers: bool = False, reviewers: List[Dict] = None) -> str:
     """Generate enhanced HTML report with PNG icons (no emojis) and professional design"""
     
     analogous = get_analogous_colors(primary_color, 2)
@@ -4104,6 +4470,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         ("url", "icon_url.png"),
         ("problems", "icon_problems.png"),
         ("list", "icon_list.png"),
+        ("reviewers", "icon_reviewers.png"),
     ]
     
     for key, filename in icon_files:
@@ -4134,6 +4501,15 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     
     # Determine if we need to show self-citations section
     show_self_citations_section = paper_authors and len(paper_authors) > 0
+    
+    # Confidential banner if reviewers section is enabled
+    confidential_banner = ""
+    if show_reviewers:
+        if lang == 'ru':
+            banner_text = get_text_local('confidential_banner_ru')
+        else:
+            banner_text = get_text_local('confidential_banner_en')
+        confidential_banner = f'<div class="confidential-banner">🔒 {banner_text}</div>'
     
     # Helper functions for clickable links
     def make_clickable_doi(doi):
@@ -4273,6 +4649,11 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             """
         non_journal_sources_html += "</div>"
     
+    # Generate Potential Reviewers section
+    reviewers_html = ""
+    if show_reviewers and reviewers:
+        reviewers_html = generate_reviewers_html(reviewers, lang)
+    
     # Generate full reference list with color coding for different types
     full_references_html = ""
     duplicate_indices = set()
@@ -4339,7 +4720,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         </div>
         """
     
-    # Build sidebar navigation with PNG icons (updated with new sections)
+    # Build sidebar navigation with PNG icons (updated with reviewers section)
     sidebar_items = [
         ("overview", "html_overview", icons["overview"]),
         ("identifiers", "html_identifier_coverage", icons["identifier"]),
@@ -4359,6 +4740,9 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     
     if duplicates and len(duplicates) > 0:
         sidebar_items.append(("duplicates", "duplicate_references_title", icons.get("duplicates", icons["list"])))
+    
+    if show_reviewers and reviewers:
+        sidebar_items.append(("potential_reviewers", "potential_reviewers", icons.get("reviewers", icons["list"])))
     
     sidebar_items.extend([
         ("crossref_only", "html_crossref_only", icons["crossref"]),
@@ -4677,6 +5061,78 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             border-left: 3px solid #dc3545 !important;
         }}
         
+        /* Reviewer card styles */
+        .reviewer-card {{
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+            border-left: 4px solid {primary_color};
+        }}
+        
+        .reviewer-card:hover {{
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }}
+        
+        .reviewer-name {{
+            font-size: 18px;
+            font-weight: 600;
+            color: {primary_color};
+            margin-bottom: 8px;
+        }}
+        
+        .reviewer-orcid {{
+            font-size: 13px;
+            margin-bottom: 8px;
+        }}
+        
+        .reviewer-country {{
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 8px;
+        }}
+        
+        .reviewer-section-title {{
+            font-weight: 600;
+            margin-top: 12px;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #333;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 4px;
+        }}
+        
+        .external-id-item {{
+            font-size: 12px;
+            margin-bottom: 6px;
+            padding-left: 8px;
+        }}
+        
+        .reviewer-website {{
+            font-size: 12px;
+            margin-bottom: 6px;
+        }}
+        
+        .confidential-banner {{
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            text-align: center;
+            font-weight: bold;
+            border: 2px solid #ffd32a;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }}
+        
+        .confidential-banner::before {{
+            content: "🔒 ";
+            font-size: 20px;
+        }}
+        
         .footer {{
             text-align: center;
             padding: 20px;
@@ -4750,6 +5206,8 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     {sidebar_html}
     
     <div class="main-content">
+        {confidential_banner}
+        
         <div class="header">
             <div style="display: flex; justify-content: center; margin-bottom: 15px;">
                 <img src="data:image/png;base64,{logo_base64}" style="height: 150px; width: auto;" alt="Logo">
@@ -4877,11 +5335,11 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             </div>
         </div>
         
-        <!-- AUTHORS SECTION -->
+        <!-- AUTHORS SECTION (UPDATED WITH ALL AFFILIATIONS) -->
         <div id="authors" class="section">
             {make_section_title("authors", "html_authors")}
             <div>
-                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(author["display_name"])}</span><span class="rank-count">{author["count"]} {get_text_local("html_citations_label")}</span>' + (f'<div style="font-size: 11px; color: #667eea;">{get_text_local("orcid_label")}: {make_clickable_orcid(author["orcid"])}</div>' if author.get("orcid") else '') + (f'<div style="font-size: 11px; color: #666;"><strong>{get_text_local("institution_label")}:</strong> {html.escape(author["institution"][:50])}</div>' if author.get("institution") else '') + (f'<div style="font-size: 11px; color: #666;"><strong>{get_text_local("country_label")}:</strong> {", ".join(author["countries"])}</div>' if author.get("countries") else '') + (f'<div style="font-size: 11px; color: #666;"><strong>{get_text_local("all_authors_affiliations")}:</strong><br>' + '<br>'.join([html.escape(aff[:80]) for aff in author.get("affiliations", [])[:3]]) + '</div>' if author.get("affiliations") else '') + '<div class="progress-bar"><div class="progress-fill" style="width: ' + str(min(100, author["count"] / stats["author_frequency_all"]["all_authors"][0]["count"] * 100 if stats["author_frequency_all"]["all_authors"] else 0)) + '%;"></div></div></div>' for i, author in enumerate(stats["author_frequency_all"]["all_authors"][:30])])}
+                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(author["display_name"])}</span><span class="rank-count">{author["count"]} {get_text_local("html_citations_label")}</span>' + (f'<div style="font-size: 11px; margin-top: 5px;"><strong>{get_text_local("orcid_label")}:</strong> {make_clickable_orcid(author["orcid"])}</div>' if author.get("orcid") else '') + (f'<div style="font-size: 11px; margin-top: 5px;"><strong>{get_text_local("institution_label")}:</strong> {html.escape(author["primary_institution"][:50])}</div>' if author.get("primary_institution") else '') + (f'<div style="font-size: 11px; margin-top: 5px;"><strong>{get_text_local("country_label")}:</strong> {", ".join(author["countries"][:5])}</div>' if author.get("countries") else '') + (f'<div style="font-size: 11px; margin-top: 5px;"><strong>{get_text_local("all_affiliations")}:</strong><br>' + '<br>'.join([f'• {html.escape(aff["name"][:80])} ({aff["country"] if aff["country"] else get_text_local("not_found")})' for aff in author.get("affiliations", [])[:5]]) + '</div>' if author.get("affiliations") else '') + (f'<div style="font-size: 10px; color: #999; margin-top: 5px;">{author.get("num_affiliations", 1)} {get_text_local("num_affiliations")}, {author.get("num_countries", 1)} {get_text_local("num_countries")}</div>' if author.get("num_affiliations", 1) > 1 or author.get("num_countries", 1) > 1 else '') + '<div class="progress-bar"><div class="progress-fill" style="width: ' + str(min(100, author["count"] / stats["author_frequency_all"]["all_authors"][0]["count"] * 100 if stats["author_frequency_all"]["all_authors"] else 0)) + '%;"></div></div></div>' for i, author in enumerate(stats["author_frequency_all"]["all_authors"][:30])])}
             </div>
             <div style="margin-top: 15px;">
                 <span class="badge badge-info">{get_text_local('unique_authors')}: {stats['author_frequency_all']['unique_authors']}</span>
@@ -5071,6 +5529,9 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         <!-- DUPLICATES SECTION -->
         {duplicates_html}
         
+        <!-- POTENTIAL REVIEWERS SECTION -->
+        {reviewers_html}
+        
         <!-- ONLY CROSSREF SECTION -->
         <div id="crossref_only" class="section">
             {make_section_title("crossref", "html_crossref_only")}
@@ -5177,7 +5638,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     
     return html_content
 
-# ======================== UI INTERFACE (ENGLISH, UPDATED WITH NEW FILTERS) ========================
+# ======================== UI INTERFACE (ENGLISH, UPDATED WITH NEW FILTERS AND REVIEWERS) ========================
 def main():
     # Language selector in sidebar (before anything else)
     with st.sidebar:
@@ -5279,6 +5740,20 @@ def main():
         # Apply theme on color change
         secondary = st.session_state.get('secondary_color', get_complementary_color(st.session_state.primary_color))
         apply_theme_css(st.session_state.primary_color, secondary)
+        
+        st.markdown("---")
+        
+        # ========== NEW: POTENTIAL REVIEWERS TOGGLE ==========
+        st.markdown(f"## 👥 {get_text('propose_reviewers')}")
+        show_reviewers_toggle = st.checkbox(
+            get_text('propose_reviewers'),
+            value=st.session_state.get('show_potential_reviewers', False),
+            key="show_reviewers_toggle"
+        )
+        st.session_state.show_potential_reviewers = show_reviewers_toggle
+        
+        if show_reviewers_toggle:
+            st.info("🔍 When enabled, a 'Potential Reviewers' section will appear with candidates from cited works (last 4 years, no affiliation conflicts)")
         
         st.markdown("---")
     
@@ -5414,6 +5889,33 @@ def main():
             with st.spinner(get_text('analysis_started')):
                 stats = generate_advanced_statistics(results)
             
+            # ========== GENERATE POTENTIAL REVIEWERS IF TOGGLED ==========
+            reviewers = []
+            if st.session_state.get('show_potential_reviewers', False):
+                with st.spinner(get_text('fetching_orcid_profiles')):
+                    # Get normalized paper authors for self-citation check
+                    paper_authors_norm = set()
+                    for author in paper_authors:
+                        norm, _ = normalize_author_name(author)
+                        paper_authors_norm.add(norm)
+                    
+                    # Get paper affiliations from stats
+                    paper_affiliations = set(stats.get('paper_affiliations', []))
+                    
+                    # Get candidates
+                    candidates = get_reviewer_candidates(results, paper_authors_norm, paper_affiliations)
+                    
+                    # Filter by affiliation (max 3 per affiliation)
+                    filtered_candidates = filter_reviewers_by_affiliation(candidates, max_per_affiliation=3)
+                    
+                    # Fetch ORCID profiles
+                    reviewers = fetch_orcid_profiles_parallel(filtered_candidates)
+                    
+                    if reviewers:
+                        st.success(f"✅ Found {len(reviewers)} potential reviewers")
+                    else:
+                        st.info(get_text('none_detected'))
+            
             # Display metrics with percentages
             st.markdown('<div class="stats-grid">', unsafe_allow_html=True)
             col1, col2, col3, col4 = st.columns(4)
@@ -5515,6 +6017,10 @@ def main():
                 {"id": "problems", "icon": "⚠️", "title": get_text('problematic_refs'), "subtitle": get_text('html_problems')}
             ]
             
+            # Add potential reviewers tab if enabled
+            if st.session_state.get('show_potential_reviewers', False) and reviewers:
+                tabs_config.append({"id": "reviewers", "icon": "👥", "title": get_text('potential_reviewers'), "subtitle": get_text('html_reviewers')})
+            
             # Create buttons in rows of 6
             cols_per_row = 6
             for i in range(0, len(tabs_config), cols_per_row):
@@ -5560,7 +6066,6 @@ def main():
                     {"Identifier type": "URL", "Count": stats['identifier_coverage']['stats']['has_url'], "Percentage": f"{stats['identifier_coverage_percents']['has_url']:.1f}%"},
                     {"Identifier type": get_text('preprint_repository_count'), "Count": stats['identifier_coverage']['stats']['has_arxiv'], "Percentage": f"{stats['identifier_coverage_percents']['has_arxiv']:.1f}%"},
                     {"Identifier type": "PMID", "Count": stats['identifier_coverage']['stats']['has_pmid'], "Percentage": f"{stats['identifier_coverage_percents']['has_pmid']:.1f}%"},
-                    {"Identifier type": get_text('books_count'), "Count": stats['identifier_coverage']['stats']['is_book'], "Percentage": f"{stats['identifier_coverage_percents']['books']:.1f}%"},
                     {"Identifier type": get_text('preprint_repository_count') + " (from API)", "Count": stats['identifier_coverage']['stats']['is_preprint_repository'], "Percentage": f"{stats['identifier_coverage_percents']['preprint_repository']:.1f}%"},
                     {"Identifier type": get_text('proceedings_count'), "Count": stats['identifier_coverage']['stats']['is_proceedings'], "Percentage": f"{stats['identifier_coverage_percents']['proceedings']:.1f}%"},
                     {"Identifier type": get_text('retracted_count'), "Count": stats['identifier_coverage']['stats']['is_retracted'], "Percentage": f"{stats['identifier_coverage_percents']['retracted']:.1f}%"},
@@ -5575,33 +6080,7 @@ def main():
                         st.text(ref)
             
             elif active_tab == "authors":
-                st.markdown(f"### {get_text('top_authors')}")
-                for i, author in enumerate(stats['author_frequency_all']['all_authors'][:30], 1):
-                    # Make ORCID clickable if exists
-                    orcid_html = ""
-                    if author.get('orcid'):
-                        orcid_url = author['orcid']
-                        orcid_html = f' 🔗 <a href="{orcid_url}" target="_blank" style="color: #667eea; text-decoration: none;">ORCID: {author["orcid"]}</a>'
-                    
-                    inst_text = f" 🏛 {author['institution'][:50]}" if author.get('institution') else ""
-                    country_text = f" 🌍 {', '.join(author['countries'])}" if author.get('countries') else ""
-                    affiliations_text = ""
-                    if author.get('affiliations'):
-                        aff_list = author['affiliations'][:3]
-                        affiliations_text = f"<div style='font-size: 11px; color: #666; margin-top: 5px;'><strong>Affiliations:</strong><br>{'<br>'.join([html.escape(aff[:80]) for aff in aff_list])}</div>"
-                    
-                    st.markdown(f"""
-                    <div class="rank-item">
-                        <span class="rank-number">{i}.</span>
-                        <span class="rank-name">{author['display_name']}{orcid_html}{inst_text}{country_text}</span>
-                        <span class="rank-count">{author['count']} {get_text('html_citations_label')}</span>
-                        <div class="progress-bar-custom">
-                            <div class="progress-fill" style="width: {author['count'] / stats['author_frequency_all']['all_authors'][0]['count'] * 100 if stats['author_frequency_all']['all_authors'] else 0}%;"></div>
-                        </div>
-                        {affiliations_text}
-                    </div>
-                    """, unsafe_allow_html=True)
-                st.markdown(f"**{get_text('unique_authors')}:** {stats['author_frequency_all']['unique_authors']}")
+                display_top_authors(stats)
             
             elif active_tab == "journals":
                 st.markdown(f"### {get_text('all_journals')}")
@@ -5670,37 +6149,7 @@ def main():
                 st.dataframe(concepts_df, use_container_width=True)
             
             elif active_tab == "geography":
-                st.markdown(f"### {get_text('geographic_distribution')}")
-                
-                # Type 1
-                st.markdown(f"#### {get_text('geography_type_1')}")
-                st.caption(get_text('geography_type_1_desc'))
-                if stats['geography']['type1_unique_countries_per_reference']:
-                    geo1_df = pd.DataFrame(list(stats['geography']['type1_unique_countries_per_reference'].items()), columns=["Country", "References count"])
-                    st.dataframe(geo1_df, use_container_width=True)
-                
-                # Type 2
-                st.markdown(f"#### {get_text('geography_type_2')}")
-                st.caption(get_text('geography_type_2_desc'))
-                if stats['geography']['type2_authors_per_country']:
-                    geo2_df = pd.DataFrame(list(stats['geography']['type2_authors_per_country'].items()), columns=["Country", "Authors count"])
-                    st.dataframe(geo2_df, use_container_width=True)
-                
-                # Type 3
-                st.markdown(f"#### {get_text('geography_type_3')}")
-                st.caption(get_text('geography_type_3_desc'))
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric(get_text('single_country'), stats['geography']['single_country_count'])
-                with col2:
-                    st.metric(get_text('international_collab'), stats['geography']['international_count'])
-                with col3:
-                    st.metric(get_text('total_references') + " (with country)", stats['geography']['total_references_with_country'])
-                
-                if stats['geography']['collaboration_matrix']:
-                    st.markdown(f"#### {get_text('collaboration_matrix')}")
-                    collab_df = pd.DataFrame(stats['geography']['collaboration_matrix'][:15])
-                    st.dataframe(collab_df, use_container_width=True)
+                display_geography_section(stats)
             
             elif active_tab == "collaboration":
                 st.markdown(f"### {get_text('collaboration_networks')}")
@@ -5831,6 +6280,9 @@ def main():
                 
                 if not stats['problematic_refs'] and not stats.get('retracted_refs'):
                     st.success(get_text('no_problematic'))
+            
+            elif active_tab == "reviewers" and reviewers:
+                display_potential_reviewers_section(reviewers)
             
             st.markdown("---")
             st.markdown(f"### {get_text('full_reference_list')}")
@@ -6109,9 +6561,32 @@ def main():
             journal_name = st.session_state.get('journal_name', '')
             article_number = st.session_state.get('article_number', '')
             duplicates = st.session_state.get('duplicates', [])
+            show_reviewers = st.session_state.get('show_potential_reviewers', False)
             
             # Generate statistics
             stats = generate_advanced_statistics(results)
+            
+            # Generate reviewers if needed
+            reviewers = []
+            if show_reviewers:
+                with st.spinner(get_text('fetching_orcid_profiles')):
+                    # Get normalized paper authors
+                    paper_authors_norm = set()
+                    for author in paper_authors:
+                        norm, _ = normalize_author_name(author)
+                        paper_authors_norm.add(norm)
+                    
+                    # Get paper affiliations
+                    paper_affiliations = set(stats.get('paper_affiliations', []))
+                    
+                    # Get candidates
+                    candidates = get_reviewer_candidates(results, paper_authors_norm, paper_affiliations)
+                    
+                    # Filter by affiliation
+                    filtered_candidates = filter_reviewers_by_affiliation(candidates, max_per_affiliation=3)
+                    
+                    # Fetch ORCID profiles
+                    reviewers = fetch_orcid_profiles_parallel(filtered_candidates)
             
             st.markdown(f"### {get_text('export_report')}")
             st.markdown(get_text('download_html'))
@@ -6120,7 +6595,7 @@ def main():
             primary_color = st.session_state.get('primary_color', '#667eea')
             secondary_color = st.session_state.get('secondary_color', get_complementary_color(primary_color))
             
-            # Generate HTML report with duplicates and new types
+            # Generate HTML report with duplicates and new types and reviewers
             html_report = generate_html_report_advanced(
                 results, 
                 stats, 
@@ -6130,7 +6605,9 @@ def main():
                 article_number, 
                 duplicates,
                 primary_color,
-                secondary_color
+                secondary_color,
+                show_reviewers,
+                reviewers
             )
             
             # Generate filename from journal abbreviation and article number (no datetime)
@@ -6184,7 +6661,7 @@ def main():
             st.markdown("---")
             st.markdown(f"### {get_text('text_export')}")
             
-            # Prepare text export with comprehensive data (updated with new types)
+            # Prepare text export with comprehensive data (updated with new types and reviewers)
             copy_text = f"""
     === COMPREHENSIVE REFERENCE LIST ANALYSIS ===
     Journal: {journal_name if journal_name else 'Chimica Techno Acta'}
@@ -6272,6 +6749,14 @@ def main():
     
     === PROBLEMATIC REFERENCES ===
     {chr(10).join([f"- {ref['problems']}: {ref['text'][:100]}..." for ref in stats['problematic_refs'][:5]]) if stats['problematic_refs'] else "No problematic references detected"}
+    """
+            
+            # Add potential reviewers section to text export if enabled
+            if show_reviewers and reviewers:
+                copy_text += f"""
+    
+    === POTENTIAL REVIEWERS ===
+    {chr(10).join([f"{i+1}. {r['display_name']}" + (f" (ORCID: {r['orcid']})" if r.get('orcid') else "") + f" - {len(r['candidate_articles'])} cited articles, latest: {r['latest_year']}" for i, r in enumerate(reviewers[:30])]) if reviewers else "No potential reviewers found"}
     """
             
             st.text_area(get_text('text_export'), copy_text, height=400)
