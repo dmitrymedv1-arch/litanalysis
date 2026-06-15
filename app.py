@@ -639,7 +639,7 @@ TEXTS = {
         
         # New for Potential Reviewers
         'propose_reviewers': "Propose potential reviewers",
-        'potential_reviewers': "👥 Potential Reviewers",
+        'potential_reviewers': "Potential Reviewers",
         'confidential_banner': "CONFIDENTIAL: This report is intended for editorial use only and must not be shared with reviewers or authors.",
         'fetching_orcid_profiles': "🔍 Fetching ORCID profiles for potential reviewers...",
         'orcid_profile_not_public': "ORCID profile is not public or not found",
