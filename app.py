@@ -2824,7 +2824,8 @@ def parse_reference_list(references_text: str) -> List[str]:
     - Bracketed: "[1] Reference text"
     - Parenthesized: "(1) Reference text"
     - Plain DOI list: one DOI per line
-    - Mixed formats
+    - Plain URL list: one URL per line (any http/https URL)
+    - Mixed formats (numbered + DOI + URL)
     """
     lines = references_text.strip().split('\n')
     references = []
@@ -2840,7 +2841,11 @@ def parse_reference_list(references_text: str) -> List[str]:
     ]
     
     # Pattern for detecting if a line looks like a standalone DOI or URL
-    doi_url_pattern = r'^(https?://doi\.org/|https?://dx\.doi\.org/|10\.\d{4,9}/)'
+    # EXPANDED: Now matches ANY http/https URL, not just DOI URLs
+    doi_url_pattern = r'^(https?://(?:doi\.org/|dx\.doi\.org/|)|10\.\d{4,9}/)'
+    
+    # NEW: Pattern for detecting plain HTTP/HTTPS URLs (without DOI in path)
+    plain_url_pattern = r'^(https?://[^\s]+)'
     
     for line in lines:
         line = line.strip()
@@ -2849,33 +2854,58 @@ def parse_reference_list(references_text: str) -> List[str]:
         
         is_new_ref = False
         
-        # Check if line starts with a reference marker
+        # Check if line starts with a reference marker (numbered, bracketed, etc.)
         for pattern in patterns:
             if re.match(pattern, line):
                 is_new_ref = True
                 break
         
-        # SPECIAL CASE: If line starts with DOI/URL pattern AND previous line
-        # was also a DOI/URL, treat as separate reference even without marker
+        # SPECIAL CASE 1: Line starts with DOI/DOI-URL pattern
         if not is_new_ref and re.match(doi_url_pattern, line):
-            # Check if current_ref is not empty and contains a DOI/URL pattern
+            # Check if current_ref is not empty and contains content
             if current_ref:
-                # Join current_ref to see if it looks like it contains DOIs
+                # Join current_ref to see if it already has content
                 current_text = ' '.join(current_ref)
-                # If current_text already has a DOI and this is another DOI on new line,
+                # If current_text already has a DOI/URL and this is another on new line,
                 # it should be a separate reference
-                if re.search(doi_url_pattern, current_text):
+                if re.search(doi_url_pattern, current_text) or re.search(plain_url_pattern, current_text):
                     # Save current reference and start new one
                     if current_ref:
                         references.append(' '.join(current_ref))
                         current_ref = []
                     is_new_ref = True
         
+        # SPECIAL CASE 2 (NEW): Line starts with plain URL (any http/https)
+        if not is_new_ref and re.match(plain_url_pattern, line):
+            # Check if this URL might be part of previous reference
+            url_match = re.match(plain_url_pattern, line)
+            if url_match:
+                potential_url = url_match.group(1)
+                
+                # If current_ref is empty, this is definitely a new reference
+                if not current_ref:
+                    is_new_ref = True
+                else:
+                    # Check if previous reference already has a URL or DOI
+                    current_text = ' '.join(current_ref)
+                    # If previous reference has a URL/DOI and this line is a pure URL,
+                    # it's likely a separate reference
+                    if re.search(plain_url_pattern, current_text) or re.search(doi_url_pattern, current_text):
+                        # Save current reference and start new one
+                        if current_ref:
+                            references.append(' '.join(current_ref))
+                            current_ref = []
+                        is_new_ref = True
+                    else:
+                        # URL might be continuation of previous reference (unlikely but possible)
+                        # Let it be treated as continuation
+                        pass
+        
         if is_new_ref:
             if current_ref:
                 references.append(' '.join(current_ref))
             
-            # Clean the line from the marker
+            # Clean the line from the marker if it's a numbered/bracketed reference
             cleaned_line = line
             for pattern in patterns:
                 cleaned_line = re.sub(pattern, '', cleaned_line, count=1)
@@ -2891,21 +2921,52 @@ def parse_reference_list(references_text: str) -> List[str]:
     if current_ref:
         references.append(' '.join(current_ref))
     
-    # Post-processing: split any reference that contains multiple DOIs on the same line
+    # Post-processing: split any reference that contains multiple DOIs/URLs on the same line
     final_references = []
     for ref in references:
-        # Check if this reference contains multiple DOI patterns separated by spaces or newlines
+        # Check if this reference contains multiple DOI/URL patterns separated by spaces or newlines
         # Find all DOIs/URLs in this reference
         doi_matches = re.findall(r'(https?://doi\.org/10\.\d{4,9}/[^\s]+|10\.\d{4,9}/[^\s]+)', ref)
+        url_matches = re.findall(r'(https?://[^\s]+)', ref)
         
-        if len(doi_matches) > 1:
-            # Split into separate references, one per DOI
+        # If we have multiple URL/DOI matches, split into separate references
+        total_matches = len(doi_matches) + len([u for u in url_matches if 'doi.org' not in u])
+        
+        if total_matches > 1:
+            # Split into separate references, one per DOI/URL
+            all_matches = []
             for doi_match in doi_matches:
-                final_references.append(doi_match.strip())
+                all_matches.append(doi_match.strip())
+            for url_match in url_matches:
+                if 'doi.org' not in url_match and url_match not in all_matches:
+                    all_matches.append(url_match.strip())
+            
+            for match in all_matches:
+                final_references.append(match)
         else:
             final_references.append(ref)
     
-    return final_references
+    # FINAL POST-PROCESSING (NEW): Detect and split mixed content where URL is on same line as text
+    # Example: "Some text https://example.com" should be treated as one reference
+    # But if it's just a URL alone, keep as is
+    refined_references = []
+    for ref in final_references:
+        # If reference is empty, skip
+        if not ref.strip():
+            continue
+        
+        # Check if reference contains both text and a URL that might be a separate reference
+        # Pattern: something that looks like a reference number followed by URL
+        # e.g., "2. https://example.com" or "2 https://example.com"
+        number_url_pattern = r'^(\d+)[\.\)]?\s+(https?://[^\s]+)'
+        match = re.match(number_url_pattern, ref.strip())
+        if match:
+            # This looks like a numbered URL reference - keep as single reference
+            refined_references.append(ref)
+        else:
+            refined_references.append(ref)
+    
+    return refined_references
 
 def analyze_all_references(references: List[str], batch_size: int = 50, paper_authors: Set[str] = None) -> List[Dict]:
     """Analyze all references with batching - NOW USING OPTIMIZED VERSION WITH NEW AFFILIATION LOGIC"""
