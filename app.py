@@ -4060,12 +4060,14 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         if result.get('is_retracted'):
             problems.append(get_text('retracted'))
             has_problem = True
-        if result.get('is_preprint'):
-            problems.append(get_text('preprint'))
-            has_problem = True
+        # REMOVED: is_preprint is NOT a problem - it's a valid non-journal source with DOI
+        # if result.get('is_preprint'):
+        #     problems.append(get_text('preprint'))
+        #     has_problem = True
         if result.get('crossmark_issues'):
             for issue in result['crossmark_issues']:
-                if not any(note in issue for note in ['Repository source', 'Electronic book', 'Conference proceedings']):
+                # Skip non-problematic issue types (preprints, repositories, proceedings, ebooks)
+                if not any(note in issue for note in ['Repository source', 'Preprint', 'Repository / Preprint', 'Electronic book', 'Conference proceedings', 'arXiv preprint']):
                     problems.append(issue)
                     has_problem = True
         
