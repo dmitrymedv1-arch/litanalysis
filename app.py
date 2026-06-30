@@ -14,7 +14,9 @@ import difflib
 import math
 from collections import defaultdict
 from itertools import combinations
-import html 
+import html
+import styles
+
 # ======================== COLOR UTILITIES FOR DYNAMIC THEMES ========================
 import colorsys
 
@@ -5787,6 +5789,28 @@ def main():
         
         st.markdown("---")
         
+        # ========== СТИЛЬ ОТЧЕТА (НОВЫЙ РАЗДЕЛ) ==========
+        st.markdown(f"## 🎨 Report Style")
+        st.markdown("*Select visual design for HTML report*")
+        
+        # Получаем список стилей
+        style_names = styles.get_style_names()
+        style_options = list(style_names.keys())
+        style_labels = [f"{key}. {name}" for key, name in style_names.items()]
+        
+        selected_style_label = st.selectbox(
+            "Style",
+            options=style_labels,
+            index=0,
+            help="Choose the visual style for the generated HTML report"
+        )
+        
+        # Извлекаем ключ выбранного стиля
+        selected_style_key = selected_style_label.split(".")[0]
+        st.session_state.selected_style = selected_style_key
+        
+        st.markdown("---")
+        
         # ========== SETTINGS (LAST) ==========
         st.markdown(f"## {get_text('settings')}")
         batch_size = st.slider(get_text('batch_size'), 10, 100, 50, help=get_text('batch_size_help'))
@@ -6696,19 +6720,22 @@ def main():
             secondary_color = st.session_state.get('secondary_color', get_complementary_color(primary_color))
             
             # Generate HTML report with duplicates and new types
-            html_report = generate_html_report_advanced(
-                results, 
-                stats, 
-                paper_authors, 
-                st.session_state.language, 
-                journal_name, 
-                article_number, 
-                duplicates,
-                primary_color,
-                secondary_color,
-                potential_reviewers,
-                propose_reviewers
-            )
+            report_data = {
+                **stats,  # Все статистические данные
+                "journal_name": journal_name,
+                "article_number": article_number,
+                "duplicates": duplicates,
+                "results": results,
+                "paper_authors": paper_authors,
+                "potential_reviewers": potential_reviewers if propose_reviewers else [],
+                "show_reviewers": propose_reviewers
+            }
+            
+            # Получаем выбранный стиль
+            selected_style = st.session_state.get('selected_style', '0')
+            
+            # Генерируем HTML в выбранном стиле
+            html_report = styles.generate_report(selected_style, report_data)
             
             # Generate filename from journal abbreviation and article number (no datetime)
             def get_journal_abbreviation(journal_name: str) -> str:
