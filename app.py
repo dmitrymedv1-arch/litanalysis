@@ -15,6 +15,15 @@ import math
 from collections import defaultdict
 from itertools import combinations
 import html 
+
+# ======================== ИМПОРТ СТИЛЕЙ ========================
+try:
+    from styles import STYLE_GENERATORS
+    STYLES_AVAILABLE = True
+except ImportError:
+    STYLES_AVAILABLE = False
+    STYLE_GENERATORS = {}
+
 # ======================== COLOR UTILITIES FOR DYNAMIC THEMES ========================
 import colorsys
 
@@ -1732,13 +1741,6 @@ def merge_authors_from_results(results: List[Dict]) -> List[Dict]:
     return result_list
 
 # ======================== HELPER FUNCTIONS FOR AUTHOR PROCESSING ========================
-
-# OLD FUNCTIONS REMOVED:
-# - clean_affiliation() - REMOVED (replaced by extract_country_from_affiliation_string)
-# - get_country_from_affiliation() - REMOVED (replaced by extract_country_from_affiliation_string)
-# - extract_authors_from_crossref() - REPLACED by extract_authors_with_affiliations_from_crossref
-# - extract_authors_from_openalex() - REPLACED by extract_authors_with_affiliations_from_openalex
-# - merge_authors() - REPLACED by merge_authors_from_results
 
 def format_orcid_id(orcid: str) -> str:
     """Format ORCID ID to full URL"""
@@ -3938,8 +3940,7 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
                     'doi': result['doi']
                 })
             elif result['openalex_status']:
-                doi_status['openalex_only'] += 1
-                openalex_only_refs.append({
+                doi_status['openalex_only'] += 1                openalex_only_refs.append({
                     'text': result['original_text'],
                     'doi': result['doi']
                 })
@@ -5688,6 +5689,37 @@ def main():
         
         st.markdown("---")
         
+        # ========== ВЫБОР СТИЛЯ ОТЧЕТА (НОВЫЙ БЛОК) ==========
+        st.markdown(f"## 🎨 Стиль отчета")
+        
+        if STYLES_AVAILABLE:
+            style_options = {key: info["name"] for key, info in STYLE_GENERATORS.items()}
+            default_style = "classic"
+            
+            selected_style = st.selectbox(
+                "Выберите дизайн HTML отчета",
+                options=list(style_options.keys()),
+                format_func=lambda x: style_options.get(x, x),
+                index=list(style_options.keys()).index(default_style) if default_style in style_options else 0,
+                key="selected_style"
+            )
+            
+            # Сохраняем выбор в session_state
+            st.session_state.selected_style = selected_style
+            
+            # Показываем информацию о стиле
+            if selected_style != "classic":
+                st.caption(f"🎨 Выбран: {style_options.get(selected_style, selected_style)}")
+                st.caption("💡 Цветовая тема отключена для этого стиля")
+            else:
+                st.caption("📄 Используется классический дизайн")
+        else:
+            st.warning("⚠️ Стили не загружены. Убедитесь, что файл styles.py существует.")
+            selected_style = "classic"
+            st.session_state.selected_style = "classic"
+        
+        st.markdown("---")
+        
         # ========== PROPOSE POTENTIAL REVIEWERS (NEW ORDER - AFTER ARTICLE NUMBER) ==========
         st.markdown(f"## {get_text('propose_reviewers')}")
         propose_reviewers = st.checkbox(
@@ -5700,90 +5732,100 @@ def main():
         st.markdown("---")
         
         # ========== COLOR THEME (NEW ORDER - AFTER REVIEWERS) ==========
-        st.markdown(f"## 🎨 Color Theme")
-        
-        # Initialize color theme in session state
-        if 'primary_color' not in st.session_state:
-            st.session_state.primary_color = '#667eea'
-        if 'secondary_color' not in st.session_state:
-            st.session_state.secondary_color = '#f39c12'
-        
-        # Predefined theme options
-        preset_themes = {
-            "Default (Blue-Purple)": {"primary": "#667eea", "secondary": "#9b59b6"},
-            "Emerald (Green-Teal)": {"primary": "#2ecc71", "secondary": "#27ae60"},
-            "Sunset (Orange-Coral)": {"primary": "#e74c3c", "secondary": "#c0392b"},
-            "Ocean (Deep Blue)": {"primary": "#3498db", "secondary": "#2980b9"},
-            "Royal (Purple-Pink)": {"primary": "#9b59b6", "secondary": "#e84393"},
-            "Forest (Dark Green)": {"primary": "#27ae60", "secondary": "#2ecc71"},
-            "Cherry (Red-Pink)": {"primary": "#e84393", "secondary": "#9b59b6"},
-            "Amber (Yellow-Orange)": {"primary": "#f39c12", "secondary": "#e67e22"},
-        }
-        
-        # Theme selector with radio buttons or selectbox
-        theme_option = st.selectbox(
-            "🎨 Preset themes",
-            options=list(preset_themes.keys()),
-            index=0
-        )
-        
-        # Option to use preset or custom
-        use_preset = st.checkbox("Use preset theme", value=True)
-        
-        if use_preset:
-            selected_theme = preset_themes[theme_option]
-            st.session_state.primary_color = selected_theme["primary"]
-            st.session_state.secondary_color = selected_theme["secondary"]
+        # Показываем только для классического стиля
+        if selected_style == "classic" or not STYLES_AVAILABLE:
+            st.markdown(f"## 🎨 Color Theme")
+            
+            # Initialize color theme in session state
+            if 'primary_color' not in st.session_state:
+                st.session_state.primary_color = '#667eea'
+            if 'secondary_color' not in st.session_state:
+                st.session_state.secondary_color = '#f39c12'
+            
+            # Predefined theme options
+            preset_themes = {
+                "Default (Blue-Purple)": {"primary": "#667eea", "secondary": "#9b59b6"},
+                "Emerald (Green-Teal)": {"primary": "#2ecc71", "secondary": "#27ae60"},
+                "Sunset (Orange-Coral)": {"primary": "#e74c3c", "secondary": "#c0392b"},
+                "Ocean (Deep Blue)": {"primary": "#3498db", "secondary": "#2980b9"},
+                "Royal (Purple-Pink)": {"primary": "#9b59b6", "secondary": "#e84393"},
+                "Forest (Dark Green)": {"primary": "#27ae60", "secondary": "#2ecc71"},
+                "Cherry (Red-Pink)": {"primary": "#e84393", "secondary": "#9b59b6"},
+                "Amber (Yellow-Orange)": {"primary": "#f39c12", "secondary": "#e67e22"},
+            }
+            
+            # Theme selector with radio buttons or selectbox
+            theme_option = st.selectbox(
+                "🎨 Preset themes",
+                options=list(preset_themes.keys()),
+                index=0
+            )
+            
+            # Option to use preset or custom
+            use_preset = st.checkbox("Use preset theme", value=True)
+            
+            if use_preset:
+                selected_theme = preset_themes[theme_option]
+                st.session_state.primary_color = selected_theme["primary"]
+                st.session_state.secondary_color = selected_theme["secondary"]
+            else:
+                # Custom color picker
+                selected_color = st.color_picker(
+                    "🎨 Pick your primary color",
+                    value=st.session_state.primary_color,
+                    help="Choose any color. Complementary color will be auto-generated!"
+                )
+                st.session_state.primary_color = selected_color
+                st.session_state.secondary_color = get_complementary_color(selected_color)
+            
+            # Use secondary color from session state
+            complementary = st.session_state.secondary_color
+            
+            # Display color preview
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(
+                    f'<div style="text-align: center;">'
+                    f'<div class="color-preview" style="background: {st.session_state.primary_color};"></div>'
+                    f'<div style="font-size: 11px; margin-top: 5px;">Primary</div>'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
+            with col2:
+                st.markdown(
+                    f'<div style="text-align: center;">'
+                    f'<div class="color-preview" style="background: {complementary};"></div>'
+                    f'<div style="font-size: 11px; margin-top: 5px;">Complementary</div>'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
+            
+            # Show gradient preview
+            st.markdown(
+                f'<div class="complementary-preview" style="height: 8px; width: 100%; margin: 10px 0;"></div>',
+                unsafe_allow_html=True
+            )
+            
+            # Show theme info
+            st.markdown(
+                f'<div class="theme-info">'
+                f'✨ Complementary color automatically selected<br>'
+                f'🎨 Gradient: Primary → Complementary'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+            
+            # Apply theme on color change
+            secondary = st.session_state.get('secondary_color', get_complementary_color(st.session_state.primary_color))
+            apply_theme_css(st.session_state.primary_color, secondary)
         else:
-            # Custom color picker
-            selected_color = st.color_picker(
-                "🎨 Pick your primary color",
-                value=st.session_state.primary_color,
-                help="Choose any color. Complementary color will be auto-generated!"
-            )
-            st.session_state.primary_color = selected_color
-            st.session_state.secondary_color = get_complementary_color(selected_color)
-        
-        # Use secondary color from session state
-        complementary = st.session_state.secondary_color
-        
-        # Display color preview
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(
-                f'<div style="text-align: center;">'
-                f'<div class="color-preview" style="background: {st.session_state.primary_color};"></div>'
-                f'<div style="font-size: 11px; margin-top: 5px;">Primary</div>'
-                f'</div>',
-                unsafe_allow_html=True
-            )
-        with col2:
-            st.markdown(
-                f'<div style="text-align: center;">'
-                f'<div class="color-preview" style="background: {complementary};"></div>'
-                f'<div style="font-size: 11px; margin-top: 5px;">Complementary</div>'
-                f'</div>',
-                unsafe_allow_html=True
-            )
-        
-        # Show gradient preview
-        st.markdown(
-            f'<div class="complementary-preview" style="height: 8px; width: 100%; margin: 10px 0;"></div>',
-            unsafe_allow_html=True
-        )
-        
-        # Show theme info
-        st.markdown(
-            f'<div class="theme-info">'
-            f'✨ Complementary color automatically selected<br>'
-            f'🎨 Gradient: Primary → Complementary'
-            f'</div>',
-            unsafe_allow_html=True
-        )
-        
-        # Apply theme on color change
-        secondary = st.session_state.get('secondary_color', get_complementary_color(st.session_state.primary_color))
-        apply_theme_css(st.session_state.primary_color, secondary)
+            # Для не-классических стилей показываем информацию
+            st.markdown("""
+            <div style="background: #f0f0f0; border-radius: 10px; padding: 15px; text-align: center; font-size: 13px; color: #666;">
+                🎨 Цветовая тема фиксирована для этого стиля<br>
+                <span style="font-size: 11px;">Дизайн-система стиля определяет цветовую схему</span>
+            </div>
+            """, unsafe_allow_html=True)
         
         st.markdown("---")
         
@@ -6631,6 +6673,7 @@ def main():
             article_number = st.session_state.get('article_number', '')
             duplicates = st.session_state.get('duplicates', [])
             propose_reviewers = st.session_state.get('propose_reviewers', False)
+            selected_style = st.session_state.get('selected_style', 'classic')
             
             # Generate statistics
             stats = generate_advanced_statistics(results)
@@ -6689,26 +6732,44 @@ def main():
                     )
             
             st.markdown(f"### {get_text('export_report')}")
-            st.markdown(get_text('download_html'))
-
-            # Get current theme colors
+            
+            # Get current theme colors (only for classic style)
             primary_color = st.session_state.get('primary_color', '#667eea')
             secondary_color = st.session_state.get('secondary_color', get_complementary_color(primary_color))
             
-            # Generate HTML report with duplicates and new types
-            html_report = generate_html_report_advanced(
-                results, 
-                stats, 
-                paper_authors, 
-                st.session_state.language, 
-                journal_name, 
-                article_number, 
-                duplicates,
-                primary_color,
-                secondary_color,
-                potential_reviewers,
-                propose_reviewers
-            )
+            # Выбор генератора в зависимости от стиля
+            if STYLES_AVAILABLE and selected_style != "classic" and selected_style in STYLE_GENERATORS:
+                # Используем новый стиль из styles.py
+                generator_info = STYLE_GENERATORS[selected_style]
+                generator_func = generator_info["generator"]
+                
+                if generator_func:
+                    st.info(f"🎨 Используется стиль: **{generator_info['name']}**")
+                    html_report = generator_func(
+                        stats, 
+                        st.session_state.language, 
+                        journal_name, 
+                        article_number
+                    )
+                else:
+                    # Fallback на классический
+                    st.warning("⚠️ Генератор стиля не найден. Используется классический стиль.")
+                    html_report = generate_html_report_advanced(
+                        results, stats, paper_authors, st.session_state.language, 
+                        journal_name, article_number, duplicates,
+                        primary_color, secondary_color,
+                        potential_reviewers, propose_reviewers
+                    )
+            else:
+                # Используем классический стиль
+                if selected_style == "classic":
+                    st.caption("📄 Используется классический дизайн с возможностью настройки цветовой темы")
+                html_report = generate_html_report_advanced(
+                    results, stats, paper_authors, st.session_state.language, 
+                    journal_name, article_number, duplicates,
+                    primary_color, secondary_color,
+                    potential_reviewers, propose_reviewers
+                )
             
             # Generate filename from journal abbreviation and article number (no datetime)
             def get_journal_abbreviation(journal_name: str) -> str:
@@ -6743,6 +6804,11 @@ def main():
                 file_name = f"{journal_abbr}_{num_part}.html"
             else:
                 file_name = f"{journal_abbr}.html"
+            
+            # Добавляем суффикс для не-классических стилей
+            if selected_style != "classic" and selected_style in STYLE_GENERATORS:
+                style_suffix = f"_{selected_style}"
+                file_name = file_name.replace('.html', f'{style_suffix}.html')
             
             st.download_button(
                 label=get_text('download_html'),
