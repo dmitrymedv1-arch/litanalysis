@@ -301,7 +301,8 @@ def generate_style_0_classic(data: Dict) -> str:
         journals_html += f'''
         <tr>
             <td>{i}</td>
-            <td>{html.escape(journal.get("journal", "Unknown"))}</td>
+            journal_name = journal.get("journal") or "Unknown"
+            <td>{html.escape(str(journal_name))}</td>
             <td>{journal.get("count", 0)}</td>
             <td>{journal.get("percentage", 0):.1f}%</td>
         </tr>
@@ -313,7 +314,8 @@ def generate_style_0_classic(data: Dict) -> str:
         publishers_html += f'''
         <tr>
             <td>{i}</td>
-            <td>{html.escape(publisher.get("publisher", "Unknown"))}</td>
+            publisher_name = publisher.get("publisher") or "Unknown"
+            <td>{html.escape(str(publisher_name))}</td>
             <td>{publisher.get("count", 0)}</td>
             <td>{publisher.get("percentage", 0):.1f}%</td>
         </tr>
@@ -518,13 +520,20 @@ def generate_style_0_classic(data: Dict) -> str:
     classics_html = ''
     if citation_classics:
         for i, classic in enumerate(citation_classics, 1):
+            # Безопасное получение значений с защитой от None
+            title = classic.get("title") or "Unknown"
+            journal = classic.get("journal") or "Unknown"
+            year = classic.get("year") or "N/A"
+            citations = classic.get("citations") or 0
+            doi = classic.get("doi") or ""
+            
             classics_html += f'''
             <div class="rank-item">
                 <span class="rank-number">{i}.</span>
-                <span class="rank-name">{html.escape(classic.get("title", "Unknown"))}</span>
-                <span class="rank-count">Citations: {classic.get("citations", 0)}</span>
-                <div style="font-size: 12px; color: #666; margin-top: 5px;">{html.escape(classic.get("journal", "Unknown"))} ({classic.get("year", "N/A")})</div>
-                <div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(classic.get("doi", ""))}</div>
+                <span class="rank-name">{html.escape(str(title))}</span>
+                <span class="rank-count">Citations: {citations}</span>
+                <div style="font-size: 12px; color: #666; margin-top: 5px;">{html.escape(str(journal))} ({year})</div>
+                <div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(doi)}</div>
             </div>
             '''
     else:
