@@ -1,3 +1,8 @@
+"""
+app.py - Comprehensive Reference List Analysis
+Enhanced version with Crossref + OpenAlex analytics
+"""
+
 import streamlit as st
 import pandas as pd
 import re
@@ -15,6 +20,31 @@ import math
 from collections import defaultdict
 from itertools import combinations
 import html 
+
+# ======================== ИМПОРТ СТИЛЕЙ ========================
+from styles import (
+    BASE_CSS,
+    generate_theme_css,
+    get_theme_info,
+    get_available_themes,
+    get_theme_display_name,
+    theme_uses_primary,
+    theme_uses_secondary,
+    get_reference_color_style,
+    REFERENCE_COLORS_FULL,
+    REFERENCE_COLORS_BORDER_ONLY,
+    REFERENCE_COLORS_ICONS,
+    REFERENCE_COLORS_THEMED,
+    REFERENCE_COLORS_TEXT,
+    hex_to_rgb,
+    rgb_to_hex,
+    get_complementary_color,
+    get_contrast_color,
+    get_analogous_colors,
+    get_gradient_colors,
+    inject_color_placeholders
+)
+
 # ======================== COLOR UTILITIES FOR DYNAMIC THEMES ========================
 import colorsys
 
@@ -657,6 +687,32 @@ TEXTS = {
         'num_affiliations': "Number of affiliations",
         'num_countries': "Number of countries",
         'affiliation': "Affiliation",
+        
+        # New for Design Theme
+        'design_theme': "🎨 Design Theme",
+        'theme_default': "Gradient Classic",
+        'theme_glassmorphism': "Glassmorphism",
+        'theme_neon_dark': "Neon Dark",
+        'theme_aurora': "Aurora Borealis",
+        'theme_brutalist': "Brutalist",
+        'theme_minimalist_white': "Minimalist White",
+        'theme_ocean_deep': "Ocean Deep",
+        'theme_cosmic': "Cosmic",
+        'theme_terrazzo': "Terrazzo",
+        'theme_modern_cards': "Modern Cards",
+        'theme_duotone': "Duotone",
+        'theme_morphing': "Morphing",
+        'theme_current': "Current: {}",
+        'theme_color_warning': "⚠️ Color Theme is disabled for this design",
+        'theme_color_partial': "ℹ️ Color Theme uses only Primary color for accents",
+        
+        # New for Reference Color Style
+        'reference_colors': "🎨 Reference Color Style",
+        'ref_colors_full': "Full (background + border)",
+        'ref_colors_border': "Border only",
+        'ref_colors_icons': "Icons only",
+        'ref_colors_themed': "Themed (follows primary color)",
+        'ref_colors_text': "Text only",
     },
     'ru': {
         # General UI
@@ -923,6 +979,32 @@ TEXTS = {
         'num_affiliations': "Количество аффилиаций",
         'num_countries': "Количество стран",
         'affiliation': "Аффилиация",
+        
+        # New for Design Theme
+        'design_theme': "🎨 Тема оформления",
+        'theme_default': "Gradient Classic",
+        'theme_glassmorphism': "Glassmorphism",
+        'theme_neon_dark': "Neon Dark",
+        'theme_aurora': "Aurora Borealis",
+        'theme_brutalist': "Brutalist",
+        'theme_minimalist_white': "Minimalist White",
+        'theme_ocean_deep': "Ocean Deep",
+        'theme_cosmic': "Cosmic",
+        'theme_terrazzo': "Terrazzo",
+        'theme_modern_cards': "Modern Cards",
+        'theme_duotone': "Duotone",
+        'theme_morphing': "Morphing",
+        'theme_current': "Текущая: {}",
+        'theme_color_warning': "⚠️ Цветовая тема отключена для этого дизайна",
+        'theme_color_partial': "ℹ️ Цветовая тема использует только Primary цвет для акцентов",
+        
+        # New for Reference Color Style
+        'reference_colors': "🎨 Стиль цветной кодировки",
+        'ref_colors_full': "Полный (фон + граница)",
+        'ref_colors_border': "Только граница",
+        'ref_colors_icons': "Только иконки",
+        'ref_colors_themed': "Тематический (следует primary цвету)",
+        'ref_colors_text': "Только текст",
     }
 }
 
@@ -958,6 +1040,15 @@ if 'orcid_cache' not in st.session_state:
     st.session_state.orcid_cache = {}
 if 'propose_reviewers' not in st.session_state:
     st.session_state.propose_reviewers = False
+
+# ======================== НОВЫЕ ИНИЦИАЛИЗАЦИИ ДЛЯ ТЕМ ========================
+# Initialize design theme in session state
+if 'design_theme' not in st.session_state:
+    st.session_state.design_theme = 'default'
+
+# Initialize reference color style in session state
+if 'reference_color_style' not in st.session_state:
+    st.session_state.reference_color_style = 'full'
 
 # ======================== COUNTRY CODES MAPPING ========================
 COUNTRY_CODES = {
@@ -4327,8 +4418,20 @@ def get_color_for_author(index: int) -> str:
     return colors[index % len(colors)]
 
 # ======================== HTML REPORT (ENGLISH, UPDATED WITH NEW TYPES AND REVIEWERS) ========================
-def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_authors: Set[str] = None, lang: str = 'en', journal_name: str = '', article_number: str = '', duplicates: List[Dict] = None, primary_color: str = '#667eea', secondary_color: str = '#f39c12', potential_reviewers: List[Dict] = None, show_reviewers: bool = False) -> str:
+def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_authors: Set[str] = None, lang: str = 'en', journal_name: str = '', article_number: str = '', duplicates: List[Dict] = None, primary_color: str = '#667eea', secondary_color: str = '#f39c12', potential_reviewers: List[Dict] = None, show_reviewers: bool = False, design_theme: str = 'default', reference_color_style: str = 'full') -> str:
     """Generate enhanced HTML report with PNG icons (no emojis) and professional design"""
+    
+    # ========== ИМПОРТ СТИЛЕЙ ИЗ styles.py ==========
+    from styles import generate_theme_css, get_reference_color_style
+    
+    # ========== ГЕНЕРАЦИЯ CSS ДЛЯ ВЫБРАННОЙ ТЕМЫ ==========
+    theme_css = generate_theme_css(design_theme, primary_color, secondary_color)
+    
+    # ========== ДОБАВЛЯЕМ СТИЛЬ ЦВЕТНОЙ КОДИРОВКИ ==========
+    reference_colors_css = get_reference_color_style(reference_color_style)
+    
+    # Добавляем цветную кодировку в базовые стили
+    theme_css += reference_colors_css
     
     analogous = get_analogous_colors(primary_color, 2)
     
@@ -4796,7 +4899,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     # Get current date only (without time)
     current_date = datetime.now().strftime('%d.%m.%Y')
 
-    # Build HTML content
+    # Build HTML content with theme CSS
     html_content = f"""<!DOCTYPE html>
 <html lang="{lang}">
 <head>
@@ -4804,384 +4907,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{get_text_local('app_title')}</title>
     <style>
-        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            padding: 0;
-            margin: 0;
-        }}
-        .report-wrapper {{
-            max-width: 1400px;
-            margin: 0 auto;
-            background: white;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-        }}
-        .sidebar {{
-            position: fixed;
-            left: 0;
-            top: 0;
-            width: 260px;
-            height: 100vh;
-            background: linear-gradient(135deg, {primary_color} 0%, {secondary_color} 100%);
-            color: white;
-            padding: 30px 20px;
-            overflow-y: auto;
-            z-index: 1000;
-        }}
-        .sidebar h3 {{
-            margin-bottom: 20px;
-            font-size: 18px;
-            font-weight: 600;
-        }}
-        .sidebar a {{
-            color: white;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 10px 15px;
-            margin: 5px 0;
-            border-radius: 8px;
-            transition: all 0.3s;
-        }}
-        .sidebar a:hover {{
-            background: rgba(255,255,255,0.2);
-            transform: translateX(5px);
-        }}
-        .sidebar-icon {{
-            width: 22px;
-            height: 22px;
-            background: transparent;
-            display: inline-block;
-            vertical-align: middle;
-        }}
-        .main-content {{
-            margin-left: 260px;
-            padding: 30px 40px;
-        }}
-        .header {{
-            background: linear-gradient(135deg, {primary_color} 0%, {secondary_color} 100%);
-            color: white;
-            padding: 40px;
-            border-radius: 15px;
-            margin-bottom: 30px;
-            text-align: center;
-        }}
-        .header h1 {{
-            font-size: 32px;
-            margin-bottom: 10px;
-        }}
-        .header .date {{
-            opacity: 0.9;
-            margin-top: 10px;
-        }}
-        .stats-grid {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }}
-        .stat-card {{
-            background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
-            border-radius: 15px;
-            padding: 20px;
-            text-align: center;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            transition: transform 0.3s;
-        }}
-        .stat-card:hover {{
-            transform: translateY(-5px);
-        }}
-        .stat-number {{
-            font-size: 32px;
-            font-weight: bold;
-            background: linear-gradient(135deg, {primary_color} 0%, {secondary_color} 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }}
-        .stat-label {{
-            color: #666;
-            margin-top: 10px;
-            font-size: 14px;
-        }}
-        .stat-percent {{
-            font-size: 12px;
-            color: #155724;
-            background-color: #d4edda;
-            padding: 3px 10px;
-            border-radius: 20px;
-            margin-top: 8px;
-            display: inline-block;
-        }}
-        .section {{
-            background: white;
-            border-radius: 15px;
-            padding: 25px;
-            margin-bottom: 30px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }}
-        .section-title {{
-            font-size: 24px;
-            font-weight: 600;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 3px solid {primary_color};
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }}
-        .section-icon {{
-            width: 28px;
-            height: 28px;
-            vertical-align: middle;
-            display: inline-block;
-            background: transparent;
-        }}
-        .rank-item {{
-            border-radius: 10px;
-            padding: 12px;
-            margin-bottom: 10px;
-            transition: all 0.3s;
-        }}
-        .rank-number {{
-            font-weight: bold;
-            color: {primary_color};
-            font-size: 18px;
-            display: inline-block;
-            width: 40px;
-        }}
-        .rank-name {{
-            display: inline-block;
-            width: 300px;
-            font-weight: 500;
-        }}
-        .rank-count {{
-            float: right;
-            color: #666;
-        }}
-        .progress-bar {{
-            background: #e0e0e0;
-            border-radius: 10px;
-            height: 8px;
-            margin-top: 8px;
-            overflow: hidden;
-        }}
-        .progress-fill {{
-            background: linear-gradient(90deg, {primary_color}, {secondary_color});
-            height: 100%;
-            border-radius: 10px;
-        }}
-        .concepts-grid {{
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 15px;
-            margin-top: 20px;
-        }}
-        .concept-card {{
-            background: linear-gradient(135deg, {primary_color}15 0%, {secondary_color}15 100%);
-            border-radius: 10px;
-            padding: 15px;
-            text-align: center;
-            border: 1px solid {primary_color}30;
-        }}
-        .concept-name {{
-            font-weight: 600;
-            color: {primary_color};
-        }}
-        .concept-score {{
-            font-size: 12px;
-            color: #666;
-            margin-top: 5px;
-        }}
-        .badge {{
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            margin: 2px;
-        }}
-        .badge-success {{ background: #d4edda; color: #155724; }}
-        .badge-warning {{ background: #fff3cd; color: #856404; }}
-        .badge-danger {{ background: #f8d7da; color: #721c24; }}
-        .badge-info {{ background: #d1ecf1; color: #0c5460; }}
-        .badge-repository {{ background: #e2d5f8; color: #5e2a9e; }}
-        .badge-book {{ background: #bbecde; color: #0e6b5e; }}
-        .badge-proceedings {{ background: #fff2c9; color: #b26b00; }}
-        
-        /* Color coding for different reference types in full list */
-        .normal-article {{
-            background: #e8f5e9 !important;
-            border-left: 3px solid #4caf50 !important;
-        }}
-        .notfound-reference {{
-            background: #e9ecef !important;
-            border-left: 3px solid #6c757d !important;
-        }}
-        .suspicious-reference {{
-            background: #f8d7da !important;
-            border-left: 3px solid #dc3545 !important;
-        }}
-        .duplicate-reference {{
-            background: #ffe5cc !important;
-            border-left: 3px solid #fd7e14 !important;
-        }}
-        .ebook-reference {{
-            background: #d4f1e9 !important;
-            border-left: 3px solid #0e6b5e !important;
-        }}
-        .repository-reference {{
-            background: #e2d5f8 !important;
-            border-left: 3px solid #5e2a9e !important;
-        }}
-        .preprint-reference {{
-            background: #e2d5f8 !important;
-            border-left: 3px solid #5e2a9e !important;
-        }}
-        .proceedings-reference {{
-            background: #fff2c9 !important;
-            border-left: 3px solid #b26b00 !important;
-        }}
-        .retracted-reference {{
-            background: #f8d7da !important;
-            border-left: 3px solid #dc3545 !important;
-        }}
-        
-        /* Reviewer card styles */
-        .reviewer-card {{
-            background: white;
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            transition: transform 0.2s, box-shadow 0.2s;
-            border-left: 4px solid {primary_color};
-        }}
-        .reviewer-card:hover {{
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }}
-        .reviewer-name {{
-            font-size: 18px;
-            font-weight: 600;
-            color: {primary_color};
-            margin-bottom: 8px;
-        }}
-        .reviewer-orcid {{
-            font-family: monospace;
-            font-size: 12px;
-            margin-bottom: 8px;
-        }}
-        .reviewer-section {{
-            margin-top: 12px;
-            padding-top: 8px;
-            border-top: 1px solid #e0e0e0;
-        }}
-        .reviewer-section-title {{
-            font-weight: 600;
-            font-size: 13px;
-            margin-bottom: 8px;
-            color: #555;
-        }}
-        .external-id-link {{
-            display: inline-block;
-            background: #f0f0f0;
-            padding: 4px 10px;
-            border-radius: 15px;
-            font-size: 11px;
-            margin: 3px;
-            text-decoration: none;
-            color: #333;
-            transition: background 0.2s;
-        }}
-        .external-id-link:hover {{
-            background: {primary_color};
-            color: white;
-        }}
-        .reviewer-website {{
-            display: inline-block;
-            margin: 3px 6px 3px 0;
-            font-size: 12px;
-        }}
-        .confidential-banner {{
-            background: linear-gradient(135deg, #fff3cd 0%, #ffe69e 100%);
-            border-left: 4px solid #dc3545;
-            padding: 12px 20px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            font-weight: 500;
-            text-align: center;
-        }}
-        
-        .footer {{
-            text-align: center;
-            padding: 20px;
-            color: #666;
-            font-size: 12px;
-            border-top: 1px solid #e0e0e0;
-            margin-top: 30px;
-        }}
-        table {{
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-        }}
-        th, td {{
-            padding: 10px;
-            text-align: left;
-            border-bottom: 1px solid #e0e0e0;
-        }}
-        th {{
-            background: linear-gradient(135deg, {primary_color} 0%, {secondary_color} 100%);
-            color: white;
-        }}
-        tr:hover {{
-            background: #f5f5f5;
-        }}
-        .clickable-link {{
-            color: {primary_color};
-            text-decoration: none;
-            transition: all 0.3s;
-        }}
-        .clickable-link:hover {{
-            color: {secondary_color};
-            text-decoration: underline;
-        }}
-        .full-text-container {{
-            max-height: 150px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            font-family: monospace;
-            font-size: 12px;
-            background: #f5f5f5;
-            padding: 8px;
-            border-radius: 5px;
-            margin-top: 5px;
-        }}
-        
-        /* Special styling for expander content */
-        .ebook-reference .full-text-container,
-        .repository-reference .full-text-container,
-        .preprint-reference .full-text-container,
-        .proceedings-reference .full-text-container,
-        .suspicious-reference .full-text-container,
-        .duplicate-reference .full-text-container,
-        .notfound-reference .full-text-container,
-        .retracted-reference .full-text-container {{
-            background: rgba(255,255,255,0.7);
-        }}
-        
-        @media print {{
-            .sidebar {{ display: none; }}
-            .main-content {{ margin-left: 0; }}
-            .stat-card, .section {{ break-inside: avoid; }}
-        }}
-        @media (max-width: 768px) {{
-            .sidebar {{ display: none; }}
-            .main-content {{ margin-left: 0; padding: 20px; }}
-        }}
+        {theme_css}
     </style>
 </head>
 <body>
@@ -5699,7 +5425,101 @@ def main():
         
         st.markdown("---")
         
-        # ========== COLOR THEME (NEW ORDER - AFTER REVIEWERS) ==========
+        # ========== DESIGN THEME (NEW SECTION) ==========
+        st.markdown(f"## {get_text('design_theme')}")
+        
+        # Get available themes from styles.py
+        available_themes = get_available_themes()
+        theme_names = {theme: get_theme_display_name(theme) for theme in available_themes}
+        
+        # Create theme selector with icons
+        theme_options = {
+            'default': '🎨 Gradient Classic',
+            'glassmorphism': '🪟 Glassmorphism',
+            'neon_dark': '🌙 Neon Dark',
+            'aurora': '🌌 Aurora Borealis',
+            'brutalist': '🏛 Brutalist',
+            'minimalist_white': '⬜ Minimalist White',
+            'ocean_deep': '🌊 Ocean Deep',
+            'cosmic': '🚀 Cosmic',
+            'terrazzo': '🎨 Terrazzo',
+            'modern_cards': '📐 Modern Cards',
+            'duotone': '🌈 Duotone',
+            'morphing': '🌀 Morphing'
+        }
+        
+        current_theme = st.session_state.get('design_theme', 'default')
+        
+        # Show theme selector as radio buttons in a grid
+        theme_cols = st.columns(3)
+        theme_keys = list(theme_options.keys())
+        for i, key in enumerate(theme_keys):
+            col_idx = i % 3
+            with theme_cols[col_idx]:
+                if st.button(
+                    theme_options[key],
+                    key=f"theme_{key}",
+                    use_container_width=True,
+                    type="primary" if current_theme == key else "secondary"
+                ):
+                    st.session_state.design_theme = key
+                    st.rerun()
+        
+        # Show current theme info
+        theme_info = get_theme_info(current_theme)
+        st.info(get_text('theme_current').format(theme_info['name']))
+        
+        # Show color theme status
+        uses_primary = theme_info['uses_primary']
+        uses_secondary = theme_info['uses_secondary']
+        
+        if not uses_primary and not uses_secondary:
+            st.warning(get_text('theme_color_warning'))
+        elif uses_primary and not uses_secondary:
+            st.info(get_text('theme_color_partial'))
+        
+        st.markdown("---")
+        
+        # ========== REFERENCE COLOR STYLE (NEW SECTION) ==========
+        st.markdown(f"## {get_text('reference_colors')}")
+        
+        color_style_options = {
+            'full': get_text('ref_colors_full'),
+            'border_only': get_text('ref_colors_border'),
+            'icons': get_text('ref_colors_icons'),
+            'themed': get_text('ref_colors_themed'),
+            'text': get_text('ref_colors_text')
+        }
+        
+        current_color_style = st.session_state.get('reference_color_style', 'full')
+        
+        # Show color style selector
+        for style_key, style_name in color_style_options.items():
+            if st.radio(
+                "",
+                options=[style_key],
+                format_func=lambda x: style_name,
+                key=f"color_style_{style_key}",
+                index=0 if current_color_style == style_key else None,
+                disabled=current_color_style != style_key
+            ):
+                st.session_state.reference_color_style = style_key
+                st.rerun()
+        
+        # Simplified: use selectbox for color style
+        color_style = st.selectbox(
+            get_text('reference_colors'),
+            options=list(color_style_options.keys()),
+            format_func=lambda x: color_style_options[x],
+            index=list(color_style_options.keys()).index(current_color_style)
+        )
+        if color_style != current_color_style:
+            st.session_state.reference_color_style = color_style
+            st.rerun()
+        
+        st.markdown("---")
+        
+        # ========== COLOR THEME (NEW ORDER - AFTER REVIEWERS AND DESIGN THEME) ==========
         st.markdown(f"## 🎨 Color Theme")
         
         # Initialize color theme in session state
@@ -5708,84 +5528,92 @@ def main():
         if 'secondary_color' not in st.session_state:
             st.session_state.secondary_color = '#f39c12'
         
-        # Predefined theme options
-        preset_themes = {
-            "Default (Blue-Purple)": {"primary": "#667eea", "secondary": "#9b59b6"},
-            "Emerald (Green-Teal)": {"primary": "#2ecc71", "secondary": "#27ae60"},
-            "Sunset (Orange-Coral)": {"primary": "#e74c3c", "secondary": "#c0392b"},
-            "Ocean (Deep Blue)": {"primary": "#3498db", "secondary": "#2980b9"},
-            "Royal (Purple-Pink)": {"primary": "#9b59b6", "secondary": "#e84393"},
-            "Forest (Dark Green)": {"primary": "#27ae60", "secondary": "#2ecc71"},
-            "Cherry (Red-Pink)": {"primary": "#e84393", "secondary": "#9b59b6"},
-            "Amber (Yellow-Orange)": {"primary": "#f39c12", "secondary": "#e67e22"},
-        }
+        # Check if current theme uses colors
+        current_theme_info = get_theme_info(st.session_state.get('design_theme', 'default'))
+        color_theme_enabled = current_theme_info['uses_primary'] or current_theme_info['uses_secondary']
         
-        # Theme selector with radio buttons or selectbox
-        theme_option = st.selectbox(
-            "🎨 Preset themes",
-            options=list(preset_themes.keys()),
-            index=0
-        )
-        
-        # Option to use preset or custom
-        use_preset = st.checkbox("Use preset theme", value=True)
-        
-        if use_preset:
-            selected_theme = preset_themes[theme_option]
-            st.session_state.primary_color = selected_theme["primary"]
-            st.session_state.secondary_color = selected_theme["secondary"]
+        if not color_theme_enabled:
+            st.info("🎨 Color Theme is disabled for this design")
+            st.markdown("---")
         else:
-            # Custom color picker
-            selected_color = st.color_picker(
-                "🎨 Pick your primary color",
-                value=st.session_state.primary_color,
-                help="Choose any color. Complementary color will be auto-generated!"
+            # Predefined theme options
+            preset_themes = {
+                "Default (Blue-Purple)": {"primary": "#667eea", "secondary": "#9b59b6"},
+                "Emerald (Green-Teal)": {"primary": "#2ecc71", "secondary": "#27ae60"},
+                "Sunset (Orange-Coral)": {"primary": "#e74c3c", "secondary": "#c0392b"},
+                "Ocean (Deep Blue)": {"primary": "#3498db", "secondary": "#2980b9"},
+                "Royal (Purple-Pink)": {"primary": "#9b59b6", "secondary": "#e84393"},
+                "Forest (Dark Green)": {"primary": "#27ae60", "secondary": "#2ecc71"},
+                "Cherry (Red-Pink)": {"primary": "#e84393", "secondary": "#9b59b6"},
+                "Amber (Yellow-Orange)": {"primary": "#f39c12", "secondary": "#e67e22"},
+            }
+            
+            # Theme selector with radio buttons or selectbox
+            theme_option = st.selectbox(
+                "🎨 Preset themes",
+                options=list(preset_themes.keys()),
+                index=0
             )
-            st.session_state.primary_color = selected_color
-            st.session_state.secondary_color = get_complementary_color(selected_color)
-        
-        # Use secondary color from session state
-        complementary = st.session_state.secondary_color
-        
-        # Display color preview
-        col1, col2 = st.columns(2)
-        with col1:
+            
+            # Option to use preset or custom
+            use_preset = st.checkbox("Use preset theme", value=True)
+            
+            if use_preset:
+                selected_theme = preset_themes[theme_option]
+                st.session_state.primary_color = selected_theme["primary"]
+                st.session_state.secondary_color = selected_theme["secondary"]
+            else:
+                # Custom color picker
+                selected_color = st.color_picker(
+                    "🎨 Pick your primary color",
+                    value=st.session_state.primary_color,
+                    help="Choose any color. Complementary color will be auto-generated!"
+                )
+                st.session_state.primary_color = selected_color
+                st.session_state.secondary_color = get_complementary_color(selected_color)
+            
+            # Use secondary color from session state
+            complementary = st.session_state.secondary_color
+            
+            # Display color preview
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(
+                    f'<div style="text-align: center;">'
+                    f'<div class="color-preview" style="background: {st.session_state.primary_color};"></div>'
+                    f'<div style="font-size: 11px; margin-top: 5px;">Primary</div>'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
+            with col2:
+                st.markdown(
+                    f'<div style="text-align: center;">'
+                    f'<div class="color-preview" style="background: {complementary};"></div>'
+                    f'<div style="font-size: 11px; margin-top: 5px;">Complementary</div>'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
+            
+            # Show gradient preview
             st.markdown(
-                f'<div style="text-align: center;">'
-                f'<div class="color-preview" style="background: {st.session_state.primary_color};"></div>'
-                f'<div style="font-size: 11px; margin-top: 5px;">Primary</div>'
+                f'<div class="complementary-preview" style="height: 8px; width: 100%; margin: 10px 0;"></div>',
+                unsafe_allow_html=True
+            )
+            
+            # Show theme info
+            st.markdown(
+                f'<div class="theme-info">'
+                f'✨ Complementary color automatically selected<br>'
+                f'🎨 Gradient: Primary → Complementary'
                 f'</div>',
                 unsafe_allow_html=True
             )
-        with col2:
-            st.markdown(
-                f'<div style="text-align: center;">'
-                f'<div class="color-preview" style="background: {complementary};"></div>'
-                f'<div style="font-size: 11px; margin-top: 5px;">Complementary</div>'
-                f'</div>',
-                unsafe_allow_html=True
-            )
-        
-        # Show gradient preview
-        st.markdown(
-            f'<div class="complementary-preview" style="height: 8px; width: 100%; margin: 10px 0;"></div>',
-            unsafe_allow_html=True
-        )
-        
-        # Show theme info
-        st.markdown(
-            f'<div class="theme-info">'
-            f'✨ Complementary color automatically selected<br>'
-            f'🎨 Gradient: Primary → Complementary'
-            f'</div>',
-            unsafe_allow_html=True
-        )
-        
-        # Apply theme on color change
-        secondary = st.session_state.get('secondary_color', get_complementary_color(st.session_state.primary_color))
-        apply_theme_css(st.session_state.primary_color, secondary)
-        
-        st.markdown("---")
+            
+            # Apply theme on color change
+            secondary = st.session_state.get('secondary_color', get_complementary_color(st.session_state.primary_color))
+            apply_theme_css(st.session_state.primary_color, secondary)
+            
+            st.markdown("---")
         
         # ========== SETTINGS (LAST) ==========
         st.markdown(f"## {get_text('settings')}")
@@ -6695,6 +6523,10 @@ def main():
             primary_color = st.session_state.get('primary_color', '#667eea')
             secondary_color = st.session_state.get('secondary_color', get_complementary_color(primary_color))
             
+            # Get current design theme and reference color style from session state
+            design_theme = st.session_state.get('design_theme', 'default')
+            reference_color_style = st.session_state.get('reference_color_style', 'full')
+            
             # Generate HTML report with duplicates and new types
             html_report = generate_html_report_advanced(
                 results, 
@@ -6707,7 +6539,9 @@ def main():
                 primary_color,
                 secondary_color,
                 potential_reviewers,
-                propose_reviewers
+                propose_reviewers,
+                design_theme,
+                reference_color_style
             )
             
             # Generate filename from journal abbreviation and article number (no datetime)
