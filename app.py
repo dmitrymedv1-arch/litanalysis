@@ -5494,22 +5494,8 @@ def main():
         
         current_color_style = st.session_state.get('reference_color_style', 'full')
         
-        # Show color style selector
-        for style_key, style_name in color_style_options.items():
-            if st.radio(
-                "Select color style",
-                options=[style_key],
-                format_func=lambda x: style_name,
-                key=f"color_style_{style_key}",
-                index=0 if current_color_style == style_key else None,
-                disabled=current_color_style != style_key
-            ):
-                st.session_state.reference_color_style = style_key
-                st.rerun()
-        
-        # Simplified: use selectbox for color style
         color_style = st.selectbox(
-            get_text('reference_colors'),
+            get_text('reference_colors'),  # Непустой label
             options=list(color_style_options.keys()),
             format_func=lambda x: color_style_options[x],
             index=list(color_style_options.keys()).index(current_color_style)
