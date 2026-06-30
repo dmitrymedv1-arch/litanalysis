@@ -15,6 +15,15 @@ import math
 from collections import defaultdict
 from itertools import combinations
 import html 
+
+# ======================== IMPORT STYLES ========================
+from styles import (
+    STYLE_GENERATORS, 
+    STYLE_NAMES, 
+    generate_classic_report,
+    get_style_generator
+)
+
 # ======================== COLOR UTILITIES FOR DYNAMIC THEMES ========================
 import colorsys
 
@@ -657,6 +666,21 @@ TEXTS = {
         'num_affiliations': "Number of affiliations",
         'num_countries': "Number of countries",
         'affiliation': "Affiliation",
+        
+        # Report style selection
+        'report_style': "🎨 Report Style",
+        'style_classic': "📄 Classic",
+        'style_glassmorphism': "✨ Glassmorphism",
+        'style_neon_cyber': "💜 Neon Cyber",
+        'style_glass_enhanced': "🔮 Glass Enhanced",
+        'style_smart_glow': "💡 Smart Glow",
+        'style_aurora': "🌌 Aurora",
+        'style_timeline_wave': "📊 Timeline Wave",
+        'style_masonry': "🧱 Masonry",
+        'style_holographic': "🌀 Holographic",
+        'style_geo_bubbles': "🌍 Geo Bubbles",
+        'style_particles': "✨ Particles",
+        'style_fixed_theme': "🎨 For this style, color theme is fixed",
     },
     'ru': {
         # General UI
@@ -923,6 +947,21 @@ TEXTS = {
         'num_affiliations': "Количество аффилиаций",
         'num_countries': "Количество стран",
         'affiliation': "Аффилиация",
+        
+        # Report style selection
+        'report_style': "🎨 Стиль отчета",
+        'style_classic': "📄 Классический",
+        'style_glassmorphism': "✨ Glassmorphism",
+        'style_neon_cyber': "💜 Neon Cyber",
+        'style_glass_enhanced': "🔮 Улучшенное стекло",
+        'style_smart_glow': "💡 Умное свечение",
+        'style_aurora': "🌌 Северное сияние",
+        'style_timeline_wave': "📊 Волна времени",
+        'style_masonry': "🧱 Плиточный",
+        'style_holographic': "🌀 Голографический",
+        'style_geo_bubbles': "🌍 Гео-пузырьки",
+        'style_particles': "✨ Космический",
+        'style_fixed_theme': "🎨 Для этого стиля цветовая тема фиксирована",
     }
 }
 
@@ -958,6 +997,10 @@ if 'orcid_cache' not in st.session_state:
     st.session_state.orcid_cache = {}
 if 'propose_reviewers' not in st.session_state:
     st.session_state.propose_reviewers = False
+
+# Initialize report style in session state
+if 'report_style' not in st.session_state:
+    st.session_state.report_style = 'classic'
 
 # ======================== COUNTRY CODES MAPPING ========================
 COUNTRY_CODES = {
@@ -1732,13 +1775,6 @@ def merge_authors_from_results(results: List[Dict]) -> List[Dict]:
     return result_list
 
 # ======================== HELPER FUNCTIONS FOR AUTHOR PROCESSING ========================
-
-# OLD FUNCTIONS REMOVED:
-# - clean_affiliation() - REMOVED (replaced by extract_country_from_affiliation_string)
-# - get_country_from_affiliation() - REMOVED (replaced by extract_country_from_affiliation_string)
-# - extract_authors_from_crossref() - REPLACED by extract_authors_with_affiliations_from_crossref
-# - extract_authors_from_openalex() - REPLACED by extract_authors_with_affiliations_from_openalex
-# - merge_authors() - REPLACED by merge_authors_from_results
 
 def format_orcid_id(orcid: str) -> str:
     """Format ORCID ID to full URL"""
@@ -4326,1299 +4362,9 @@ def get_color_for_author(index: int) -> str:
     ]
     return colors[index % len(colors)]
 
-# ======================== HTML REPORT (ENGLISH, UPDATED WITH NEW TYPES AND REVIEWERS) ========================
-def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_authors: Set[str] = None, lang: str = 'en', journal_name: str = '', article_number: str = '', duplicates: List[Dict] = None, primary_color: str = '#667eea', secondary_color: str = '#f39c12', potential_reviewers: List[Dict] = None, show_reviewers: bool = False) -> str:
-    """Generate enhanced HTML report with PNG icons (no emojis) and professional design"""
-    
-    analogous = get_analogous_colors(primary_color, 2)
-    
-    css_vars = generate_css_variables(primary_color, secondary_color)
-    
-    primary_rgb = hex_to_rgb(primary_color)
-    secondary_rgb = hex_to_rgb(secondary_color)
-    
-    import base64
-    import os
-    
-    # Local function for getting localized text
-    def get_text_local(key: str) -> str:
-        """Get localized text by key for HTML report"""
-        if lang == 'ru' and key in TEXTS['ru']:
-            return TEXTS['ru'][key]
-        elif key in TEXTS['en']:
-            return TEXTS['en'][key]
-        else:
-            return key
-    
-    # Load logo
-    logo_base64 = ""
-    try:
-        with open("logo.png", "rb") as img_file:
-            logo_base64 = base64.b64encode(img_file.read()).decode()
-    except FileNotFoundError:
-        pass
-    
-    # Load all icons as base64
-    icons = {}
-    
-    icon_files = [
-        ("overview", "icon_overview.png"),
-        ("identifier", "icon_identifier.png"),
-        ("authors", "icon_authors.png"),
-        ("journals", "icon_journals.png"),
-        ("publishers", "icon_publishers.png"),
-        ("yearly", "icon_yearly.png"),
-        ("concepts", "icon_concepts.png"),
-        ("geography", "icon_geography.png"),
-        ("collaborations", "icon_collaborations.png"),
-        ("diversity", "icon_diversity.png"),
-        ("classics", "icon_classics.png"),
-        ("selfcitation", "icon_selfcitation.png"),
-        ("crossref", "icon_crossref.png"),
-        ("openalex", "icon_openalex.png"),
-        ("suspicious", "icon_suspicious.png"),
-        ("nondoi", "icon_nondoi.png"),
-        ("duplicates", "duplicates.png"),
-        ("nonjournal", "icon_nonjournal.png"),
-        ("url", "icon_url.png"),
-        ("problems", "icon_problems.png"),
-        ("list", "icon_list.png"),
-        ("reviewers", "icon_reviewers.png"),
-    ]
-    
-    for key, filename in icon_files:
-        try:
-            with open(f"icons/{filename}", "rb") as f:
-                icons[key] = f"data:image/png;base64,{base64.b64encode(f.read()).decode()}"
-        except FileNotFoundError:
-            icons[key] = ""
-    
-    # Helper function to create section title with icon
-    def make_section_title(icon_key, title_key):
-        icon_src = icons.get(icon_key, "")
-        title_text = get_text_local(title_key)
-        if icon_src:
-            return f'<div class="section-title"><img src="{icon_src}" class="section-icon" alt=""> {title_text}</div>'
-        else:
-            return f'<div class="section-title">{title_text}</div>'
-    
-    # Set default journal name if not provided
-    if not journal_name or journal_name.strip() == '':
-        journal_name_display = get_text_local('journal_name_label') + ": Chimica Techno Acta"
-    else:
-        journal_name_display = get_text_local('journal_name_label') + ": " + html.escape(journal_name)
-    
-    article_number_display = ""
-    if article_number and article_number.strip():
-        article_number_display = f'<div><strong>{get_text_local("article_number_label")}:</strong> {html.escape(article_number)}</div>'
-    
-    # Determine if we need to show self-citations section
-    show_self_citations_section = paper_authors and len(paper_authors) > 0
-    
-    # Helper functions for clickable links
-    def make_clickable_doi(doi):
-        if doi:
-            not_found_text = get_text_local('not_found')
-            return f'<a href="https://doi.org/{doi}" target="_blank" class="clickable-link">{html.escape(doi)}</a>'
-        return not_found_text
-    
-    def make_clickable_orcid(orcid):
-        if orcid:
-            return f'<a href="{orcid}" target="_blank" class="clickable-link">{html.escape(orcid)}</a>'
-        return ''
-    
-    # Prepare self-citation authors highlighting with colors
-    paper_authors_set = set()
-    paper_authors_colors = {}
-    normalized_paper_authors_map = {}
-    
-    if show_self_citations_section and paper_authors:
-        for idx, author in enumerate(paper_authors):
-            paper_authors_set.add(author)
-            paper_authors_colors[author] = get_color_for_author(idx)
-            norm, display = normalize_author_name(author)
-            normalized_paper_authors_map[norm] = {'display': display, 'color': get_color_for_author(idx)}
-    
-    # Generate authors display for self-citation section header
-    authors_header_html = ""
-    if show_self_citations_section and paper_authors_set:
-        authors_header_parts = []
-        for author in paper_authors_set:
-            escaped_author = html.escape(author)
-            color = paper_authors_colors[author]
-            authors_header_parts.append(f'<span style="color: {color}; font-weight: bold;">{escaped_author}</span>')
-        authors_header_html = f'<div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 8px;"><strong>{get_text_local("html_self_citation_authors_label")}:</strong> {", ".join(authors_header_parts)}</div>'
-    
-    def format_authors_with_colors_for_selfcitations(authors_list, paper_norm_map):
-        if not authors_list:
-            return ""
-        formatted_authors = []
-        for author in authors_list:
-            norm_author, _ = normalize_author_name(author)
-            if norm_author in paper_norm_map:
-                escaped_author = html.escape(author)
-                color = paper_norm_map[norm_author]['color']
-                formatted_authors.append(f'<span style="color: {color}; font-weight: bold; background-color: {color}20; padding: 2px 4px; border-radius: 3px;">{escaped_author}</span>')
-            else:
-                formatted_authors.append(html.escape(author))
-        return ', '.join(formatted_authors)
-    
-    # Generate self-citations section
-    self_citations_html = ""
-    if show_self_citations_section:
-        if stats.get('self_citation_refs'):
-            for ref in stats.get('self_citation_refs', []):
-                authors_full_list = ref.get('authors_display', [])
-                formatted_authors = format_authors_with_colors_for_selfcitations(authors_full_list, normalized_paper_authors_map)
-                original_text_full = html.escape(ref.get('original_text', ''))
-                doi_info = f'<div style="font-size: 13px; margin-top: 8px;"><strong>{get_text_local("doi_found")}:</strong> {make_clickable_doi(ref.get("doi"))}</div>' if ref.get('doi') else ''
-                journal_info = f'<div style="font-size: 13px; margin-top: 5px;"><strong>{get_text_local("journal")}:</strong> {html.escape(ref.get("journal", get_text_local("not_found")))}</div>' if ref.get('journal') else ''
-                year_info = f'<div style="font-size: 13px; margin-top: 5px;"><strong>{get_text_local("year")}:</strong> {ref.get("year", get_text_local("not_found"))}</div>' if ref.get('year') else ''
-                
-                # Determine special class for reference type
-                special_class = ""
-                if ref.get('is_retracted', False):
-                    special_class = "retracted-reference"
-                elif ref.get('is_ebook', False):
-                    special_class = "ebook-reference"
-                elif ref.get('is_repository', False):
-                    special_class = "repository-reference"
-                elif ref.get('is_proceedings', False):
-                    special_class = "proceedings-reference"
-                
-                self_citations_html += f"""
-                <div class="rank-item {special_class}" style="margin-bottom: 15px;">
-                    <div><strong>{get_text_local("reference")}:</strong></div>
-                    <div class="full-text-container">{original_text_full}</div>
-                    <div style="font-size: 13px; margin-top: 8px;"><strong>{get_text_local("authors")}:</strong> {formatted_authors}</div>
-                    {doi_info}
-                    {journal_info}
-                    {year_info}
-                </div>
-                """
-        else:
-            self_citations_html = f'<p>{get_text_local("none_detected")}</p>'
-    
-    # Generate duplicates section
-    duplicates_html = ""
-    if duplicates and len(duplicates) > 0:
-        duplicates_html = f"""
-        <div id="duplicates" class="section">
-            {make_section_title("duplicates", "duplicate_references_title")}
-        """
-        for dup in duplicates:
-            ref_num_1 = dup['index1'] + 1
-            ref_num_2 = dup['index2'] + 1
-            doi = dup.get('doi', get_text_local('not_found'))
-            duplicates_html += f"""
-            <div class="rank-item duplicate-reference" style="margin-bottom: 10px;">
-                <span class="badge badge-warning">{get_text_local("full_doi_match")}</span>
-                <div style="margin-top: 8px;"><strong>{get_text_local("references")} {ref_num_1} {get_text_local("and")} {ref_num_2}</strong> — {get_text_local("doi_found")}: {make_clickable_doi(doi)}</div>
-                <div style="font-size: 12px; color: #666; margin-top: 5px;">{get_text_local("reference")} {ref_num_1}: {html.escape(dup['ref1'])}...</div>
-                <div style="font-size: 12px; color: #666; margin-top: 5px;">{get_text_local("reference")} {ref_num_2}: {html.escape(dup['ref2'])}...</div>
-            </div>
-            """
-        duplicates_html += "</div>"
-    
-    # Generate Non-journal Sources with DOI section
-    non_journal_sources_html = ""
-    if stats.get('non_journal_sources_with_doi'):
-        non_journal_sources_html = f"""
-        <div id="nonjournal" class="section">
-            {make_section_title("nonjournal", "html_non_journal_sources_with_doi")}
-            <div style="margin-bottom: 15px; font-size: 13px; color: #666;">{get_text_local("non_journal_sources_with_doi_desc")}</div>
-        """
-        for source in stats.get('non_journal_sources_with_doi', []):
-            badge_class = ""
-            badge_text = ""
-            if source.get('type') == 'repository':
-                badge_class = "badge-repository"
-                badge_text = get_text_local("repository")
-            elif source.get('type') == 'ebook':
-                badge_class = "badge-book"
-                badge_text = get_text_local("ebook")
-            elif source.get('type') == 'proceedings':
-                badge_class = "badge-proceedings"
-                badge_text = get_text_local("proceedings")
-            else:
-                badge_class = "badge-info"
-                badge_text = source.get('type', get_text_local("reference"))
-            
-            non_journal_sources_html += f"""
-            <div class="rank-item">
-                <span class="{badge_class}">{badge_text}</span>
-                <div style="margin-top: 8px;">{html.escape(source['text'])}</div>
-                <div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(source.get('doi'))}</div>
-            </div>
-            """
-        non_journal_sources_html += "</div>"
-    
-    # Generate Potential Reviewers section (if enabled)
-    potential_reviewers_html = ""
-    if show_reviewers and potential_reviewers:
-        reviewers_content = ""
-        for i, reviewer in enumerate(potential_reviewers, 1):
-            reviewer_name = reviewer.get('display_name', 'Unknown')
-            orcid = reviewer.get('orcid', '')
-            latest_year = reviewer.get('latest_year', 'N/A')
-            citation_count = reviewer.get('citation_count', 0)
-            affiliations = reviewer.get('affiliations', [])
-            countries = reviewer.get('countries', [])
-            orcid_profile = reviewer.get('orcid_profile', {})
-            
-            # ORCID link
-            orcid_link = f'<div class="reviewer-orcid">🔗 <a href="{orcid}" target="_blank" class="clickable-link">ORCID: {orcid.replace("https://orcid.org/", "")}</a></div>' if orcid else ''
-            
-            # Countries
-            countries_str = ', '.join(countries[:3]) if countries else ''
-            
-            # Affiliations
-            aff_str = ', '.join(affiliations[:3])
-            if len(affiliations) > 3:
-                aff_str += f' +{len(affiliations)-3} more'
-            
-            # ORCID Profile details
-            profile_html = ""
-            if orcid_profile:
-                # Country from ORCID
-                if orcid_profile.get('country'):
-                    profile_html += f'<div><strong>{get_text_local("orcid_country")}:</strong> {orcid_profile["country"]}</div>'
-                
-                # Keywords
-                if orcid_profile.get('keywords'):
-                    keywords_str = ', '.join(orcid_profile['keywords'][:5])
-                    profile_html += f'<div><strong>{get_text_local("orcid_keywords")}:</strong> {keywords_str}</div>'
-                
-                # External IDs
-                if orcid_profile.get('external_ids'):
-                    profile_html += f'<div class="reviewer-section"><div class="reviewer-section-title">{get_text_local("orcid_other_ids")}:</div>'
-                    for id_type, id_info in orcid_profile['external_ids'].items():
-                        id_url = id_info['url']
-                        friendly_name = id_type.replace('-', ' ').title()
-                        if id_url:
-                            profile_html += f'<a href="{id_url}" target="_blank" class="external-id-link">{friendly_name}</a>'
-                        else:
-                            profile_html += f'<span class="external-id-link">{friendly_name}</span>'
-                    profile_html += '</div>'
-                
-                # Websites
-                if orcid_profile.get('researcher_urls'):
-                    profile_html += f'<div class="reviewer-section"><div class="reviewer-section-title">{get_text_local("orcid_websites")}:</div>'
-                    for url_info in orcid_profile['researcher_urls']:
-                        url_name = url_info.get('name', 'Website')
-                        url_value = url_info.get('url', '')
-                        if url_value:
-                            profile_html += f'<a href="{url_value}" target="_blank" class="reviewer-website">{url_name}</a>'
-                    profile_html += '</div>'
-            
-            reviewers_content += f"""
-            <div class="reviewer-card">
-                <div class="reviewer-name">{i}. {reviewer_name}</div>
-                {orcid_link}
-                <div style="display: flex; gap: 20px; margin: 10px 0;">
-                    <div><strong>{get_text_local("reviewer_article_year")}:</strong> {latest_year}</div>
-                    <div><strong>{get_text_local("reviewer_citations")}:</strong> {citation_count}</div>
-                    {f'<div><strong>{get_text_local("orcid_country")}:</strong> {countries_str}</div>' if countries_str else ''}
-                </div>
-                {profile_html}
-                <div><strong>{get_text_local("affiliation")}:</strong> {aff_str}</div>
-            </div>
-            """
-        
-        potential_reviewers_html = f"""
-        <div id="reviewers" class="section">
-            {make_section_title("reviewers", "potential_reviewers")}
-            {reviewers_content}
-        </div>
-        """
-    
-    # Generate full reference list with color coding for different types
-    full_references_html = ""
-    duplicate_indices = set()
-    if duplicates:
-        for dup in duplicates:
-            duplicate_indices.add(dup['index1'])
-            duplicate_indices.add(dup['index2'])
-    
-    for idx, result in enumerate(results[:300]):
-        authors_full_list = result.get('authors_display', [])
-        formatted_authors = ', '.join([html.escape(a) for a in authors_full_list]) if authors_full_list else get_text_local("not_found")
-        original_text_full = html.escape(result.get('original_text', ''))
-        doi_info = f'<div style="font-size: 13px; margin-top: 5px;"><strong>{get_text_local("doi_found")}:</strong> {make_clickable_doi(result.get("doi"))}</div>' if result.get('doi') else ''
-        status_icon = "⚠" if result.get('is_suspicious_doi') else ("✓" if result.get('doi') else "✗")
-        
-        # Determine color class based on priority (from highest to lowest priority)
-        color_class = ""
-        if result.get('is_retracted', False):
-            color_class = "retracted-reference"
-        elif result.get('is_suspicious_doi', False):
-            color_class = "suspicious-reference"
-        elif idx in duplicate_indices:
-            color_class = "duplicate-reference"
-        elif result.get('is_ebook', False):
-            color_class = "ebook-reference"
-        elif result.get('is_proceedings', False):
-            color_class = "proceedings-reference"
-        elif result.get('is_repository', False):
-            color_class = "repository-reference"
-        elif result.get('is_preprint', False):
-            color_class = "preprint-reference"
-        elif not result.get('doi') and not result.get('crossref_status') and not result.get('openalex_status'):
-            color_class = "notfound-reference"
-        elif result.get('doi') and result.get('crossref_status') and result.get('openalex_status'):
-            color_class = "normal-article"
-        elif result.get('doi'):
-            color_class = "normal-article"
-        else:
-            color_class = "notfound-reference"
-        
-        # Badge for special types
-        special_badge = ""
-        if result.get('is_retracted', False):
-            special_badge = f'<span class="badge-danger" style="margin-left: 10px;">{get_text_local("retracted")}</span>'
-        elif result.get('is_ebook', False):
-            special_badge = f'<span class="badge-book" style="margin-left: 10px;">{get_text_local("ebook")}</span>'
-        elif result.get('is_repository', False):
-            special_badge = f'<span class="badge-repository" style="margin-left: 10px;">{get_text_local("repository")}</span>'
-        elif result.get('is_preprint', False):
-            special_badge = f'<span class="badge-repository" style="margin-left: 10px;">{get_text_local("preprint")}</span>'
-        elif result.get('is_proceedings', False):
-            special_badge = f'<span class="badge-proceedings" style="margin-left: 10px;">{get_text_local("proceedings")}</span>'
-        elif result.get('is_suspicious_doi', False):
-            special_badge = f'<span class="badge-danger" style="margin-left: 10px;">{get_text_local("suspicious_doi_badge")}</span>'
-        elif idx in duplicate_indices:
-            special_badge = f'<span class="badge-warning" style="margin-left: 10px;">{get_text_local("full_doi_match")}</span>'
-        
-        full_references_html += f"""
-        <div class="rank-item {color_class}" style="margin-bottom: 15px;">
-            <div><strong>{status_icon} {get_text_local("reference")} {idx + 1}:</strong>{special_badge}</div>
-            <div class="full-text-container">{original_text_full}</div>
-            <div style="font-size: 13px; margin-top: 5px;"><strong>{get_text_local("authors")}:</strong> {formatted_authors}</div>
-            {doi_info}
-        </div>
-        """
-    
-    # Build sidebar navigation with PNG icons (updated with new sections)
-    sidebar_items = [
-        ("overview", "html_overview", icons["overview"]),
-        ("identifiers", "html_identifier_coverage", icons["identifier"]),
-        ("authors", "html_authors", icons["authors"]),
-        ("journals", "html_journals", icons["journals"]),
-        ("publishers", "html_publishers", icons["publishers"]),
-        ("yearly", "html_yearly", icons["yearly"]),
-        ("concepts", "html_concepts", icons["concepts"]),
-        ("geography", "html_geography", icons["geography"]),
-        ("collaboration", "html_collaborations", icons["collaborations"]),
-        ("diversity", "html_diversity", icons["diversity"]),
-        ("classics", "html_classics", icons["classics"]),
-    ]
-    
-    if show_self_citations_section:
-        sidebar_items.append(("selfcitations", "html_self_citations", icons["selfcitation"]))
-    
-    if duplicates and len(duplicates) > 0:
-        sidebar_items.append(("duplicates", "duplicate_references_title", icons.get("duplicates", icons["list"])))
-    
-    if show_reviewers and potential_reviewers:
-        sidebar_items.append(("reviewers", "potential_reviewers", icons.get("reviewers", icons["list"])))
-    
-    sidebar_items.extend([
-        ("crossref_only", "html_crossref_only", icons["crossref"]),
-        ("openalex_only", "html_openalex_only", icons["openalex"]),
-        ("suspicious_doi", "html_suspicious_doi", icons["suspicious"]),
-        ("non_doi", "html_non_doi", icons["nondoi"]),
-        ("nonjournal", "html_non_journal_sources_with_doi", icons.get("nonjournal", "")),
-        ("url_sources", "html_url_sources", icons["url"]),
-        ("problems", "html_problems", icons["problems"]),
-        ("full_reference_list", "full_reference_list_title", icons["list"]),
-    ])
-    
-    sidebar_html = '<div class="sidebar">\n'
-    sidebar_html += f'<h3>{get_text_local("navigation")}</h3>\n'
-    for item_id, title_key, icon_src in sidebar_items:
-        title_text = get_text_local(title_key)
-        if icon_src:
-            sidebar_html += f'''
-            <a href="#{item_id}">
-                <img src="{icon_src}" class="sidebar-icon" alt="{title_text}">
-                <span>{title_text}</span>
-            </a>
-            '''
-        else:
-            sidebar_html += f'''
-            <a href="#{item_id}">
-                <span>{title_text}</span>
-            </a>
-            '''
-    sidebar_html += '</div>\n'
-    
-    # Confidential banner for reviewers mode
-    confidential_banner = ""
-    if show_reviewers:
-        confidential_text = get_text_local('confidential_banner')
-        confidential_banner = f'''
-        <div class="confidential-banner">
-            ⚠️ {confidential_text}
-        </div>
-        '''
-    
-    # Format metrics for overview section
-    total_references = stats['total_references']
-    total_with_doi = stats['total_with_doi']
-    total_with_doi_percent = stats.get('total_with_doi_percent', 0)
-    last_5_years = stats['yearly_stats']['last_5_years']
-    last_5_years_percent = stats['yearly_stats']['last_5_years_percent']
-    self_citations_count = stats['self_citations_count']
-    self_citations_percent = stats['self_citations_percent']
-    total_citations_sum = stats.get('total_citations_sum', 0)
-    avg_citations = stats.get('avg_citations', 0)
-    
-    # Get identifier coverage stats
-    identifier_stats = stats['identifier_coverage']['stats']
-    identifier_percents = stats['identifier_coverage_percents']
-    
-    # Format citation classics
-    citation_classics_html = ""
-    if stats['citation_classics']:
-        for i, classic in enumerate(stats['citation_classics']):
-            citation_classics_html += f"""
-            <div class="rank-item">
-                <span class="rank-number">{i+1}.</span>
-                <span class="rank-name">{html.escape(classic["title"] if classic["title"] else get_text_local("not_found"))}</span>
-                <span class="rank-count">{get_text_local("html_citations_count")}: {classic["citations"]}</span>
-                <div style="font-size: 12px; color: #666; margin-top: 5px;">{html.escape(classic["journal"] if classic["journal"] else get_text_local("not_found"))} ({classic["year"] if classic["year"] else get_text_local("not_found")})</div>
-                {f'<div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(classic["doi"])}</div>' if classic.get("doi") else ''}
-            </div>
-            """
-    else:
-        citation_classics_html = f'<p>{get_text_local("no_citation_classics")}</p>'
-    
-    # Get current date only (without time)
-    current_date = datetime.now().strftime('%d.%m.%Y')
-
-    # Build HTML content
-    html_content = f"""<!DOCTYPE html>
-<html lang="{lang}">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{get_text_local('app_title')}</title>
-    <style>
-        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            padding: 0;
-            margin: 0;
-        }}
-        .report-wrapper {{
-            max-width: 1400px;
-            margin: 0 auto;
-            background: white;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-        }}
-        .sidebar {{
-            position: fixed;
-            left: 0;
-            top: 0;
-            width: 260px;
-            height: 100vh;
-            background: linear-gradient(135deg, {primary_color} 0%, {secondary_color} 100%);
-            color: white;
-            padding: 30px 20px;
-            overflow-y: auto;
-            z-index: 1000;
-        }}
-        .sidebar h3 {{
-            margin-bottom: 20px;
-            font-size: 18px;
-            font-weight: 600;
-        }}
-        .sidebar a {{
-            color: white;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 10px 15px;
-            margin: 5px 0;
-            border-radius: 8px;
-            transition: all 0.3s;
-        }}
-        .sidebar a:hover {{
-            background: rgba(255,255,255,0.2);
-            transform: translateX(5px);
-        }}
-        .sidebar-icon {{
-            width: 22px;
-            height: 22px;
-            background: transparent;
-            display: inline-block;
-            vertical-align: middle;
-        }}
-        .main-content {{
-            margin-left: 260px;
-            padding: 30px 40px;
-        }}
-        .header {{
-            background: linear-gradient(135deg, {primary_color} 0%, {secondary_color} 100%);
-            color: white;
-            padding: 40px;
-            border-radius: 15px;
-            margin-bottom: 30px;
-            text-align: center;
-        }}
-        .header h1 {{
-            font-size: 32px;
-            margin-bottom: 10px;
-        }}
-        .header .date {{
-            opacity: 0.9;
-            margin-top: 10px;
-        }}
-        .stats-grid {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }}
-        .stat-card {{
-            background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
-            border-radius: 15px;
-            padding: 20px;
-            text-align: center;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            transition: transform 0.3s;
-        }}
-        .stat-card:hover {{
-            transform: translateY(-5px);
-        }}
-        .stat-number {{
-            font-size: 32px;
-            font-weight: bold;
-            background: linear-gradient(135deg, {primary_color} 0%, {secondary_color} 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }}
-        .stat-label {{
-            color: #666;
-            margin-top: 10px;
-            font-size: 14px;
-        }}
-        .stat-percent {{
-            font-size: 12px;
-            color: #155724;
-            background-color: #d4edda;
-            padding: 3px 10px;
-            border-radius: 20px;
-            margin-top: 8px;
-            display: inline-block;
-        }}
-        .section {{
-            background: white;
-            border-radius: 15px;
-            padding: 25px;
-            margin-bottom: 30px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }}
-        .section-title {{
-            font-size: 24px;
-            font-weight: 600;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 3px solid {primary_color};
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }}
-        .section-icon {{
-            width: 28px;
-            height: 28px;
-            vertical-align: middle;
-            display: inline-block;
-            background: transparent;
-        }}
-        .rank-item {{
-            border-radius: 10px;
-            padding: 12px;
-            margin-bottom: 10px;
-            transition: all 0.3s;
-        }}
-        .rank-number {{
-            font-weight: bold;
-            color: {primary_color};
-            font-size: 18px;
-            display: inline-block;
-            width: 40px;
-        }}
-        .rank-name {{
-            display: inline-block;
-            width: 300px;
-            font-weight: 500;
-        }}
-        .rank-count {{
-            float: right;
-            color: #666;
-        }}
-        .progress-bar {{
-            background: #e0e0e0;
-            border-radius: 10px;
-            height: 8px;
-            margin-top: 8px;
-            overflow: hidden;
-        }}
-        .progress-fill {{
-            background: linear-gradient(90deg, {primary_color}, {secondary_color});
-            height: 100%;
-            border-radius: 10px;
-        }}
-        .concepts-grid {{
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 15px;
-            margin-top: 20px;
-        }}
-        .concept-card {{
-            background: linear-gradient(135deg, {primary_color}15 0%, {secondary_color}15 100%);
-            border-radius: 10px;
-            padding: 15px;
-            text-align: center;
-            border: 1px solid {primary_color}30;
-        }}
-        .concept-name {{
-            font-weight: 600;
-            color: {primary_color};
-        }}
-        .concept-score {{
-            font-size: 12px;
-            color: #666;
-            margin-top: 5px;
-        }}
-        .badge {{
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            margin: 2px;
-        }}
-        .badge-success {{ background: #d4edda; color: #155724; }}
-        .badge-warning {{ background: #fff3cd; color: #856404; }}
-        .badge-danger {{ background: #f8d7da; color: #721c24; }}
-        .badge-info {{ background: #d1ecf1; color: #0c5460; }}
-        .badge-repository {{ background: #e2d5f8; color: #5e2a9e; }}
-        .badge-book {{ background: #bbecde; color: #0e6b5e; }}
-        .badge-proceedings {{ background: #fff2c9; color: #b26b00; }}
-        
-        /* Color coding for different reference types in full list */
-        .normal-article {{
-            background: #e8f5e9 !important;
-            border-left: 3px solid #4caf50 !important;
-        }}
-        .notfound-reference {{
-            background: #e9ecef !important;
-            border-left: 3px solid #6c757d !important;
-        }}
-        .suspicious-reference {{
-            background: #f8d7da !important;
-            border-left: 3px solid #dc3545 !important;
-        }}
-        .duplicate-reference {{
-            background: #ffe5cc !important;
-            border-left: 3px solid #fd7e14 !important;
-        }}
-        .ebook-reference {{
-            background: #d4f1e9 !important;
-            border-left: 3px solid #0e6b5e !important;
-        }}
-        .repository-reference {{
-            background: #e2d5f8 !important;
-            border-left: 3px solid #5e2a9e !important;
-        }}
-        .preprint-reference {{
-            background: #e2d5f8 !important;
-            border-left: 3px solid #5e2a9e !important;
-        }}
-        .proceedings-reference {{
-            background: #fff2c9 !important;
-            border-left: 3px solid #b26b00 !important;
-        }}
-        .retracted-reference {{
-            background: #f8d7da !important;
-            border-left: 3px solid #dc3545 !important;
-        }}
-        
-        /* Reviewer card styles */
-        .reviewer-card {{
-            background: white;
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            transition: transform 0.2s, box-shadow 0.2s;
-            border-left: 4px solid {primary_color};
-        }}
-        .reviewer-card:hover {{
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }}
-        .reviewer-name {{
-            font-size: 18px;
-            font-weight: 600;
-            color: {primary_color};
-            margin-bottom: 8px;
-        }}
-        .reviewer-orcid {{
-            font-family: monospace;
-            font-size: 12px;
-            margin-bottom: 8px;
-        }}
-        .reviewer-section {{
-            margin-top: 12px;
-            padding-top: 8px;
-            border-top: 1px solid #e0e0e0;
-        }}
-        .reviewer-section-title {{
-            font-weight: 600;
-            font-size: 13px;
-            margin-bottom: 8px;
-            color: #555;
-        }}
-        .external-id-link {{
-            display: inline-block;
-            background: #f0f0f0;
-            padding: 4px 10px;
-            border-radius: 15px;
-            font-size: 11px;
-            margin: 3px;
-            text-decoration: none;
-            color: #333;
-            transition: background 0.2s;
-        }}
-        .external-id-link:hover {{
-            background: {primary_color};
-            color: white;
-        }}
-        .reviewer-website {{
-            display: inline-block;
-            margin: 3px 6px 3px 0;
-            font-size: 12px;
-        }}
-        .confidential-banner {{
-            background: linear-gradient(135deg, #fff3cd 0%, #ffe69e 100%);
-            border-left: 4px solid #dc3545;
-            padding: 12px 20px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            font-weight: 500;
-            text-align: center;
-        }}
-        
-        .footer {{
-            text-align: center;
-            padding: 20px;
-            color: #666;
-            font-size: 12px;
-            border-top: 1px solid #e0e0e0;
-            margin-top: 30px;
-        }}
-        table {{
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-        }}
-        th, td {{
-            padding: 10px;
-            text-align: left;
-            border-bottom: 1px solid #e0e0e0;
-        }}
-        th {{
-            background: linear-gradient(135deg, {primary_color} 0%, {secondary_color} 100%);
-            color: white;
-        }}
-        tr:hover {{
-            background: #f5f5f5;
-        }}
-        .clickable-link {{
-            color: {primary_color};
-            text-decoration: none;
-            transition: all 0.3s;
-        }}
-        .clickable-link:hover {{
-            color: {secondary_color};
-            text-decoration: underline;
-        }}
-        .full-text-container {{
-            max-height: 150px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            font-family: monospace;
-            font-size: 12px;
-            background: #f5f5f5;
-            padding: 8px;
-            border-radius: 5px;
-            margin-top: 5px;
-        }}
-        
-        /* Special styling for expander content */
-        .ebook-reference .full-text-container,
-        .repository-reference .full-text-container,
-        .preprint-reference .full-text-container,
-        .proceedings-reference .full-text-container,
-        .suspicious-reference .full-text-container,
-        .duplicate-reference .full-text-container,
-        .notfound-reference .full-text-container,
-        .retracted-reference .full-text-container {{
-            background: rgba(255,255,255,0.7);
-        }}
-        
-        @media print {{
-            .sidebar {{ display: none; }}
-            .main-content {{ margin-left: 0; }}
-            .stat-card, .section {{ break-inside: avoid; }}
-        }}
-        @media (max-width: 768px) {{
-            .sidebar {{ display: none; }}
-            .main-content {{ margin-left: 0; padding: 20px; }}
-        }}
-    </style>
-</head>
-<body>
-    {sidebar_html}
-    
-    <div class="main-content">
-        <div class="header">
-            <div style="display: flex; justify-content: center; margin-bottom: 15px;">
-                <img src="data:image/png;base64,{logo_base64}" style="height: 150px; width: auto;" alt="Logo">
-            </div>
-            <div style="margin-top: 10px;">{journal_name_display}</div>
-            {article_number_display}
-            <div class="date">{get_text_local('html_generated')}: {current_date}</div>
-            <div style="margin-top: 15px;">
-                <span class="badge badge-success">{get_text_local('status_both')}</span>
-                <span class="badge badge-info">{get_text_local('total_references')}: {stats['total_references']}</span>
-            </div>
-        </div>
-        
-        {confidential_banner}
-        
-        <!-- OVERVIEW SECTION -->
-        <div id="overview" class="section">
-            {make_section_title("overview", "html_overview")}
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-number">{total_references}</div>
-                    <div class="stat-percent">(100.0%)</div>
-                    <div class="stat-label">{get_text_local('total_references')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{total_with_doi}</div>
-                    <div class="stat-percent">({total_with_doi_percent:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('doi_found')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{last_5_years}</div>
-                    <div class="stat-percent">({last_5_years_percent:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('last_5_years_metric')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{self_citations_count}</div>
-                    <div class="stat-percent">({self_citations_percent:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('self_citations')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{total_citations_sum}</div>
-                    <div class="stat-label">{get_text_local('total_citations')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{avg_citations:.1f}</div>
-                    <div class="stat-label">{get_text_local('avg_citations')}</div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- IDENTIFIER COVERAGE SECTION (UPDATED - NO DUPLICATION) -->
-        <div id="identifiers" class="section">
-            {make_section_title("identifier", "html_identifier_coverage")}
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-number">{identifier_stats['has_doi']}</div>
-                    <div class="stat-percent">({identifier_percents['has_doi']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('doi_found')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{identifier_stats['has_url']}</div>
-                    <div class="stat-percent">({identifier_percents['has_url']:.1f}%)</div>
-                    <div class="stat-label">URL</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{identifier_stats['is_preprint_repository']}</div>
-                    <div class="stat-percent">({identifier_percents['preprint_repository']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('preprint_repository_count')} (arXiv + OpenAlex)</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{identifier_stats['has_pmid']}</div>
-                    <div class="stat-percent">({identifier_percents['has_pmid']:.1f}%)</div>
-                    <div class="stat-label">PMID</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{identifier_stats['is_ebook_platform']}</div>
-                    <div class="stat-percent">({identifier_percents['ebook_platform']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('ebook')} (with DOI)</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{identifier_stats['is_book_no_doi']}</div>
-                    <div class="stat-percent">({identifier_percents['book_no_doi']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('books_count')} (ISBN only)</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{identifier_stats['is_proceedings']}</div>
-                    <div class="stat-percent">({identifier_percents['proceedings']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('proceedings_count')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{identifier_stats['is_retracted']}</div>
-                    <div class="stat-percent">({identifier_percents['retracted']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('retracted_count')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{identifier_stats['has_none']}</div>
-                    <div class="stat-percent">({identifier_percents['has_none']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('no_identifier')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{identifier_stats['multiple']}</div>
-                    <div class="stat-percent">({identifier_percents['multiple']:.1f}%)</div>
-                    <div class="stat-label">Multiple identifiers</div>
-                </div>
-            </div>
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-number">{stats['doi_status']['both']}</div>
-                    <div class="stat-percent">({stats['doi_status_percents']['both']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('status_both')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{stats['doi_status']['crossref_only']}</div>
-                    <div class="stat-percent">({stats['doi_status_percents']['crossref_only']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('status_crossref_only')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{stats['doi_status']['openalex_only']}</div>
-                    <div class="stat-percent">({stats['doi_status_percents']['openalex_only']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('status_openalex_only')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{stats['doi_status']['none']}</div>
-                    <div class="stat-percent">({stats['doi_status_percents']['none']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('status_none')}</div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- AUTHORS SECTION (UPDATED with all affiliations) -->
-        <div id="authors" class="section">
-            {make_section_title("authors", "html_authors")}
-            <div>
-                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(author["display_name"])}</span><span class="rank-count">{author["mention_count"]} {get_text_local("html_citations_label")}</span>' + (f'<div style="font-size: 11px; color: #667eea;">{get_text_local("orcid_label")}: {make_clickable_orcid(author["orcid"])}</div>' if author.get("orcid") else '') + (f'<div style="font-size: 11px; color: #666;"><strong>{get_text_local("institution_label")}:</strong> {html.escape(author["primary_institution"][:50])}</div>' if author.get("primary_institution") else '') + (f'<div style="font-size: 11px; color: #666;"><strong>{get_text_local("country_label")}:</strong> {", ".join(author["countries"])}</div>' if author.get("countries") else '') + (f'<div style="font-size: 11px; color: #666;"><strong>{get_text_local("all_affiliations")}:</strong><br>' + '<br>'.join([html.escape(aff["name"][:80]) for aff in author.get("affiliations", [])[:3]]) + '</div>' if author.get("affiliations") else '') + '<div class="progress-bar"><div class="progress-fill" style="width: ' + str(min(100, author["mention_count"] / stats["author_frequency_all"]["all_authors"][0]["mention_count"] * 100 if stats["author_frequency_all"]["all_authors"] else 0)) + '%;"></div></div></div>' for i, author in enumerate(stats["author_frequency_all"]["all_authors"][:30])])}
-            </div>
-            <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_text_local('unique_authors')}: {stats['author_frequency_all']['unique_authors']}</span>
-                <span class="badge badge-info">{get_text_local('shannon_authors')}: {stats['shannon_index']['authors']}</span>
-                <span class="badge badge-info">{get_text_local('orcid_coverage')}: {stats['orcid_coverage']['with_orcid']} ({stats['orcid_coverage']['coverage_percent']:.1f}%)</span>
-            </div>
-        </div>
-        
-        <!-- JOURNALS SECTION -->
-        <div id="journals" class="section">
-            {make_section_title("journals", "html_journals")}
-            <table>
-                <thead>
-                    <tr><th>{get_text_local('html_rank')}</th><th>{get_text_local('journal')}</th><th>{get_text_local('html_count')}</th><th>{get_text_local('html_percentage')}</th></tr>
-                </thead>
-                <tbody>
-                    {''.join([f'<tr><td>{i+1}</td><td>{html.escape(journal["journal"])}</td><td>{journal["count"]}</td><td>{journal["percentage"]:.1f}%</td></tr>' for i, journal in enumerate(stats["journal_frequency_all"]["all_journals"])])}
-                </tbody>
-            </table>
-            <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_text_local('unique_journals')}: {stats['journal_frequency_all']['unique_journals']}</span>
-                <span class="badge badge-info">{get_text_local('shannon_journals')}: {stats['shannon_index']['journals']}</span>
-            </div>
-        </div>
-        
-        <!-- PUBLISHERS SECTION -->
-        <div id="publishers" class="section">
-            {make_section_title("publishers", "html_publishers")}
-            <table>
-                <thead>
-                    <tr><th>{get_text_local('html_rank')}</th><th>{get_text_local('publisher')}</th><th>{get_text_local('html_count')}</th><th>{get_text_local('html_percentage')}</th></tr>
-                </thead>
-                <tbody>
-                    {''.join([f'<tr><td>{i+1}</td><td>{html.escape(publisher["publisher"])}</td><td>{publisher["count"]}</td><td>{publisher["percentage"]:.1f}%</td></tr>' for i, publisher in enumerate(stats["publisher_frequency"]["all_publishers"])])}
-                </tbody>
-            </table>
-            <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_text_local('unique_publishers_metric')}: {stats['publisher_frequency']['unique_publishers']}</span>
-                <span class="badge badge-info">{get_text_local('shannon_publishers')}: {stats['shannon_index']['publishers']}</span>
-            </div>
-        </div>
-        
-        <!-- YEARLY STATISTICS -->
-        <div id="yearly" class="section">
-            {make_section_title("yearly", "html_yearly")}
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-number">{stats['yearly_stats']['last_year']}</div>
-                    <div class="stat-percent">({stats['yearly_stats']['last_year_percent']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('last_year')} ({stats['yearly_stats']['last_completed_year']})</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{stats['yearly_stats']['last_3_years']}</div>
-                    <div class="stat-percent">({stats['yearly_stats']['last_3_years_percent']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('last_3_years')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{stats['yearly_stats']['last_5_years']}</div>
-                    <div class="stat-percent">({stats['yearly_stats']['last_5_years_percent']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('last_5_years_metric')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{stats['yearly_stats']['last_10_years']}</div>
-                    <div class="stat-percent">({stats['yearly_stats']['last_10_years_percent']:.1f}%)</div>
-                    <div class="stat-label">{get_text_local('last_10_years')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{stats['yearly_stats']['unknown_year']}</div>
-                    <div class="stat-label">{get_text_local('references_with_unknown_year')}</div>
-                </div>
-            </div>
-            <div>
-                <h4>{get_text_local('distribution_by_year')}:</h4>
-                {''.join([f'<div class="rank-item"><span class="rank-name">{year}</span><span class="rank-count">{stats["yearly_stats"]["yearly_counts"][year]} {get_text_local("references_count")} ({stats["yearly_stats"]["yearly_percentages"][year]:.1f}%)</span><div class="progress-bar"><div class="progress-fill" style="width: {stats["yearly_stats"]["yearly_percentages"][year]}%;"></div></div></div>' for year in sorted(stats["yearly_stats"]["yearly_counts"].keys(), reverse=True)])}
-            </div>
-            <div style="margin-top: 15px;">
-                <h4>{get_text_local('cumulative_percentage')}:</h4>
-                {''.join([f'<div class="rank-item"><span class="rank-name">{year}</span><span class="rank-count">{stats["yearly_stats"]["cumulative_percentages"][year]:.1f}% {get_text_local("cumulative")}</span><div class="progress-bar"><div class="progress-fill" style="width: {stats["yearly_stats"]["cumulative_percentages"][year]}%;"></div></div></div>' for year in sorted(stats["yearly_stats"]["yearly_counts"].keys(), reverse=True)])}
-            </div>
-            <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_text_local('median_age')}: {stats['temporal']['median_age']} {get_text_local('years')}</span>
-                <span class="badge badge-info">{get_text_local('average_age')}: {stats['temporal']['average_age']:.1f} {get_text_local('years')}</span>
-            </div>
-        </div>
-        
-        <!-- CONCEPTS SECTION -->
-        <div id="concepts" class="section">
-            {make_section_title("concepts", "html_concepts")}
-            <div class="concepts-grid">
-                {''.join([f'<div class="concept-card"><div class="concept-name">{html.escape(concept[0])}</div><div class="concept-score">{get_text_local("html_frequency")}: {concept[1]}</div></div>' for concept in stats['concepts']['concepts'][:12]])}
-            </div>
-            <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_text_local('unique_concepts')}: {stats['concepts']['unique_concepts']}</span>
-            </div>
-        </div>
-        
-        <!-- GEOGRAPHY SECTION - THREE TYPES -->
-        <div id="geography" class="section">
-            {make_section_title("geography", "html_geography")}
-            
-            <!-- Type 1: Unique countries per reference -->
-            <h4>{get_text_local('geography_type_1')}</h4>
-            <p style="font-size: 12px; color: #666; margin-bottom: 10px;">{get_text_local('geography_type_1_desc')}</p>
-            <div>
-                {''.join([f'<div class="rank-item"><span class="rank-name">{html.escape(country)}</span><span class="rank-count">{count} {get_text_local("references_count")}</span><div class="progress-bar"><div class="progress-fill" style="width: {count / max(stats["geography"]["type1_unique_countries_per_reference"].values()) * 100 if stats["geography"]["type1_unique_countries_per_reference"] else 0}%;"></div></div></div>' for country, count in list(stats['geography']['type1_unique_countries_per_reference'].items())[:15]])}
-            </div>
-            
-            <!-- Type 2: Authors per country -->
-            <h4 style="margin-top: 25px;">{get_text_local('geography_type_2')}</h4>
-            <p style="font-size: 12px; color: #666; margin-bottom: 10px;">{get_text_local('geography_type_2_desc')}</p>
-            <div>
-                {''.join([f'<div class="rank-item"><span class="rank-name">{html.escape(country)}</span><span class="rank-count">{count} {get_text_local("html_authors_count")}</span><div class="progress-bar"><div class="progress-fill" style="width: {count / max(stats["geography"]["type2_authors_per_country"].values()) * 100 if stats["geography"]["type2_authors_per_country"] else 0}%;"></div></div></div>' for country, count in list(stats['geography']['type2_authors_per_country'].items())[:15]])}
-            </div>
-            
-            <!-- Type 3: Collaboration patterns -->
-            <h4 style="margin-top: 25px;">{get_text_local('geography_type_3')}</h4>
-            <p style="font-size: 12px; color: #666; margin-bottom: 10px;">{get_text_local('geography_type_3_desc')}</p>
-            <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
-                <div class="stat-card">
-                    <div class="stat-number">{stats['geography']['single_country_count']}</div>
-                    <div class="stat-label">{get_text_local('single_country')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{stats['geography']['international_count']}</div>
-                    <div class="stat-label">{get_text_local('international_collab')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{stats['geography']['total_references_with_country']}</div>
-                    <div class="stat-label">{get_text_local('total_references')} (with country)</div>
-                </div>
-            </div>
-            
-            <h5 style="margin-top: 20px;">{get_text_local('collaboration_matrix')}:</h5>
-            <div>
-                {''.join([f'<div class="rank-item"><span class="rank-name">{collab["country1"]} + {collab["country2"]}</span><span class="rank-count">{collab["count"]} {get_text_local("references_count")}</span><div class="progress-bar"><div class="progress-fill" style="width: {collab["count"] / max([c["count"] for c in stats["geography"]["collaboration_matrix"]]) * 100 if stats["geography"]["collaboration_matrix"] else 0}%;"></div></div></div>' for collab in stats['geography']['collaboration_matrix'][:15]])}
-            </div>
-        </div>
-        
-        <!-- COLLABORATION SECTION -->
-        <div id="collaboration" class="section">
-            {make_section_title("collaborations", "html_collaborations")}
-            <div>
-                {''.join([f'<div class="rank-item"><span class="rank-number">{i+1}.</span><span class="rank-name">{html.escape(collab["author1"])} + {html.escape(collab["author2"])}</span><span class="rank-count">{collab["count"]} {get_text_local("html_joint_works")}</span></div>' for i, collab in enumerate(stats["collaboration"]["top_collaborations"][:8])])}
-            </div>
-            <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_text_local('core_authors_label')}: {', '.join([f"{html.escape(author[0])} ({author[1]} {get_text_local('html_connections')})" for author in stats['collaboration']['core_authors'][:5]])}</span>
-            </div>
-        </div>
-        
-        <!-- DIVERSITY SECTION -->
-        <div id="diversity" class="section">
-            {make_section_title("diversity", "html_diversity")}
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-number">{stats['shannon_index']['authors']}</div>
-                    <div class="stat-label">{get_text_local('shannon_authors')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{stats['shannon_index']['journals']}</div>
-                    <div class="stat-label">{get_text_local('shannon_journals')}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">{stats['shannon_index']['publishers']}</div>
-                    <div class="stat-label">{get_text_local('shannon_publishers')}</div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- CITATION CLASSICS SECTION -->
-        <div id="classics" class="section">
-            {make_section_title("classics", "html_classics")}
-            {citation_classics_html}
-        </div>
-        
-        <!-- SELF-CITATIONS SECTION -->
-        {f'''
-        <div id="selfcitations" class="section">
-            {make_section_title("selfcitation", "html_self_citations")}
-            {authors_header_html}
-            {self_citations_html}
-            <div style="margin-top: 15px;">
-                <span class="badge badge-info">{get_text_local('html_total_self_citations')}: {self_citations_count} ({self_citations_percent:.1f}%)</span>
-            </div>
-        </div>
-        ''' if show_self_citations_section else ''}
-        
-        <!-- DUPLICATES SECTION -->
-        {duplicates_html}
-        
-        <!-- POTENTIAL REVIEWERS SECTION (if enabled) -->
-        {potential_reviewers_html}
-        
-        <!-- ONLY CROSSREF SECTION -->
-        <div id="crossref_only" class="section">
-            {make_section_title("crossref", "html_crossref_only")}
-            {''.join([f'<div class="rank-item"><div>{html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('crossref_only_refs', [])[:20]]) if stats.get('crossref_only_refs') else f'<p>{get_text_local("no_crossref_only")}</p>'}
-        </div>
-        
-        <!-- ONLY OPENALEX SECTION -->
-        <div id="openalex_only" class="section">
-            {make_section_title("openalex", "html_openalex_only")}
-            {''.join([f'<div class="rank-item"><div>{html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('openalex_only_refs', [])[:20]]) if stats.get('openalex_only_refs') else f'<p>{get_text_local("no_openalex_only")}</p>'}
-        </div>
-        
-        <!-- SUSPICIOUS DOIS SECTION -->
-        <div id="suspicious_doi" class="section">
-            {make_section_title("suspicious", "html_suspicious_doi")}
-            <div style="margin-bottom: 15px; font-size: 13px; color: #666;">{get_text_local('suspicious_dois_hint')}</div>
-            
-            <!-- Repository sources (not invalid) -->
-            {f'''
-            <div style="margin-top: 10px; margin-bottom: 15px;">
-                <h4>{get_text_local("repository")} {get_text_local("references")}:</h4>
-                <div style="font-size: 12px; color: #5e2a9e; margin-bottom: 10px;">{get_text_local("html_repository_note")}</div>
-                {''.join([f'<div class="rank-item repository-reference"><span class="badge-repository">{get_text_local("repository")}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div>' if ref.get("doi") else '') + '</div>' for ref in stats.get('repository_refs', [])[:20]])}
-            </div>
-            ''' if stats.get('repository_refs') else ''}
-            
-            <!-- Proceedings sources (not invalid) -->
-            {f'''
-            <div style="margin-top: 10px; margin-bottom: 15px;">
-                <h4>{get_text_local("proceedings")} {get_text_local("references")}:</h4>
-                <div style="font-size: 12px; color: #b26b00; margin-bottom: 10px;">{get_text_local("html_proceedings_note")}</div>
-                {''.join([f'<div class="rank-item proceedings-reference"><span class="badge-proceedings">{get_text_local("proceedings")}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div>' if ref.get("doi") else '') + '</div>' for ref in stats.get('proceedings_refs', [])[:20]])}
-            </div>
-            ''' if stats.get('proceedings_refs') else ''}
-            
-            <!-- Truly suspicious DOIs -->
-            <div style="margin-top: 10px;">
-                <h4>{get_text_local("suspicious_dois")}:</h4>
-                {''.join([f'<div class="rank-item suspicious-reference"><div class="badge badge-danger">{get_text_local("html_attention")}</div><div>{html.escape(ref["text"])}</div><div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div></div>' for ref in stats.get('suspicious_doi_refs', [])[:20]]) if stats.get('suspicious_doi_refs') else f'<p>{get_text_local("no_suspicious_dois")}</p>'}
-            </div>
-        </div>
-        
-        <!-- NON-DOI SOURCES SECTION -->
-        <div id="non_doi" class="section">
-            {make_section_title("nondoi", "html_non_doi")}
-            
-            <!-- Books with ISBN but no DOI -->
-            {f'''
-            <div style="margin-bottom: 15px;">
-                <h4>{get_text_local("books_count")} (ISBN without DOI):</h4>
-                {''.join([f'<div class="rank-item book-reference"><span class="badge-book">{get_text_local("ebook")}</span><div style="margin-top: 8px;">{html.escape(ref)}</div></div>' for ref in stats.get('books_with_isbn_no_doi', [])[:20]])}
-            </div>
-            ''' if stats.get('books_with_isbn_no_doi') else ''}
-            
-            <!-- Other non-DOI sources -->
-            <div>
-                <h4>{get_text_local("other")} {get_text_local("non_doi_sources")}:</h4>
-                {''.join([f'<div class="rank-item notfound-reference">{html.escape(ref)}</div>' for ref in stats['identifier_coverage']['references_without_doi'][:20]]) if stats['identifier_coverage']['references_without_doi'] else f'<p>{get_text_local("all_have_doi")}</p>'}
-            </div>
-        </div>
-        
-        <!-- NON-JOURNAL SOURCES WITH DOI SECTION -->
-        {non_journal_sources_html}
-        
-        <!-- URL SOURCES SECTION -->
-        <div id="url_sources" class="section">
-            {make_section_title("url", "html_url_sources")}
-            {''.join([f'<div class="rank-item">{html.escape(ref)}</div>' for ref in stats['identifier_coverage']['references_with_only_url'][:20]]) if stats['identifier_coverage']['references_with_only_url'] else f'<p>{get_text_local("no_url_only")}</p>'}
-        </div>
-        
-        <!-- PROBLEMS SECTION (includes retractions) -->
-        <div id="problems" class="section">
-            {make_section_title("problems", "html_problems")}
-            
-            <!-- Retracted articles -->
-            {f'''
-            <div style="margin-bottom: 20px;">
-                <h4>{get_text_local("retracted_count")}:</h4>
-                {''.join([f'<div class="rank-item retracted-reference"><span class="badge-danger" style="background: #f8d7da; color: #721c24;">{get_text_local("retracted")}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div>' + (f'<div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref["doi"])}</div>' if ref.get("doi") else '') + '</div>' for ref in stats.get('retracted_refs', [])[:20]]) if stats.get('retracted_refs') else f'<p>{get_text_local("none_detected")}</p>'}
-            </div>
-            ''' if stats.get('retracted_refs') else ''}
-            
-            <!-- Other problematic references -->
-            <div>
-                <h4>{get_text_local("other")} {get_text_local("problematic_refs")}:</h4>
-                {''.join([f'<div class="rank-item"><span class="badge badge-warning">{html.escape(ref["problems"])}</span><div style="margin-top: 8px;">{html.escape(ref["text"])}</div></div>' for ref in stats['problematic_refs'][:10]]) if stats['problematic_refs'] else f'<p>{get_text_local("no_problematic")}</p>'}
-            </div>
-        </div>
-        
-        <!-- FULL REFERENCE LIST SECTION -->
-        <div id="full_reference_list" class="section">
-            {make_section_title("list", "full_reference_list_title")}
-            {full_references_html}
-            {f'<p style="margin-top: 15px; color: #666;">{get_text_local("showing_first").format(500, len(results))}</p>' if len(results) > 500 else ''}
-        </div>
-        
-        <div class="footer">
-            {get_text_local('html_footer')}<br>
-            {get_text_local('html_copyright')}
-        </div>
-    </div>
-</body>
-</html>"""
-    
-    return html_content
+# ======================== HTML REPORT (UPDATED WITH STYLE SELECTION) ========================
+# The generate_classic_report function has been moved to styles.py
+# We import it from there
 
 # ======================== UI INTERFACE (ENGLISH, UPDATED WITH NEW FILTERS AND ORDER) ========================
 def main():
@@ -5688,7 +4434,34 @@ def main():
         
         st.markdown("---")
         
-        # ========== PROPOSE POTENTIAL REVIEWERS (NEW ORDER - AFTER ARTICLE NUMBER) ==========
+        # ========== REPORT STYLE SELECTION (NEW) ==========
+        st.markdown(f"## {get_text('report_style')}")
+        
+        style_options = {
+            'classic': get_text('style_classic'),
+            'glassmorphism': get_text('style_glassmorphism'),
+            'neon_cyber': get_text('style_neon_cyber'),
+            'glass_enhanced': get_text('style_glass_enhanced'),
+            'smart_glow': get_text('style_smart_glow'),
+            'aurora': get_text('style_aurora'),
+            'timeline_wave': get_text('style_timeline_wave'),
+            'masonry': get_text('style_masonry'),
+            'holographic': get_text('style_holographic'),
+            'geo_bubbles': get_text('style_geo_bubbles'),
+            'particles': get_text('style_particles')
+        }
+        
+        selected_style = st.selectbox(
+            get_text('report_style'),
+            options=list(style_options.keys()),
+            format_func=lambda x: style_options[x],
+            index=0 if st.session_state.get('report_style', 'classic') == 'classic' else list(style_options.keys()).index(st.session_state.get('report_style', 'classic'))
+        )
+        st.session_state.report_style = selected_style
+        
+        st.markdown("---")
+        
+        # ========== PROPOSE POTENTIAL REVIEWERS ==========
         st.markdown(f"## {get_text('propose_reviewers')}")
         propose_reviewers = st.checkbox(
             get_text('propose_reviewers'),
@@ -5699,91 +4472,95 @@ def main():
         
         st.markdown("---")
         
-        # ========== COLOR THEME (NEW ORDER - AFTER REVIEWERS) ==========
-        st.markdown(f"## 🎨 Color Theme")
-        
-        # Initialize color theme in session state
-        if 'primary_color' not in st.session_state:
-            st.session_state.primary_color = '#667eea'
-        if 'secondary_color' not in st.session_state:
-            st.session_state.secondary_color = '#f39c12'
-        
-        # Predefined theme options
-        preset_themes = {
-            "Default (Blue-Purple)": {"primary": "#667eea", "secondary": "#9b59b6"},
-            "Emerald (Green-Teal)": {"primary": "#2ecc71", "secondary": "#27ae60"},
-            "Sunset (Orange-Coral)": {"primary": "#e74c3c", "secondary": "#c0392b"},
-            "Ocean (Deep Blue)": {"primary": "#3498db", "secondary": "#2980b9"},
-            "Royal (Purple-Pink)": {"primary": "#9b59b6", "secondary": "#e84393"},
-            "Forest (Dark Green)": {"primary": "#27ae60", "secondary": "#2ecc71"},
-            "Cherry (Red-Pink)": {"primary": "#e84393", "secondary": "#9b59b6"},
-            "Amber (Yellow-Orange)": {"primary": "#f39c12", "secondary": "#e67e22"},
-        }
-        
-        # Theme selector with radio buttons or selectbox
-        theme_option = st.selectbox(
-            "🎨 Preset themes",
-            options=list(preset_themes.keys()),
-            index=0
-        )
-        
-        # Option to use preset or custom
-        use_preset = st.checkbox("Use preset theme", value=True)
-        
-        if use_preset:
-            selected_theme = preset_themes[theme_option]
-            st.session_state.primary_color = selected_theme["primary"]
-            st.session_state.secondary_color = selected_theme["secondary"]
+        # ========== COLOR THEME (ONLY FOR CLASSIC STYLE) ==========
+        if selected_style == 'classic':
+            st.markdown(f"## 🎨 Color Theme")
+            
+            # Initialize color theme in session state
+            if 'primary_color' not in st.session_state:
+                st.session_state.primary_color = '#667eea'
+            if 'secondary_color' not in st.session_state:
+                st.session_state.secondary_color = '#f39c12'
+            
+            # Predefined theme options
+            preset_themes = {
+                "Default (Blue-Purple)": {"primary": "#667eea", "secondary": "#9b59b6"},
+                "Emerald (Green-Teal)": {"primary": "#2ecc71", "secondary": "#27ae60"},
+                "Sunset (Orange-Coral)": {"primary": "#e74c3c", "secondary": "#c0392b"},
+                "Ocean (Deep Blue)": {"primary": "#3498db", "secondary": "#2980b9"},
+                "Royal (Purple-Pink)": {"primary": "#9b59b6", "secondary": "#e84393"},
+                "Forest (Dark Green)": {"primary": "#27ae60", "secondary": "#2ecc71"},
+                "Cherry (Red-Pink)": {"primary": "#e84393", "secondary": "#9b59b6"},
+                "Amber (Yellow-Orange)": {"primary": "#f39c12", "secondary": "#e67e22"},
+            }
+            
+            # Theme selector with radio buttons or selectbox
+            theme_option = st.selectbox(
+                "🎨 Preset themes",
+                options=list(preset_themes.keys()),
+                index=0
+            )
+            
+            # Option to use preset or custom
+            use_preset = st.checkbox("Use preset theme", value=True)
+            
+            if use_preset:
+                selected_theme = preset_themes[theme_option]
+                st.session_state.primary_color = selected_theme["primary"]
+                st.session_state.secondary_color = selected_theme["secondary"]
+            else:
+                # Custom color picker
+                selected_color = st.color_picker(
+                    "🎨 Pick your primary color",
+                    value=st.session_state.primary_color,
+                    help="Choose any color. Complementary color will be auto-generated!"
+                )
+                st.session_state.primary_color = selected_color
+                st.session_state.secondary_color = get_complementary_color(selected_color)
+            
+            # Use secondary color from session state
+            complementary = st.session_state.secondary_color
+            
+            # Display color preview
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(
+                    f'<div style="text-align: center;">'
+                    f'<div class="color-preview" style="background: {st.session_state.primary_color};"></div>'
+                    f'<div style="font-size: 11px; margin-top: 5px;">Primary</div>'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
+            with col2:
+                st.markdown(
+                    f'<div style="text-align: center;">'
+                    f'<div class="color-preview" style="background: {complementary};"></div>'
+                    f'<div style="font-size: 11px; margin-top: 5px;">Complementary</div>'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
+            
+            # Show gradient preview
+            st.markdown(
+                f'<div class="complementary-preview" style="height: 8px; width: 100%; margin: 10px 0;"></div>',
+                unsafe_allow_html=True
+            )
+            
+            # Show theme info
+            st.markdown(
+                f'<div class="theme-info">'
+                f'✨ Complementary color automatically selected<br>'
+                f'🎨 Gradient: Primary → Complementary'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+            
+            # Apply theme on color change
+            secondary = st.session_state.get('secondary_color', get_complementary_color(st.session_state.primary_color))
+            apply_theme_css(st.session_state.primary_color, secondary)
         else:
-            # Custom color picker
-            selected_color = st.color_picker(
-                "🎨 Pick your primary color",
-                value=st.session_state.primary_color,
-                help="Choose any color. Complementary color will be auto-generated!"
-            )
-            st.session_state.primary_color = selected_color
-            st.session_state.secondary_color = get_complementary_color(selected_color)
-        
-        # Use secondary color from session state
-        complementary = st.session_state.secondary_color
-        
-        # Display color preview
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(
-                f'<div style="text-align: center;">'
-                f'<div class="color-preview" style="background: {st.session_state.primary_color};"></div>'
-                f'<div style="font-size: 11px; margin-top: 5px;">Primary</div>'
-                f'</div>',
-                unsafe_allow_html=True
-            )
-        with col2:
-            st.markdown(
-                f'<div style="text-align: center;">'
-                f'<div class="color-preview" style="background: {complementary};"></div>'
-                f'<div style="font-size: 11px; margin-top: 5px;">Complementary</div>'
-                f'</div>',
-                unsafe_allow_html=True
-            )
-        
-        # Show gradient preview
-        st.markdown(
-            f'<div class="complementary-preview" style="height: 8px; width: 100%; margin: 10px 0;"></div>',
-            unsafe_allow_html=True
-        )
-        
-        # Show theme info
-        st.markdown(
-            f'<div class="theme-info">'
-            f'✨ Complementary color automatically selected<br>'
-            f'🎨 Gradient: Primary → Complementary'
-            f'</div>',
-            unsafe_allow_html=True
-        )
-        
-        # Apply theme on color change
-        secondary = st.session_state.get('secondary_color', get_complementary_color(st.session_state.primary_color))
-        apply_theme_css(st.session_state.primary_color, secondary)
+            # Show message that color theme is fixed for this style
+            st.info(get_text('style_fixed_theme'))
         
         st.markdown("---")
         
@@ -6632,6 +5409,9 @@ def main():
             duplicates = st.session_state.get('duplicates', [])
             propose_reviewers = st.session_state.get('propose_reviewers', False)
             
+            # Get selected report style
+            selected_style = st.session_state.get('report_style', 'classic')
+            
             # Generate statistics
             stats = generate_advanced_statistics(results)
             
@@ -6691,24 +5471,40 @@ def main():
             st.markdown(f"### {get_text('export_report')}")
             st.markdown(get_text('download_html'))
 
-            # Get current theme colors
+            # Get current theme colors (only used for classic style)
             primary_color = st.session_state.get('primary_color', '#667eea')
             secondary_color = st.session_state.get('secondary_color', get_complementary_color(primary_color))
             
-            # Generate HTML report with duplicates and new types
-            html_report = generate_html_report_advanced(
-                results, 
-                stats, 
-                paper_authors, 
-                st.session_state.language, 
-                journal_name, 
-                article_number, 
-                duplicates,
-                primary_color,
-                secondary_color,
-                potential_reviewers,
-                propose_reviewers
-            )
+            # Generate HTML report with selected style
+            if selected_style == 'classic':
+                # Use classic generator with color theme
+                html_report = generate_classic_report(
+                    stats, 
+                    paper_authors, 
+                    st.session_state.language, 
+                    journal_name, 
+                    article_number, 
+                    duplicates,
+                    primary_color,
+                    secondary_color,
+                    potential_reviewers,
+                    propose_reviewers
+                )
+            else:
+                # Use style generator from styles.py
+                generator = get_style_generator(selected_style)
+                html_report = generator(
+                    stats, 
+                    paper_authors, 
+                    st.session_state.language, 
+                    journal_name, 
+                    article_number, 
+                    duplicates,
+                    primary_color,  # Not used for non-classic, but passed for compatibility
+                    secondary_color,  # Not used for non-classic, but passed for compatibility
+                    potential_reviewers,
+                    propose_reviewers
+                )
             
             # Generate filename from journal abbreviation and article number (no datetime)
             def get_journal_abbreviation(journal_name: str) -> str:
