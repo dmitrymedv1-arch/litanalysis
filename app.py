@@ -5352,10 +5352,11 @@ def main():
     with st.sidebar:
         st.markdown(f"## {get_text('language')}")
         lang_option = st.selectbox(
-            "",
+            "Language",  # Добавили текст вместо пустой строки
             options=['en', 'ru'],
             format_func=lambda x: get_text('language_english') if x == 'en' else get_text('language_russian'),
-            index=0 if st.session_state.language == 'en' else 1
+            index=0 if st.session_state.language == 'en' else 1,
+            label_visibility="collapsed"  # Скрываем label
         )
         if lang_option != st.session_state.language:
             st.session_state.language = lang_option
@@ -5496,7 +5497,7 @@ def main():
         # Show color style selector
         for style_key, style_name in color_style_options.items():
             if st.radio(
-                "",
+                "Select color style",
                 options=[style_key],
                 format_func=lambda x: style_name,
                 key=f"color_style_{style_key}",
