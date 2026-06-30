@@ -6723,14 +6723,88 @@ def main():
             
             # Generate HTML report with duplicates and new types
             report_data = {
-                **stats,  # Все статистические данные
+                # Основные метрики
+                "total_references": stats.get('total_references', 0),
+                "total_with_doi": stats.get('total_with_doi', 0),
+                "total_with_doi_percent": stats.get('total_with_doi_percent', 0),
+                "last_5_years": stats.get('yearly_stats', {}).get('last_5_years', 0),
+                "last_5_years_percent": stats.get('yearly_stats', {}).get('last_5_years_percent', 0),
+                "self_citations_count": stats.get('self_citations_count', 0),
+                "self_citations_percent": stats.get('self_citations_percent', 0),
+                "total_citations_sum": stats.get('total_citations_sum', 0),
+                "avg_citations": stats.get('avg_citations', 0),
+                
+                # DOI статус
+                "doi_status": stats.get('doi_status', {}),
+                "doi_status_percents": stats.get('doi_status_percents', {}),
+                
+                # Identifier coverage
+                "identifier_coverage": stats.get('identifier_coverage', {}),
+                "identifier_coverage_percents": stats.get('identifier_coverage_percents', {}),
+                
+                # Authors (полный список)
+                "author_frequency_all": stats.get('author_frequency_all', {}),
+                "unique_authors": stats.get('author_frequency_all', {}).get('unique_authors', 0),
+                
+                # Journals (полный список)
+                "journal_frequency_all": stats.get('journal_frequency_all', {}),
+                "unique_journals": stats.get('journal_frequency_all', {}).get('unique_journals', 0),
+                
+                # Publishers (полный список)
+                "publisher_frequency": stats.get('publisher_frequency', {}),
+                "unique_publishers": stats.get('publisher_frequency', {}).get('unique_publishers', 0),
+                
+                # Yearly stats
+                "yearly_stats": stats.get('yearly_stats', {}),
+                
+                # Concepts
+                "concepts": stats.get('concepts', {}),
+                
+                # Geography (полный)
+                "geography": stats.get('geography', {}),
+                
+                # Collaboration
+                "collaboration": stats.get('collaboration', {}),
+                
+                # Shannon index
+                "shannon_index": stats.get('shannon_index', {}),
+                
+                # ORCID coverage
+                "orcid_coverage": stats.get('orcid_coverage', {}),
+                
+                # Citation classics
+                "citation_classics": stats.get('citation_classics', []),
+                
+                # Temporal
+                "temporal": stats.get('temporal', {}),
+                
+                # Problematic refs (полные списки)
+                "problematic_refs": stats.get('problematic_refs', []),
+                "crossref_only_refs": stats.get('crossref_only_refs', []),
+                "openalex_only_refs": stats.get('openalex_only_refs', []),
+                "suspicious_doi_refs": stats.get('suspicious_doi_refs', []),
+                "repository_refs": stats.get('repository_refs', []),
+                "proceedings_refs": stats.get('proceedings_refs', []),
+                "retracted_refs": stats.get('retracted_refs', []),
+                "books_with_isbn_no_doi": stats.get('books_with_isbn_no_doi', []),
+                "non_journal_sources_with_doi": stats.get('non_journal_sources_with_doi', []),
+                "references_without_doi": stats.get('identifier_coverage', {}).get('references_without_doi', []),
+                "references_with_only_url": stats.get('identifier_coverage', {}).get('references_with_only_url', []),
+                
+                # Self citations
+                "self_citation_refs": stats.get('self_citation_refs', []),
+                
+                # Дополнительные поля
                 "journal_name": journal_name,
                 "article_number": article_number,
                 "duplicates": duplicates,
                 "results": results,
                 "paper_authors": paper_authors,
                 "potential_reviewers": potential_reviewers if propose_reviewers else [],
-                "show_reviewers": propose_reviewers
+                "show_reviewers": propose_reviewers,
+                "primary_color": primary_color,
+                "secondary_color": secondary_color,
+                "lang": st.session_state.language
             }
             
             # Получаем выбранный стиль
