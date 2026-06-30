@@ -311,13 +311,15 @@ def generate_style_0_classic(data: Dict) -> str:
     # Build publishers section
     publishers_html = ''
     for i, publisher in enumerate(all_publishers, 1):
+        publisher_name = publisher.get("publisher") or "Unknown"
+        count = publisher.get("count") or 0
+        percentage = publisher.get("percentage") or 0
         publishers_html += f'''
         <tr>
             <td>{i}</td>
-            publisher_name = publisher.get("publisher") or "Unknown"
             <td>{html.escape(str(publisher_name))}</td>
-            <td>{publisher.get("count", 0)}</td>
-            <td>{publisher.get("percentage", 0):.1f}%</td>
+            <td>{count}</td>
+            <td>{percentage:.1f}%</td>
         </tr>
         '''
     
