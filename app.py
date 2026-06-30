@@ -18,12 +18,10 @@ import html
 
 # ======================== IMPORT STYLES ========================
 from styles import (
-    STYLE_GENERATORS, 
-    STYLE_NAMES, 
+    STYLE_GENERATORS,
     generate_classic_report,
     get_style_generator
 )
-
 # ======================== COLOR UTILITIES FOR DYNAMIC THEMES ========================
 import colorsys
 
