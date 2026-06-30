@@ -3940,7 +3940,8 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
                     'doi': result['doi']
                 })
             elif result['openalex_status']:
-                doi_status['openalex_only'] += 1                openalex_only_refs.append({
+                doi_status['openalex_only'] += 1
+                openalex_only_refs.append({
                     'text': result['original_text'],
                     'doi': result['doi']
                 })
