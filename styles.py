@@ -1,5 +1,5 @@
 # ============================================================
-# styles.py - Все стили HTML отчетов
+# styles.py - Все стили HTML отчетов (ПОЛНАЯ ВЕРСИЯ)
 # ============================================================
 
 from datetime import datetime
@@ -22,17 +22,35 @@ def get_footer(journal_name: str = "Chimica Techno Acta") -> str:
 def make_clickable_doi(doi: str) -> str:
     """Создает кликабельную ссылку для DOI"""
     if doi:
-        return f'<a href="https://doi.org/{doi}" target="_blank" style="color: #667eea; text-decoration: none;">{html.escape(doi)}</a>'
+        return f'<a href="https://doi.org/{doi}" target="_blank" style="color: #667eea; text-decoration: none;">{html.escape(str(doi))}</a>'
     return "Not found"
 
+def safe_str(value) -> str:
+    """Безопасное преобразование в строку с защитой от None"""
+    if value is None:
+        return ""
+    return str(value)
+
+def safe_escape(value) -> str:
+    """Безопасное экранирование HTML с защитой от None"""
+    if value is None:
+        return ""
+    return html.escape(str(value))
+
 # ============================================================
-# СТИЛЬ 0: КЛАССИЧЕСКИЙ (ИСХОДНЫЙ)
+# ОСНОВНАЯ ФУНКЦИЯ ГЕНЕРАЦИИ КЛАССИЧЕСКОГО ОТЧЕТА (ПОЛНАЯ ВЕРСИЯ)
 # ============================================================
 
-def generate_style_0_classic(data: Dict) -> str:
-    """Стиль 0: Классический (исходный дизайн из app.py)"""
+def generate_full_report_html(data: Dict, custom_css: str = None, custom_header: str = None) -> str:
+    """
+    Генерирует полный HTML отчет со всеми разделами.
+    Параметры:
+    - data: словарь со всеми данными
+    - custom_css: пользовательский CSS (для новых стилей)
+    - custom_header: пользовательский заголовок (для новых стилей)
+    """
     
-    # Распаковка данных
+    # ========== РАСПАКОВКА ДАННЫХ С ЗАЩИТОЙ ОТ None ==========
     total_references = data.get('total_references', 0)
     total_with_doi = data.get('total_with_doi', 0)
     total_with_doi_percent = data.get('total_with_doi_percent', 0)
@@ -116,7 +134,12 @@ def generate_style_0_classic(data: Dict) -> str:
     # Duplicates
     duplicates = data.get('duplicates', [])
     
-    # Build sidebar navigation
+    # Results for full reference list
+    results = data.get('results', [])
+    references_without_doi = data.get('references_without_doi', [])
+    references_with_only_url = data.get('references_with_only_url', [])
+    
+    # ========== ПОСТРОЕНИЕ НАВИГАЦИОННОГО МЕНЮ ==========
     sidebar_items = [
         ("overview", "Overview"),
         ("identifiers", "Identifier Coverage"),
@@ -151,10 +174,10 @@ def generate_style_0_classic(data: Dict) -> str:
     sidebar_html = '<div class="sidebar">\n'
     sidebar_html += '<h3>Navigation</h3>\n'
     for item_id, title in sidebar_items:
-        sidebar_html += f'<a href="#{item_id}"><span>{title}</span></a>\n'
+        sidebar_html += f'<a href="#{item_id}"><span>{safe_escape(title)}</span></a>\n'
     sidebar_html += '</div>\n'
     
-    # Build metrics grid
+    # ========== ПОСТРОЕНИЕ МЕТРИК ==========
     metrics_html = f'''
     <div class="stats-grid">
         <div class="metric-card">
@@ -188,7 +211,7 @@ def generate_style_0_classic(data: Dict) -> str:
     </div>
     '''
     
-    # Build identifier coverage
+    # ========== IDENTIFIER COVERAGE ==========
     identifier_html = f'''
     <div class="stats-grid">
         <div class="metric-card">
@@ -266,64 +289,75 @@ def generate_style_0_classic(data: Dict) -> str:
     </div>
     '''
     
-    # Build authors section
+    # ========== AUTHORS SECTION ==========
     authors_html = ''
-    for i, author in enumerate(all_authors[:30], 1):
-        orcid_html = f'<div style="font-size: 11px; color: #667eea;">ORCID: <a href="{author.get("orcid", "")}" target="_blank" style="color: #667eea; text-decoration: none;">{author.get("orcid", "")}</a></div>' if author.get('orcid') else ''
-        inst_html = f'<div style="font-size: 11px; color: #666;">Institution: {html.escape(author.get("primary_institution", "")[:50])}</div>' if author.get('primary_institution') else ''
-        country_html = f'<div style="font-size: 11px; color: #666;">Country: {", ".join(author.get("countries", []))}</div>' if author.get('countries') else ''
-        affiliations_html = ''
-        if author.get('affiliations'):
-            aff_list = author.get('affiliations', [])[:3]
-            affiliations_html = f'<div style="font-size: 11px; color: #666;">All affiliations:<br>{", ".join([html.escape(aff.get("name", "")[:80]) for aff in aff_list])}</div>'
-        
+    if all_authors:
         max_count = all_authors[0].get('mention_count', 1) if all_authors else 1
-        progress_width = min(100, (author.get('mention_count', 0) / max_count * 100))
-        
-        authors_html += f'''
-        <div class="rank-item">
-            <span class="rank-number">{i}.</span>
-            <span class="rank-name">{html.escape(author.get("display_name", "Unknown"))}</span>
-            <span class="rank-count">{author.get("mention_count", 0)} citations</span>
-            {orcid_html}
-            {inst_html}
-            {country_html}
-            {affiliations_html}
-            <div class="progress-bar-custom">
-                <div class="progress-fill" style="width: {progress_width}%;"></div>
+        for i, author in enumerate(all_authors[:30], 1):
+            author_name = safe_escape(author.get('display_name', 'Unknown'))
+            mention_count = author.get('mention_count', 0)
+            orcid = author.get('orcid', '')
+            primary_institution = safe_escape(author.get('primary_institution', ''))
+            countries = author.get('countries', [])
+            
+            orcid_html = f'<div style="font-size: 11px; color: #667eea;">ORCID: <a href="{safe_escape(orcid)}" target="_blank" style="color: #667eea; text-decoration: none;">{safe_escape(orcid)}</a></div>' if orcid else ''
+            inst_html = f'<div style="font-size: 11px; color: #666;">Institution: {primary_institution[:50]}</div>' if primary_institution else ''
+            country_html = f'<div style="font-size: 11px; color: #666;">Country: {", ".join([safe_escape(c) for c in countries])}</div>' if countries else ''
+            
+            affiliations_html = ''
+            if author.get('affiliations'):
+                aff_list = author.get('affiliations', [])[:3]
+                aff_names = [safe_escape(aff.get('name', '')[:80]) for aff in aff_list]
+                affiliations_html = f'<div style="font-size: 11px; color: #666;">All affiliations:<br>{", ".join(aff_names)}</div>'
+            
+            progress_width = min(100, (mention_count / max_count * 100)) if max_count > 0 else 0
+            
+            authors_html += f'''
+            <div class="rank-item">
+                <span class="rank-number">{i}.</span>
+                <span class="rank-name">{author_name}</span>
+                <span class="rank-count">{mention_count} citations</span>
+                {orcid_html}
+                {inst_html}
+                {country_html}
+                {affiliations_html}
+                <div class="progress-bar-custom">
+                    <div class="progress-fill" style="width: {progress_width}%;"></div>
+                </div>
             </div>
-        </div>
-        '''
+            '''
     
-    # Build journals section
+    # ========== JOURNALS SECTION ==========
     journals_html = ''
     for i, journal in enumerate(all_journals, 1):
+        journal_name_safe = safe_escape(journal.get('journal', 'Unknown'))
+        count = journal.get('count', 0)
+        percentage = journal.get('percentage', 0)
         journals_html += f'''
         <tr>
             <td>{i}</td>
-            journal_name = journal.get("journal") or "Unknown"
-            <td>{html.escape(str(journal_name))}</td>
-            <td>{journal.get("count", 0)}</td>
-            <td>{journal.get("percentage", 0):.1f}%</td>
-        </tr>
-        '''
-    
-    # Build publishers section
-    publishers_html = ''
-    for i, publisher in enumerate(all_publishers, 1):
-        publisher_name = publisher.get("publisher") or "Unknown"
-        count = publisher.get("count") or 0
-        percentage = publisher.get("percentage") or 0
-        publishers_html += f'''
-        <tr>
-            <td>{i}</td>
-            <td>{html.escape(str(publisher_name))}</td>
+            <td>{journal_name_safe}</td>
             <td>{count}</td>
             <td>{percentage:.1f}%</td>
         </tr>
         '''
     
-    # Build yearly section
+    # ========== PUBLISHERS SECTION ==========
+    publishers_html = ''
+    for i, publisher in enumerate(all_publishers, 1):
+        publisher_name_safe = safe_escape(publisher.get('publisher', 'Unknown'))
+        count = publisher.get('count', 0)
+        percentage = publisher.get('percentage', 0)
+        publishers_html += f'''
+        <tr>
+            <td>{i}</td>
+            <td>{publisher_name_safe}</td>
+            <td>{count}</td>
+            <td>{percentage:.1f}%</td>
+        </tr>
+        '''
+    
+    # ========== YEARLY SECTION ==========
     yearly_html = f'''
     <div class="stats-grid">
         <div class="metric-card">
@@ -394,12 +428,12 @@ def generate_style_0_classic(data: Dict) -> str:
     </div>
     '''
     
-    # Build concepts section
+    # ========== CONCEPTS SECTION ==========
     concepts_html = '<div class="concepts-grid">'
     for concept, count in concepts[:12]:
         concepts_html += f'''
         <div class="concept-card">
-            <div class="concept-name">{html.escape(concept)}</div>
+            <div class="concept-name">{safe_escape(concept)}</div>
             <div class="concept-score">Frequency: {count}</div>
         </div>
         '''
@@ -410,7 +444,7 @@ def generate_style_0_classic(data: Dict) -> str:
     </div>
     '''
     
-    # Build geography section - Type 1
+    # ========== GEOGRAPHY SECTION ==========
     geography_html = f'''
     <h4>Type 1: Unique Countries per Reference</h4>
     <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Each reference counted once per unique country</p>
@@ -422,7 +456,7 @@ def generate_style_0_classic(data: Dict) -> str:
         geo_width = (count / max_geo_count * 100) if max_geo_count > 0 else 0
         geography_html += f'''
         <div class="rank-item">
-            <span class="rank-name">{html.escape(country)}</span>
+            <span class="rank-name">{safe_escape(country)}</span>
             <span class="rank-count">{count} references</span>
             <div class="progress-bar-custom">
                 <div class="progress-fill" style="width: {geo_width}%;"></div>
@@ -442,7 +476,7 @@ def generate_style_0_classic(data: Dict) -> str:
         geo_width = (count / max_geo_authors * 100) if max_geo_authors > 0 else 0
         geography_html += f'''
         <div class="rank-item">
-            <span class="rank-name">{html.escape(country)}</span>
+            <span class="rank-name">{safe_escape(country)}</span>
             <span class="rank-count">{count} authors</span>
             <div class="progress-bar-custom">
                 <div class="progress-fill" style="width: {geo_width}%;"></div>
@@ -450,21 +484,21 @@ def generate_style_0_classic(data: Dict) -> str:
         </div>
         '''
     
-    geography_html += '''
+    geography_html += f'''
     </div>
     <h4 style="margin-top: 25px;">Type 3: Collaboration Patterns</h4>
     <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Distribution of single-country vs international collaborations</p>
     <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
         <div class="metric-card">
-            <div class="metric-number">''' + str(geography.get('single_country_count', 0)) + '''</div>
+            <div class="metric-number">{geography.get('single_country_count', 0)}</div>
             <div class="metric-label">Single country</div>
         </div>
         <div class="metric-card">
-            <div class="metric-number">''' + str(geography.get('international_count', 0)) + '''</div>
+            <div class="metric-number">{geography.get('international_count', 0)}</div>
             <div class="metric-label">International collaboration</div>
         </div>
         <div class="metric-card">
-            <div class="metric-number">''' + str(geography.get('total_references_with_country', 0)) + '''</div>
+            <div class="metric-number">{geography.get('total_references_with_country', 0)}</div>
             <div class="metric-label">References (with country)</div>
         </div>
     </div>
@@ -477,8 +511,8 @@ def generate_style_0_classic(data: Dict) -> str:
         collab_width = (collab.get('count', 0) / max_collab * 100) if max_collab > 0 else 0
         geography_html += f'''
         <div class="rank-item">
-            <span class="rank-name">{html.escape(collab.get("country1", ""))} + {html.escape(collab.get("country2", ""))}</span>
-            <span class="rank-count">{collab.get("count", 0)} references</span>
+            <span class="rank-name">{safe_escape(collab.get('country1', ''))} + {safe_escape(collab.get('country2', ''))}</span>
+            <span class="rank-count">{collab.get('count', 0)} references</span>
             <div class="progress-bar-custom">
                 <div class="progress-fill" style="width: {collab_width}%;"></div>
             </div>
@@ -487,20 +521,20 @@ def generate_style_0_classic(data: Dict) -> str:
     
     geography_html += '</div>'
     
-    # Build collaboration section
+    # ========== COLLABORATION SECTION ==========
     collaboration_html = ''
     for i, collab in enumerate(top_collaborations[:8], 1):
         collaboration_html += f'''
         <div class="rank-item">
             <span class="rank-number">{i}.</span>
-            <span class="rank-name">{html.escape(collab.get("author1", ""))} + {html.escape(collab.get("author2", ""))}</span>
-            <span class="rank-count">{collab.get("count", 0)} joint works</span>
+            <span class="rank-name">{safe_escape(collab.get('author1', ''))} + {safe_escape(collab.get('author2', ''))}</span>
+            <span class="rank-count">{collab.get('count', 0)} joint works</span>
         </div>
         '''
     
-    core_authors_html = ', '.join([f"{html.escape(author[0])} ({author[1]} connections)" for author in core_authors[:5]])
+    core_authors_html = ', '.join([f"{safe_escape(author[0])} ({author[1]} connections)" for author in core_authors[:5]])
     
-    # Build diversity section
+    # ========== DIVERSITY SECTION ==========
     diversity_html = f'''
     <div class="stats-grid">
         <div class="metric-card">
@@ -518,37 +552,36 @@ def generate_style_0_classic(data: Dict) -> str:
     </div>
     '''
     
-    # Build citation classics
+    # ========== CITATION CLASSICS ==========
     classics_html = ''
     if citation_classics:
         for i, classic in enumerate(citation_classics, 1):
-            # Безопасное получение значений с защитой от None
-            title = classic.get("title") or "Unknown"
-            journal = classic.get("journal") or "Unknown"
-            year = classic.get("year") or "N/A"
-            citations = classic.get("citations") or 0
-            doi = classic.get("doi") or ""
+            title = safe_escape(classic.get('title', 'Unknown'))
+            journal = safe_escape(classic.get('journal', 'Unknown'))
+            year = classic.get('year', 'N/A')
+            citations = classic.get('citations', 0)
+            doi = classic.get('doi', '')
             
             classics_html += f'''
             <div class="rank-item">
                 <span class="rank-number">{i}.</span>
-                <span class="rank-name">{html.escape(str(title))}</span>
+                <span class="rank-name">{title}</span>
                 <span class="rank-count">Citations: {citations}</span>
-                <div style="font-size: 12px; color: #666; margin-top: 5px;">{html.escape(str(journal))} ({year})</div>
+                <div style="font-size: 12px; color: #666; margin-top: 5px;">{journal} ({year})</div>
                 <div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(doi)}</div>
             </div>
             '''
     else:
         classics_html = '<p>No citation classics detected</p>'
     
-    # Build self-citations section
+    # ========== SELF-CITATIONS SECTION ==========
     self_citations_html = ''
     if self_citation_refs:
         for ref in self_citation_refs:
-            authors_display = ', '.join([html.escape(a) for a in ref.get('authors_display', [])])
-            original_text = html.escape(ref.get('original_text', ''))
+            authors_display = ', '.join([safe_escape(a) for a in ref.get('authors_display', [])])
+            original_text = safe_escape(ref.get('original_text', ''))
             doi = ref.get('doi', '')
-            journal = html.escape(ref.get('journal', 'Not found'))
+            journal = safe_escape(ref.get('journal', 'Not found'))
             year = ref.get('year', 'Not found')
             
             self_citations_html += f'''
@@ -564,12 +597,12 @@ def generate_style_0_classic(data: Dict) -> str:
     else:
         self_citations_html = '<p>None detected</p>'
     
-    # Build duplicates section
+    # ========== DUPLICATES SECTION ==========
     duplicates_html = ''
     if duplicates:
         for dup in duplicates:
-            ref1 = html.escape(dup.get('ref1', '')[:200])
-            ref2 = html.escape(dup.get('ref2', '')[:200])
+            ref1 = safe_escape(dup.get('ref1', '')[:200])
+            ref2 = safe_escape(dup.get('ref2', '')[:200])
             doi = dup.get('doi', 'Not found')
             duplicates_html += f'''
             <div class="rank-item duplicate-reference" style="margin-bottom: 10px;">
@@ -580,94 +613,94 @@ def generate_style_0_classic(data: Dict) -> str:
             </div>
             '''
     
-    # Build crossref only section
+    # ========== CROSSREF ONLY ==========
     crossref_only_html = ''
     if crossref_only_refs:
         for ref in crossref_only_refs[:20]:
             crossref_only_html += f'''
             <div class="rank-item">
-                <div>{html.escape(ref.get("text", ""))}</div>
-                <div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref.get("doi", ""))}</div>
+                <div>{safe_escape(ref.get('text', ''))}</div>
+                <div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref.get('doi', ''))}</div>
             </div>
             '''
     else:
         crossref_only_html = '<p>No references with only Crossref data</p>'
     
-    # Build openalex only section
+    # ========== OPENALEX ONLY ==========
     openalex_only_html = ''
     if openalex_only_refs:
         for ref in openalex_only_refs[:20]:
             openalex_only_html += f'''
             <div class="rank-item">
-                <div>{html.escape(ref.get("text", ""))}</div>
-                <div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref.get("doi", ""))}</div>
+                <div>{safe_escape(ref.get('text', ''))}</div>
+                <div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref.get('doi', ''))}</div>
             </div>
             '''
     else:
         openalex_only_html = '<p>No references with only OpenAlex data</p>'
     
-    # Build suspicious DOIs section
+    # ========== SUSPICIOUS DOIS ==========
     suspicious_doi_html = ''
     if suspicious_doi_refs:
         for ref in suspicious_doi_refs[:20]:
             suspicious_doi_html += f'''
             <div class="rank-item suspicious-reference">
                 <div class="badge badge-danger">⚠️ Attention: invalid/suspicious DOI</div>
-                <div>{html.escape(ref.get("text", ""))}</div>
-                <div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref.get("doi", ""))}</div>
+                <div>{safe_escape(ref.get('text', ''))}</div>
+                <div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref.get('doi', ''))}</div>
             </div>
             '''
     else:
         suspicious_doi_html = '<p>No suspicious DOIs detected</p>'
     
-    # Build repository refs
+    # ========== REPOSITORY REFS ==========
     repository_html = ''
     if repository_refs:
         for ref in repository_refs[:20]:
             repository_html += f'''
             <div class="rank-item repository-reference">
                 <span class="badge-repository">Repository</span>
-                <div style="margin-top: 8px;">{html.escape(ref.get("text", ""))}</div>
-                <div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref.get("doi", ""))}</div>
+                <div style="margin-top: 8px;">{safe_escape(ref.get('text', ''))}</div>
+                <div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref.get('doi', ''))}</div>
             </div>
             '''
     
-    # Build proceedings refs
+    # ========== PROCEEDINGS REFS ==========
     proceedings_html = ''
     if proceedings_refs:
         for ref in proceedings_refs[:20]:
             proceedings_html += f'''
             <div class="rank-item proceedings-reference">
                 <span class="badge-proceedings">Proceedings</span>
-                <div style="margin-top: 8px;">{html.escape(ref.get("text", ""))}</div>
-                <div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref.get("doi", ""))}</div>
+                <div style="margin-top: 8px;">{safe_escape(ref.get('text', ''))}</div>
+                <div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref.get('doi', ''))}</div>
             </div>
             '''
     
-    # Build retracted refs
+    # ========== RETRACTED REFS ==========
     retracted_html = ''
     if retracted_refs:
         for ref in retracted_refs[:20]:
             retracted_html += f'''
             <div class="rank-item retracted-reference">
                 <span class="badge-danger">Retracted</span>
-                <div style="margin-top: 8px;">{html.escape(ref.get("text", ""))}</div>
-                <div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref.get("doi", ""))}</div>
+                <div style="margin-top: 8px;">{safe_escape(ref.get('text', ''))}</div>
+                <div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(ref.get('doi', ''))}</div>
             </div>
             '''
     
-    # Build books with ISBN
+    # ========== BOOKS WITH ISBN ==========
     books_html = ''
     if books_with_isbn_no_doi:
         for ref in books_with_isbn_no_doi[:20]:
             books_html += f'''
             <div class="rank-item book-reference">
                 <span class="badge-book">Ebook</span>
-                <div style="margin-top: 8px;">{html.escape(ref)}</div>
+                <div style="margin-top: 8px;">{safe_escape(ref)}</div>
             </div>
             '''
     
-    # Build non-journal sources
+    # ========== NON-JOURNAL SOURCES ==========
     nonjournal_html = ''
     if non_journal_sources_with_doi:
         for source in non_journal_sources_with_doi[:20]:
@@ -676,23 +709,22 @@ def generate_style_0_classic(data: Dict) -> str:
             nonjournal_html += f'''
             <div class="rank-item">
                 <span class="{badge_class}">{badge_text}</span>
-                <div style="margin-top: 8px;">{html.escape(source.get("text", ""))}</div>
-                <div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(source.get("doi", ""))}</div>
+                <div style="margin-top: 8px;">{safe_escape(source.get('text', ''))}</div>
+                <div style="font-size: 11px; margin-top: 5px;">DOI: {make_clickable_doi(source.get('doi', ''))}</div>
             </div>
             '''
     
-    # Build URL sources
+    # ========== URL SOURCES ==========
     url_html = ''
-    url_refs = data.get('references_with_only_url', [])
-    if url_refs:
-        for ref in url_refs[:20]:
+    if references_with_only_url:
+        for ref in references_with_only_url[:20]:
             url_html += f'''
-            <div class="rank-item">{html.escape(ref)}</div>
+            <div class="rank-item">{safe_escape(ref)}</div>
             '''
     else:
         url_html = '<p>No URL-only references found</p>'
     
-    # Build problems section
+    # ========== PROBLEMS SECTION ==========
     problems_html = ''
     if retracted_refs:
         problems_html += f'''
@@ -710,8 +742,8 @@ def generate_style_0_classic(data: Dict) -> str:
         for ref in problematic_refs[:10]:
             problems_html += f'''
             <div class="rank-item">
-                <span class="badge badge-warning">{html.escape(ref.get("problems", ""))}</span>
-                <div style="margin-top: 8px;">{html.escape(ref.get("text", ""))}</div>
+                <span class="badge badge-warning">{safe_escape(ref.get('problems', ''))}</span>
+                <div style="margin-top: 8px;">{safe_escape(ref.get('text', ''))}</div>
             </div>
             '''
         problems_html += '</div>'
@@ -719,12 +751,11 @@ def generate_style_0_classic(data: Dict) -> str:
     if not problems_html:
         problems_html = '<p>No problematic references detected</p>'
     
-    # Build full reference list
+    # ========== FULL REFERENCE LIST ==========
     full_refs_html = ''
-    results = data.get('results', [])
     for idx, result in enumerate(results[:500]):
-        original_text = html.escape(result.get('original_text', ''))
-        authors_display = ', '.join([html.escape(a) for a in result.get('authors_display', [])])
+        original_text = safe_escape(result.get('original_text', ''))
+        authors_display = ', '.join([safe_escape(a) for a in result.get('authors_display', [])])
         doi = result.get('doi', '')
         
         status_icon = "⚠️" if result.get('is_suspicious_doi') else ("✅" if doi else "❌")
@@ -766,28 +797,25 @@ def generate_style_0_classic(data: Dict) -> str:
         </div>
         '''
     
-    # Build complete HTML
-    html_content = f'''<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Comprehensive Reference List Analysis</title>
-    <style>
-        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{
+    # ========== CSS ==========
+    if custom_css:
+        css_to_use = custom_css
+    else:
+        css_to_use = """
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
             padding: 0;
             margin: 0;
-        }}
-        .report-wrapper {{
+        }
+        .report-wrapper {
             max-width: 1400px;
             margin: 0 auto;
             background: white;
             box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-        }}
-        .sidebar {{
+        }
+        .sidebar {
             position: fixed;
             left: 0;
             top: 0;
@@ -798,13 +826,13 @@ def generate_style_0_classic(data: Dict) -> str:
             padding: 30px 20px;
             overflow-y: auto;
             z-index: 1000;
-        }}
-        .sidebar h3 {{
+        }
+        .sidebar h3 {
             margin-bottom: 20px;
             font-size: 18px;
             font-weight: 600;
-        }}
-        .sidebar a {{
+        }
+        .sidebar a {
             color: white;
             text-decoration: none;
             display: block;
@@ -813,38 +841,38 @@ def generate_style_0_classic(data: Dict) -> str:
             border-radius: 8px;
             transition: all 0.3s;
             font-size: 14px;
-        }}
-        .sidebar a:hover {{
+        }
+        .sidebar a:hover {
             background: rgba(255,255,255,0.2);
             transform: translateX(5px);
-        }}
-        .main-content {{
+        }
+        .main-content {
             margin-left: 260px;
             padding: 30px 40px;
-        }}
-        .header {{
+        }
+        .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 40px;
             border-radius: 15px;
             margin-bottom: 30px;
             text-align: center;
-        }}
-        .header h1 {{
+        }
+        .header h1 {
             font-size: 32px;
             margin-bottom: 10px;
-        }}
-        .header .date {{
+        }
+        .header .date {
             opacity: 0.9;
             margin-top: 10px;
-        }}
-        .stats-grid {{
+        }
+        .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
             margin-bottom: 30px;
-        }}
-        .metric-card {{
+        }
+        .metric-card {
             background: white;
             border-radius: 15px;
             padding: 20px;
@@ -852,20 +880,20 @@ def generate_style_0_classic(data: Dict) -> str:
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             transition: transform 0.3s;
             margin-bottom: 15px;
-        }}
-        .metric-card:hover {{
+        }
+        .metric-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 6px 12px rgba(0,0,0,0.15);
-        }}
-        .metric-number {{
+        }
+        .metric-number {
             font-size: 36px;
             font-weight: bold;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-        }}
-        .metric-percent {{
+        }
+        .metric-percent {
             font-size: 12px;
             color: #155724;
             background-color: #d4edda;
@@ -873,106 +901,105 @@ def generate_style_0_classic(data: Dict) -> str:
             border-radius: 20px;
             margin-top: 8px;
             display: inline-block;
-        }}
-        .metric-label {{
+        }
+        .metric-label {
             color: #666;
             font-size: 14px;
             margin-top: 8px;
-        }}
-        .section {{
+        }
+        .section {
             background: white;
             border-radius: 15px;
             padding: 25px;
             margin-bottom: 30px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }}
-        .section-title {{
+        }
+        .section-title {
             font-size: 24px;
             font-weight: 600;
             margin-bottom: 20px;
             padding-bottom: 10px;
             border-bottom: 3px solid #667eea;
-        }}
-        .rank-item {{
+        }
+        .rank-item {
             background: white;
             border-radius: 10px;
             padding: 12px;
             margin-bottom: 8px;
             transition: all 0.3s;
             border-left: 3px solid #667eea;
-        }}
-        .rank-item:hover {{
+        }
+        .rank-item:hover {
             transform: translateX(5px);
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }}
-        .rank-number {{
+        }
+        .rank-number {
             font-weight: bold;
             color: #667eea;
             font-size: 18px;
             display: inline-block;
             width: 40px;
-        }}
-        .rank-name {{
+        }
+        .rank-name {
             display: inline-block;
             width: 300px;
             font-weight: 500;
-        }}
-        .rank-count {{
+        }
+        .rank-count {
             float: right;
             color: #666;
-        }}
-        .progress-bar-custom {{
+        }
+        .progress-bar-custom {
             background: #e0e0e0;
             border-radius: 10px;
             height: 8px;
             margin-top: 8px;
             overflow: hidden;
-        }}
-        .progress-fill {{
+        }
+        .progress-fill {
             background: linear-gradient(90deg, #667eea, #764ba2);
             height: 100%;
             border-radius: 10px;
-            transition: width 0.5s;
-        }}
-        .badge {{
+        }
+        .badge {
             display: inline-block;
             padding: 4px 12px;
             border-radius: 20px;
             font-size: 12px;
             font-weight: 600;
-        }}
-        .badge-success {{ background: #d4edda; color: #155724; }}
-        .badge-warning {{ background: #fff3cd; color: #856404; }}
-        .badge-danger {{ background: #f8d7da; color: #721c24; }}
-        .badge-info {{ background: #d1ecf1; color: #0c5460; }}
-        .badge-repository {{ background: #e2d5f8; color: #5e2a9e; }}
-        .badge-book {{ background: #d4f1e9; color: #0e6b5e; }}
-        .badge-proceedings {{ background: #fff2c9; color: #b26b00; }}
+        }
+        .badge-success { background: #d4edda; color: #155724; }
+        .badge-warning { background: #fff3cd; color: #856404; }
+        .badge-danger { background: #f8d7da; color: #721c24; }
+        .badge-info { background: #d1ecf1; color: #0c5460; }
+        .badge-repository { background: #e2d5f8; color: #5e2a9e; }
+        .badge-book { background: #d4f1e9; color: #0e6b5e; }
+        .badge-proceedings { background: #fff2c9; color: #b26b00; }
         
-        .concepts-grid {{
+        .concepts-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
             gap: 15px;
             margin-top: 20px;
-        }}
-        .concept-card {{
+        }
+        .concept-card {
             background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
             border-radius: 10px;
             padding: 12px;
             text-align: center;
             border: 1px solid #667eea30;
-        }}
-        .concept-name {{
+        }
+        .concept-name {
             font-weight: 600;
             color: #667eea;
-        }}
-        .concept-score {{
+        }
+        .concept-score {
             font-size: 12px;
             color: #666;
             margin-top: 5px;
-        }}
+        }
         
-        .full-text-container {{
+        .full-text-container {
             max-height: 150px;
             overflow-y: auto;
             white-space: pre-wrap;
@@ -982,73 +1009,92 @@ def generate_style_0_classic(data: Dict) -> str:
             padding: 8px;
             border-radius: 5px;
             margin-top: 5px;
-        }}
+        }
         
-        .normal-article {{ background: #e8f5e9 !important; border-left: 3px solid #4caf50 !important; }}
-        .notfound-reference {{ background: #e9ecef !important; border-left: 3px solid #6c757d !important; }}
-        .suspicious-reference {{ background: #f8d7da !important; border-left: 3px solid #dc3545 !important; }}
-        .duplicate-reference {{ background: #ffe5cc !important; border-left: 3px solid #fd7e14 !important; }}
-        .ebook-reference {{ background: #d4f1e9 !important; border-left: 3px solid #0e6b5e !important; }}
-        .repository-reference {{ background: #e2d5f8 !important; border-left: 3px solid #5e2a9e !important; }}
-        .proceedings-reference {{ background: #fff2c9 !important; border-left: 3px solid #b26b00 !important; }}
-        .retracted-reference {{ background: #f8d7da !important; border-left: 3px solid #dc3545 !important; }}
+        .normal-article { background: #e8f5e9 !important; border-left: 3px solid #4caf50 !important; }
+        .notfound-reference { background: #e9ecef !important; border-left: 3px solid #6c757d !important; }
+        .suspicious-reference { background: #f8d7da !important; border-left: 3px solid #dc3545 !important; }
+        .duplicate-reference { background: #ffe5cc !important; border-left: 3px solid #fd7e14 !important; }
+        .ebook-reference { background: #d4f1e9 !important; border-left: 3px solid #0e6b5e !important; }
+        .repository-reference { background: #e2d5f8 !important; border-left: 3px solid #5e2a9e !important; }
+        .proceedings-reference { background: #fff2c9 !important; border-left: 3px solid #b26b00 !important; }
+        .retracted-reference { background: #f8d7da !important; border-left: 3px solid #dc3545 !important; }
         
-        table {{
+        table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 15px;
-        }}
-        th, td {{
+        }
+        th, td {
             padding: 10px;
             text-align: left;
             border-bottom: 1px solid #e0e0e0;
-        }}
-        th {{
+        }
+        th {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-        }}
-        tr:hover {{
+        }
+        tr:hover {
             background: #f5f5f5;
-        }}
-        .footer {{
+        }
+        .footer {
             text-align: center;
             padding: 20px;
             color: #666;
             font-size: 12px;
             border-top: 1px solid #e0e0e0;
             margin-top: 30px;
-        }}
-        .clickable-link {{
+        }
+        .clickable-link {
             color: #667eea;
             text-decoration: none;
             transition: all 0.3s;
-        }}
-        .clickable-link:hover {{
+        }
+        .clickable-link:hover {
             color: #764ba2;
             text-decoration: underline;
-        }}
+        }
         
-        @media print {{
-            .sidebar {{ display: none; }}
-            .main-content {{ margin-left: 0; }}
-            .metric-card, .section {{ break-inside: avoid; }}
-        }}
-        @media (max-width: 768px) {{
-            .sidebar {{ display: none; }}
-            .main-content {{ margin-left: 0; padding: 20px; }}
-        }}
+        @media print {
+            .sidebar { display: none; }
+            .main-content { margin-left: 0; }
+            .metric-card, .section { break-inside: avoid; }
+        }
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .main-content { margin-left: 0; padding: 20px; }
+        }
+        """
+    
+    # ========== ЗАГОЛОВОК ==========
+    if custom_header:
+        header_html = custom_header
+    else:
+        header_html = f'''
+        <div class="header">
+            <h1>Comprehensive Reference List Analysis</h1>
+            <div>Journal: {safe_escape(journal_name)}</div>
+            {f'<div>Article number: {safe_escape(article_number)}</div>' if article_number else ''}
+            <div class="date">Generated: {get_date()}</div>
+        </div>
+        '''
+    
+    # ========== СБОРКА HTML ==========
+    html_content = f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprehensive Reference List Analysis</title>
+    <style>
+        {css_to_use}
     </style>
 </head>
 <body>
     {sidebar_html}
     
     <div class="main-content">
-        <div class="header">
-            <h1>Comprehensive Reference List Analysis</h1>
-            <div>Journal: {html.escape(journal_name)}</div>
-            {f'<div>Article number: {html.escape(article_number)}</div>' if article_number else ''}
-            <div class="date">Generated: {get_date()}</div>
-        </div>
+        {header_html}
         
         <!-- OVERVIEW SECTION -->
         <div id="overview" class="section">
@@ -1219,7 +1265,7 @@ def generate_style_0_classic(data: Dict) -> str:
             
             <div>
                 <h4>Other non-DOI sources:</h4>
-                {''.join([f'<div class="rank-item notfound-reference">{html.escape(ref)}</div>' for ref in data.get('references_without_doi', [])[:20]]) if data.get('references_without_doi') else '<p>All references have DOI identifiers</p>'}
+                {''.join([f'<div class="rank-item notfound-reference">{safe_escape(ref)}</div>' for ref in references_without_doi[:20]]) if references_without_doi else '<p>All references have DOI identifiers</p>'}
             </div>
         </div>
         
@@ -1248,7 +1294,7 @@ def generate_style_0_classic(data: Dict) -> str:
         <div id="full_reference_list" class="section">
             <div class="section-title">Full Reference List</div>
             {full_refs_html}
-            {f'<p style="margin-top: 15px; color: #666;">Showing first 500 of {len(data.get("results", []))} references</p>' if len(data.get("results", [])) > 500 else ''}
+            {f'<p style="margin-top: 15px; color: #666;">Showing first 500 of {len(results)} references</p>' if len(results) > 500 else ''}
         </div>
         
         <div class="footer">
@@ -1261,608 +1307,1072 @@ def generate_style_0_classic(data: Dict) -> str:
     return html_content
 
 # ============================================================
-# СТИЛИ 1-10: ВСЕ НОВЫЕ СТИЛИ ИЗ COLAB
+# СТИЛЬ 0: КЛАССИЧЕСКИЙ (ИСХОДНЫЙ)
+# ============================================================
+
+def generate_style_0_classic(data: Dict) -> str:
+    """Стиль 0: Классический (исходный дизайн)"""
+    return generate_full_report_html(data)
+
+# ============================================================
+# СТИЛЬ 1: GLASSMORPHISM
 # ============================================================
 
 def generate_style_1_glassmorphism(data: Dict) -> str:
     """Стиль 1: Glassmorphism — стеклянный эффект с размытием"""
     
-    journal_name = data.get('journal_name', 'Chimica Techno Acta')
-    article_number = data.get('article_number', '')
+    custom_css = """
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); padding: 30px; font-family: 'Segoe UI', sans-serif; }
+    .report-wrapper { max-width: 1400px; margin: 0 auto; }
+    .sidebar {
+        position: fixed; left: 0; top: 0; width: 260px; height: 100vh;
+        background: rgba(255,255,255,0.12); backdrop-filter: blur(20px);
+        color: white; padding: 30px 20px; overflow-y: auto; z-index: 1000;
+        border-right: 1px solid rgba(255,255,255,0.15);
+    }
+    .sidebar h3 { margin-bottom: 20px; font-size: 18px; font-weight: 600; }
+    .sidebar a {
+        color: white; text-decoration: none; display: block; padding: 10px 15px;
+        margin: 5px 0; border-radius: 8px; transition: all 0.3s; font-size: 14px;
+        background: rgba(255,255,255,0.05);
+    }
+    .sidebar a:hover { background: rgba(255,255,255,0.2); transform: translateX(5px); }
+    .main-content { margin-left: 260px; padding: 30px 40px; }
+    .header {
+        background: rgba(255,255,255,0.12); backdrop-filter: blur(20px);
+        border-radius: 20px; padding: 40px; margin-bottom: 30px; text-align: center;
+        border: 1px solid rgba(255,255,255,0.15);
+        color: white;
+    }
+    .header h1 { font-size: 32px; margin-bottom: 10px; }
+    .header .date { opacity: 0.8; margin-top: 10px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .metric-card {
+        background: rgba(255,255,255,0.08); backdrop-filter: blur(10px);
+        border-radius: 16px; padding: 20px; text-align: center;
+        border: 1px solid rgba(255,255,255,0.1);
+        transition: transform 0.3s;
+        color: white;
+    }
+    .metric-card:hover { transform: translateY(-5px); }
+    .metric-number { font-size: 36px; font-weight: bold; color: white; }
+    .metric-percent { font-size: 12px; background: rgba(255,255,255,0.15); padding: 3px 10px; border-radius: 20px; margin-top: 8px; display: inline-block; color: rgba(255,255,255,0.8); }
+    .metric-label { color: rgba(255,255,255,0.7); font-size: 14px; margin-top: 8px; }
+    .section {
+        background: rgba(255,255,255,0.08); backdrop-filter: blur(10px);
+        border-radius: 16px; padding: 25px; margin-bottom: 30px;
+        border: 1px solid rgba(255,255,255,0.1);
+        color: white;
+    }
+    .section-title { font-size: 24px; font-weight: 600; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid rgba(255,255,255,0.15); color: white; }
+    .rank-item {
+        background: rgba(255,255,255,0.06); border-radius: 10px; padding: 12px; margin-bottom: 8px;
+        border-left: 3px solid rgba(255,255,255,0.3);
+        color: white;
+    }
+    .rank-item:hover { transform: translateX(5px); background: rgba(255,255,255,0.1); }
+    .rank-number { font-weight: bold; color: white; font-size: 18px; display: inline-block; width: 40px; }
+    .rank-name { display: inline-block; width: 300px; font-weight: 500; color: white; }
+    .rank-count { float: right; color: rgba(255,255,255,0.7); }
+    .progress-bar-custom { background: rgba(255,255,255,0.15); border-radius: 10px; height: 8px; margin-top: 8px; overflow: hidden; }
+    .progress-fill { background: linear-gradient(90deg, rgba(255,255,255,0.5), rgba(255,255,255,0.8)); height: 100%; border-radius: 10px; }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: rgba(255,255,255,0.15); color: white; }
+    .badge-success { background: rgba(46, 204, 113, 0.3); color: #2ecc71; }
+    .badge-warning { background: rgba(241, 196, 15, 0.3); color: #f1c40f; }
+    .badge-danger { background: rgba(231, 76, 60, 0.3); color: #e74c3c; }
+    .badge-info { background: rgba(52, 152, 219, 0.3); color: #3498db; }
+    .badge-repository { background: rgba(155, 89, 182, 0.3); color: #9b59b6; }
+    .badge-book { background: rgba(26, 188, 156, 0.3); color: #1abc9c; }
+    .badge-proceedings { background: rgba(241, 196, 15, 0.3); color: #f1c40f; }
     
-    total_references = data.get('total_references', 0)
-    total_with_doi = data.get('total_with_doi', 0)
-    last_5_years = data.get('yearly_stats', {}).get('last_5_years', 0)
-    self_citations_count = data.get('self_citations_count', 0)
-    total_citations_sum = data.get('total_citations_sum', 0)
+    .concepts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
+    .concept-card {
+        background: rgba(255,255,255,0.06); border-radius: 10px; padding: 12px; text-align: center;
+        border: 1px solid rgba(255,255,255,0.08);
+    }
+    .concept-name { font-weight: 600; color: white; }
+    .concept-score { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 5px; }
     
-    all_authors = data.get('author_frequency_all', {}).get('all_authors', [])
-    all_journals = data.get('journal_frequency_all', {}).get('all_journals', [])
+    .full-text-container {
+        max-height: 150px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 12px;
+        background: rgba(0,0,0,0.15); padding: 8px; border-radius: 5px; margin-top: 5px;
+        color: rgba(255,255,255,0.8);
+    }
     
-    return f'''<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Glassmorphism</title>
-<style>
-*{{margin:0;padding:0;box-sizing:border-box;}}
-body{{min-height:100vh;background:linear-gradient(135deg,#667eea 0%,#764ba2 50%,#f093fb 100%);padding:30px;font-family:'Segoe UI',sans-serif;}}
-.container{{max-width:1100px;margin:0 auto;}}
-.glass{{background:rgba(255,255,255,0.15);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-radius:20px;padding:30px;border:1px solid rgba(255,255,255,0.2);margin-bottom:20px;box-shadow:0 8px 32px rgba(0,0,0,0.1);}}
-h1{{color:#fff;font-size:32px;font-weight:300;letter-spacing:2px;}}
-.subtitle{{color:rgba(255,255,255,0.7);font-size:14px;}}
-.glass-grid{{display:grid;grid-template-columns:repeat(5,1fr);gap:15px;}}
-.glass-stat{{background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);border-radius:16px;padding:20px;text-align:center;border:1px solid rgba(255,255,255,0.1);}}
-.stat-number{{font-size:28px;font-weight:700;color:#fff;}}
-.stat-label{{font-size:11px;color:rgba(255,255,255,0.6);margin-top:5px;text-transform:uppercase;letter-spacing:1px;}}
-.tag-glass{{display:inline-block;padding:6px 16px;background:rgba(255,255,255,0.12);border-radius:20px;margin:4px;color:#fff;font-size:13px;backdrop-filter:blur(5px);border:1px solid rgba(255,255,255,0.08);}}
-.footer{{text-align:center;color:rgba(255,255,255,0.4);font-size:11px;padding:20px;}}
-</style>
-</head>
-<body>
-<div class="container">
-    <div class="glass"><h1>✦ Glassmorphism Report</h1><div class="subtitle">{html.escape(journal_name)} • {get_date()}</div></div>
-    <div class="glass">
-        <div class="glass-grid">
-            <div class="glass-stat"><div class="stat-number">{total_references}</div><div class="stat-label">Total</div></div>
-            <div class="glass-stat"><div class="stat-number">{total_with_doi}</div><div class="stat-label">DOI</div></div>
-            <div class="glass-stat"><div class="stat-number">{last_5_years}</div><div class="stat-label">5 Years</div></div>
-            <div class="glass-stat"><div class="stat-number">{self_citations_count}</div><div class="stat-label">Self-Cit</div></div>
-            <div class="glass-stat"><div class="stat-number">{total_citations_sum}</div><div class="stat-label">Citations</div></div>
-        </div>
-    </div>
-    <div class="glass"><div style="color:#fff;font-weight:600;margin-bottom:12px;">👨‍🎓 Authors</div>
-        {''.join([f'<span class="tag-glass">{html.escape(a.get("display_name", "Unknown"))} ({a.get("mention_count", 0)})</span>' for a in all_authors[:6]])}
-    </div>
-    <div class="glass"><div style="color:#fff;font-weight:600;margin-bottom:12px;">📖 Journals</div>
-        {''.join([f'<span class="tag-glass">{html.escape(j.get("journal", "Unknown"))} ({j.get("count", 0)})</span>' for j in all_journals[:5]])}
-    </div>
-    <div class="glass"><div style="color:#fff;font-weight:600;margin-bottom:12px;">🌍 Geography</div>
-        {''.join([f'<span class="tag-glass">{html.escape(c)}: {count}</span>' for c, count in list(data.get("geography", {}).get("type1_unique_countries_per_reference", {}).items())[:5]])}
-    </div>
-    <div class="footer">{get_footer(journal_name)}</div>
-</div>
-</body></html>'''
+    .normal-article { background: rgba(46, 204, 113, 0.15) !important; border-left: 3px solid #2ecc71 !important; }
+    .notfound-reference { background: rgba(149, 165, 166, 0.15) !important; border-left: 3px solid #95a5a6 !important; }
+    .suspicious-reference { background: rgba(231, 76, 60, 0.15) !important; border-left: 3px solid #e74c3c !important; }
+    .duplicate-reference { background: rgba(241, 196, 15, 0.15) !important; border-left: 3px solid #f1c40f !important; }
+    .ebook-reference { background: rgba(26, 188, 156, 0.15) !important; border-left: 3px solid #1abc9c !important; }
+    .repository-reference { background: rgba(155, 89, 182, 0.15) !important; border-left: 3px solid #9b59b6 !important; }
+    .proceedings-reference { background: rgba(241, 196, 15, 0.15) !important; border-left: 3px solid #f1c40f !important; }
+    .retracted-reference { background: rgba(231, 76, 60, 0.15) !important; border-left: 3px solid #e74c3c !important; }
+    
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.08); color: white; }
+    th { background: rgba(255,255,255,0.1); }
+    tr:hover { background: rgba(255,255,255,0.05); }
+    .footer { text-align: center; padding: 20px; color: rgba(255,255,255,0.4); font-size: 12px; border-top: 1px solid rgba(255,255,255,0.08); margin-top: 30px; }
+    .clickable-link { color: rgba(255,255,255,0.8); text-decoration: none; transition: all 0.3s; }
+    .clickable-link:hover { color: white; text-decoration: underline; }
+    
+    @media print { .sidebar { display: none; } .main-content { margin-left: 0; } .metric-card, .section { break-inside: avoid; } }
+    @media (max-width: 768px) { .sidebar { display: none; } .main-content { margin-left: 0; padding: 20px; } }
+    """
+    
+    return generate_full_report_html(data, custom_css)
+
+# ============================================================
+# СТИЛЬ 2: NEON CYBER
+# ============================================================
 
 def generate_style_2_neon_cyber(data: Dict) -> str:
     """Стиль 2: Neon Cyber — неоновое свечение на темном фоне"""
     
-    journal_name = data.get('journal_name', 'Chimica Techno Acta')
-    article_number = data.get('article_number', '')
+    custom_css = """
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a0f; padding: 30px; font-family: 'Courier New', monospace; color: #fff; }
+    .report-wrapper { max-width: 1400px; margin: 0 auto; }
+    .sidebar {
+        position: fixed; left: 0; top: 0; width: 260px; height: 100vh;
+        background: rgba(0,255,255,0.03); border-right: 1px solid rgba(0,255,255,0.1);
+        padding: 30px 20px; overflow-y: auto; z-index: 1000;
+    }
+    .sidebar h3 { color: #00ffff; text-shadow: 0 0 20px rgba(0,255,255,0.2); margin-bottom: 20px; font-size: 18px; }
+    .sidebar a {
+        color: rgba(0,255,255,0.6); text-decoration: none; display: block; padding: 10px 15px;
+        margin: 5px 0; border-radius: 8px; transition: all 0.3s; font-size: 14px;
+        border: 1px solid transparent;
+    }
+    .sidebar a:hover { color: #00ffff; border-color: rgba(0,255,255,0.2); text-shadow: 0 0 20px rgba(0,255,255,0.1); }
+    .main-content { margin-left: 260px; padding: 30px 40px; }
+    .header {
+        background: rgba(0,255,255,0.03); border: 1px solid rgba(0,255,255,0.15);
+        border-radius: 12px; padding: 40px; margin-bottom: 30px; text-align: center;
+        box-shadow: 0 0 40px rgba(0,255,255,0.05);
+    }
+    .header h1 { font-size: 32px; color: #00ffff; text-shadow: 0 0 30px rgba(0,255,255,0.3); }
+    .header .date { color: rgba(0,255,255,0.4); margin-top: 10px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .metric-card {
+        background: rgba(0,255,255,0.03); border: 1px solid rgba(0,255,255,0.1);
+        border-radius: 12px; padding: 20px; text-align: center;
+        transition: all 0.3s;
+    }
+    .metric-card:hover { border-color: #00ffff; box-shadow: 0 0 30px rgba(0,255,255,0.05); }
+    .metric-number { font-size: 36px; font-weight: bold; color: #00ffff; text-shadow: 0 0 30px rgba(0,255,255,0.2); }
+    .metric-percent { font-size: 12px; color: rgba(0,255,255,0.5); background: rgba(0,255,255,0.05); padding: 3px 10px; border-radius: 20px; margin-top: 8px; display: inline-block; }
+    .metric-label { color: rgba(0,255,255,0.5); font-size: 14px; margin-top: 8px; }
+    .section {
+        background: rgba(0,255,255,0.02); border: 1px solid rgba(0,255,255,0.06);
+        border-radius: 12px; padding: 25px; margin-bottom: 30px;
+    }
+    .section-title { font-size: 24px; font-weight: 600; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid rgba(0,255,255,0.1); color: #00ffff; text-shadow: 0 0 20px rgba(0,255,255,0.1); }
+    .rank-item {
+        background: rgba(0,255,255,0.02); border: 1px solid rgba(0,255,255,0.04);
+        border-radius: 8px; padding: 12px; margin-bottom: 8px;
+        transition: all 0.3s;
+    }
+    .rank-item:hover { border-color: rgba(0,255,255,0.2); transform: translateX(5px); }
+    .rank-number { font-weight: bold; color: #ff00ff; font-size: 18px; display: inline-block; width: 40px; text-shadow: 0 0 20px rgba(255,0,255,0.2); }
+    .rank-name { display: inline-block; width: 300px; font-weight: 500; color: rgba(255,255,255,0.8); }
+    .rank-count { float: right; color: rgba(0,255,255,0.5); }
+    .progress-bar-custom { background: rgba(0,255,255,0.05); border-radius: 10px; height: 8px; margin-top: 8px; overflow: hidden; }
+    .progress-fill { background: linear-gradient(90deg, #00ffff, #ff00ff); height: 100%; border-radius: 10px; box-shadow: 0 0 20px rgba(0,255,255,0.2); }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid rgba(0,255,255,0.2); color: #00ffff; background: rgba(0,255,255,0.05); }
+    .badge-success { border-color: rgba(46, 204, 113, 0.3); color: #2ecc71; }
+    .badge-warning { border-color: rgba(241, 196, 15, 0.3); color: #f1c40f; }
+    .badge-danger { border-color: rgba(231, 76, 60, 0.3); color: #e74c3c; }
+    .badge-info { border-color: rgba(52, 152, 219, 0.3); color: #3498db; }
+    .badge-repository { border-color: rgba(155, 89, 182, 0.3); color: #9b59b6; }
+    .badge-book { border-color: rgba(26, 188, 156, 0.3); color: #1abc9c; }
+    .badge-proceedings { border-color: rgba(241, 196, 15, 0.3); color: #f1c40f; }
     
-    total_references = data.get('total_references', 0)
-    total_with_doi = data.get('total_with_doi', 0)
-    last_5_years = data.get('yearly_stats', {}).get('last_5_years', 0)
-    self_citations_count = data.get('self_citations_count', 0)
-    total_citations_sum = data.get('total_citations_sum', 0)
+    .concepts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
+    .concept-card {
+        background: rgba(0,255,255,0.02); border: 1px solid rgba(0,255,255,0.06);
+        border-radius: 8px; padding: 12px; text-align: center;
+    }
+    .concept-name { font-weight: 600; color: #00ffff; }
+    .concept-score { font-size: 12px; color: rgba(0,255,255,0.4); margin-top: 5px; }
     
-    all_authors = data.get('author_frequency_all', {}).get('all_authors', [])
-    all_journals = data.get('journal_frequency_all', {}).get('all_journals', [])
+    .full-text-container {
+        max-height: 150px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 12px;
+        background: rgba(0,0,0,0.3); padding: 8px; border-radius: 5px; margin-top: 5px;
+        color: rgba(255,255,255,0.6);
+    }
     
-    return f'''<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Neon Cyber</title>
-<style>
-*{{margin:0;padding:0;box-sizing:border-box;}}
-body{{background:#0a0a0f;padding:30px;font-family:'Courier New',monospace;color:#fff;}}
-.container{{max-width:1100px;margin:0 auto;}}
-.neon-box{{background:rgba(255,255,255,0.03);border:1px solid rgba(0,255,255,0.2);border-radius:12px;padding:25px;margin-bottom:20px;position:relative;box-shadow:0 0 30px rgba(0,255,255,0.05);}}
-.neon-box::before{{content:'';position:absolute;top:-1px;left:50%;transform:translateX(-50%);width:60%;height:2px;background:linear-gradient(90deg,transparent,#00ffff,transparent);}}
-h1{{font-size:32px;color:#00ffff;text-shadow:0 0 30px rgba(0,255,255,0.3);letter-spacing:4px;}}
-.subtitle{{color:rgba(255,255,255,0.4);font-size:13px;}}
-.neon-grid{{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;}}
-.neon-stat{{background:rgba(0,255,255,0.05);border:1px solid rgba(0,255,255,0.1);border-radius:10px;padding:15px;text-align:center;}}
-.neon-number{{font-size:28px;font-weight:700;color:#00ffff;text-shadow:0 0 20px rgba(0,255,255,0.2);}}
-.neon-label{{font-size:10px;color:rgba(0,255,255,0.5);text-transform:uppercase;letter-spacing:2px;margin-top:4px;}}
-.neon-tag{{display:inline-block;padding:4px 14px;margin:3px;border:1px solid rgba(255,0,255,0.3);border-radius:4px;font-size:12px;color:#ff00ff;background:rgba(255,0,255,0.05);}}
-.neon-tag-cyan{{border-color:rgba(0,255,255,0.3);color:#00ffff;}}
-.footer{{text-align:center;color:rgba(255,255,255,0.2);font-size:11px;padding:15px;}}
-</style>
-</head>
-<body>
-<div class="container">
-    <div class="neon-box"><h1>◈ NEON CYBER</h1><div class="subtitle">{html.escape(journal_name)} • {get_date()}</div></div>
-    <div class="neon-box">
-        <div class="neon-grid">
-            <div class="neon-stat"><div class="neon-number">{total_references}</div><div class="neon-label">Total</div></div>
-            <div class="neon-stat"><div class="neon-number">{total_with_doi}</div><div class="neon-label">DOI</div></div>
-            <div class="neon-stat"><div class="neon-number">{last_5_years}</div><div class="neon-label">5Y</div></div>
-            <div class="neon-stat"><div class="neon-number">{self_citations_count}</div><div class="neon-label">SELF</div></div>
-            <div class="neon-stat"><div class="neon-number">{total_citations_sum}</div><div class="neon-label">CIT</div></div>
-        </div>
-    </div>
-    <div class="neon-box"><div style="color:#00ffff;margin-bottom:10px;">▶ AUTHORS</div>
-        {''.join([f'<span class="neon-tag">{html.escape(a.get("display_name", "Unknown"))} [{a.get("mention_count", 0)}]</span>' for a in all_authors[:6]])}
-    </div>
-    <div class="neon-box"><div style="color:#00ffff;margin-bottom:10px;">▶ JOURNALS</div>
-        {''.join([f'<span class="neon-tag neon-tag-cyan">{html.escape(j.get("journal", "Unknown"))} {j.get("count", 0)}</span>' for j in all_journals[:5]])}
-    </div>
-    <div class="neon-box"><div style="color:#00ffff;margin-bottom:10px;">▶ GEOGRAPHY</div>
-        {''.join([f'<span class="neon-tag neon-tag-cyan">{html.escape(c)}: {count}</span>' for c, count in list(data.get("geography", {}).get("type1_unique_countries_per_reference", {}).items())[:5]])}
-    </div>
-    <div class="footer">✦ {get_date()} • {get_footer(journal_name)}</div>
-</div>
-</body></html>'''
+    .normal-article { border-left: 3px solid #00ff00 !important; }
+    .notfound-reference { border-left: 3px solid #666 !important; }
+    .suspicious-reference { border-left: 3px solid #ff0000 !important; }
+    .duplicate-reference { border-left: 3px solid #ffff00 !important; }
+    .ebook-reference { border-left: 3px solid #00ffff !important; }
+    .repository-reference { border-left: 3px solid #ff00ff !important; }
+    .proceedings-reference { border-left: 3px solid #ffff00 !important; }
+    .retracted-reference { border-left: 3px solid #ff0000 !important; }
+    
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid rgba(0,255,255,0.06); color: rgba(255,255,255,0.7); }
+    th { background: rgba(0,255,255,0.05); color: #00ffff; }
+    tr:hover { background: rgba(0,255,255,0.02); }
+    .footer { text-align: center; padding: 20px; color: rgba(0,255,255,0.2); font-size: 12px; border-top: 1px solid rgba(0,255,255,0.06); margin-top: 30px; }
+    .clickable-link { color: #00ffff; text-decoration: none; transition: all 0.3s; }
+    .clickable-link:hover { color: #ff00ff; text-shadow: 0 0 20px rgba(255,0,255,0.2); }
+    
+    @media print { .sidebar { display: none; } .main-content { margin-left: 0; } }
+    @media (max-width: 768px) { .sidebar { display: none; } .main-content { margin-left: 0; padding: 20px; } }
+    """
+    
+    return generate_full_report_html(data, custom_css)
+
+# ============================================================
+# СТИЛЬ 3: GLASS ENHANCED
+# ============================================================
 
 def generate_style_3_glass_enhanced(data: Dict) -> str:
-    """Стиль 3: Glassmorphism Enhanced — улучшенный стеклянный эффект с градиентами"""
+    """Стиль 3: Glassmorphism Enhanced — улучшенный стеклянный эффект"""
     
-    journal_name = data.get('journal_name', 'Chimica Techno Acta')
-    article_number = data.get('article_number', '')
+    custom_css = """
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { min-height: 100vh; background: linear-gradient(135deg, #0c0c1e 0%, #1a1a3e 50%, #2d1b69 100%); padding: 30px; font-family: 'Segoe UI', sans-serif; color: #fff; }
+    .report-wrapper { max-width: 1400px; margin: 0 auto; }
+    .sidebar {
+        position: fixed; left: 0; top: 0; width: 260px; height: 100vh;
+        background: rgba(255,255,255,0.04); backdrop-filter: blur(20px);
+        border-right: 1px solid rgba(255,255,255,0.05);
+        padding: 30px 20px; overflow-y: auto; z-index: 1000;
+    }
+    .sidebar h3 { margin-bottom: 20px; font-size: 18px; font-weight: 600; background: linear-gradient(135deg, #f7971e, #ffd200); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .sidebar a {
+        color: rgba(255,255,255,0.5); text-decoration: none; display: block; padding: 10px 15px;
+        margin: 5px 0; border-radius: 8px; transition: all 0.3s; font-size: 14px;
+    }
+    .sidebar a:hover { background: rgba(255,255,255,0.05); color: #fff; transform: translateX(5px); }
+    .main-content { margin-left: 260px; padding: 30px 40px; }
+    .header {
+        background: rgba(255,255,255,0.04); backdrop-filter: blur(20px);
+        border-radius: 20px; padding: 40px; margin-bottom: 30px; text-align: center;
+        border: 1px solid rgba(255,255,255,0.05);
+    }
+    .header h1 { font-size: 32px; font-weight: 700; background: linear-gradient(135deg, #f7971e, #ffd200); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .header .date { color: rgba(255,255,255,0.3); margin-top: 10px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .metric-card {
+        background: rgba(255,255,255,0.03); backdrop-filter: blur(10px);
+        border-radius: 16px; padding: 20px; text-align: center;
+        border: 1px solid rgba(255,255,255,0.04);
+        transition: transform 0.3s;
+    }
+    .metric-card:hover { transform: translateY(-5px); border-color: rgba(247,151,30,0.2); }
+    .metric-number { font-size: 36px; font-weight: bold; background: linear-gradient(135deg, #f7971e, #ffd200); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .metric-percent { font-size: 12px; color: rgba(255,255,255,0.5); background: rgba(255,255,255,0.04); padding: 3px 10px; border-radius: 20px; margin-top: 8px; display: inline-block; }
+    .metric-label { color: rgba(255,255,255,0.5); font-size: 14px; margin-top: 8px; }
+    .section {
+        background: rgba(255,255,255,0.03); backdrop-filter: blur(10px);
+        border-radius: 16px; padding: 25px; margin-bottom: 30px;
+        border: 1px solid rgba(255,255,255,0.04);
+    }
+    .section-title { font-size: 24px; font-weight: 600; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.06); color: rgba(255,255,255,0.8); }
+    .rank-item {
+        background: rgba(255,255,255,0.02); border-radius: 10px; padding: 12px; margin-bottom: 8px;
+        border-left: 3px solid rgba(247,151,30,0.3);
+        transition: all 0.3s;
+    }
+    .rank-item:hover { background: rgba(255,255,255,0.04); transform: translateX(5px); }
+    .rank-number { font-weight: bold; color: #f7971e; font-size: 18px; display: inline-block; width: 40px; }
+    .rank-name { display: inline-block; width: 300px; font-weight: 500; color: rgba(255,255,255,0.8); }
+    .rank-count { float: right; color: rgba(255,255,255,0.4); }
+    .progress-bar-custom { background: rgba(255,255,255,0.04); border-radius: 10px; height: 8px; margin-top: 8px; overflow: hidden; }
+    .progress-fill { background: linear-gradient(90deg, #f7971e, #ffd200); height: 100%; border-radius: 10px; }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.04); }
+    .badge-success { border-color: rgba(46, 204, 113, 0.2); color: #2ecc71; }
+    .badge-warning { border-color: rgba(241, 196, 15, 0.2); color: #f1c40f; }
+    .badge-danger { border-color: rgba(231, 76, 60, 0.2); color: #e74c3c; }
+    .badge-info { border-color: rgba(52, 152, 219, 0.2); color: #3498db; }
+    .badge-repository { border-color: rgba(155, 89, 182, 0.2); color: #9b59b6; }
+    .badge-book { border-color: rgba(26, 188, 156, 0.2); color: #1abc9c; }
+    .badge-proceedings { border-color: rgba(241, 196, 15, 0.2); color: #f1c40f; }
     
-    total_references = data.get('total_references', 0)
-    total_with_doi = data.get('total_with_doi', 0)
-    last_5_years = data.get('yearly_stats', {}).get('last_5_years', 0)
-    self_citations_count = data.get('self_citations_count', 0)
-    total_citations_sum = data.get('total_citations_sum', 0)
-    avg_citations = data.get('avg_citations', 0)
+    .concepts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
+    .concept-card {
+        background: rgba(255,255,255,0.02); border-radius: 10px; padding: 12px; text-align: center;
+        border: 1px solid rgba(255,255,255,0.04);
+    }
+    .concept-name { font-weight: 600; color: #f7971e; }
+    .concept-score { font-size: 12px; color: rgba(255,255,255,0.3); margin-top: 5px; }
     
-    all_authors = data.get('author_frequency_all', {}).get('all_authors', [])
-    all_journals = data.get('journal_frequency_all', {}).get('all_journals', [])
+    .full-text-container {
+        max-height: 150px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 12px;
+        background: rgba(0,0,0,0.2); padding: 8px; border-radius: 5px; margin-top: 5px;
+        color: rgba(255,255,255,0.5);
+    }
     
-    return f'''<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Glass Enhanced</title>
-<style>
-*{{margin:0;padding:0;box-sizing:border-box;}}
-body{{min-height:100vh;background:linear-gradient(135deg,#0c0c1e 0%,#1a1a3e 50%,#2d1b69 100%);padding:30px;font-family:'Segoe UI',sans-serif;}}
-.container{{max-width:1100px;margin:0 auto;}}
-.glass{{background:rgba(255,255,255,0.06);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border-radius:24px;padding:28px;margin-bottom:18px;border:1px solid rgba(255,255,255,0.08);box-shadow:0 8px 40px rgba(0,0,0,0.3);}}
-h1{{background:linear-gradient(135deg,#f7971e,#ffd200);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-size:34px;font-weight:700;}}
-.subtitle{{color:rgba(255,255,255,0.5);font-size:14px;}}
-.grid{{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;}}
-.stat{{background:rgba(255,255,255,0.04);border-radius:16px;padding:18px;text-align:center;border:1px solid rgba(255,255,255,0.04);}}
-.num{{font-size:30px;font-weight:700;background:linear-gradient(135deg,#f7971e,#ffd200);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}}
-.lbl{{font-size:11px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1px;margin-top:5px;}}
-.tag{{display:inline-block;padding:5px 16px;margin:3px;border-radius:20px;font-size:13px;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.8);border:1px solid rgba(255,255,255,0.06);}}
-.tag-gold{{background:rgba(247,151,30,0.15);border-color:rgba(247,151,30,0.2);color:#f7971e;}}
-.footer{{text-align:center;color:rgba(255,255,255,0.2);font-size:11px;padding:15px;}}
-</style>
-</head>
-<body>
-<div class="container">
-    <div class="glass"><h1>✦ Glass Enhanced</h1><div class="subtitle">{html.escape(journal_name)} • {get_date()}</div></div>
-    <div class="glass">
-        <div class="grid">
-            <div class="stat"><div class="num">{total_references}</div><div class="lbl">Total</div></div>
-            <div class="stat"><div class="num">{total_with_doi}</div><div class="lbl">DOI</div></div>
-            <div class="stat"><div class="num">{last_5_years}</div><div class="lbl">5 Years</div></div>
-            <div class="stat"><div class="num">{self_citations_count}</div><div class="lbl">Self-Cit</div></div>
-            <div class="stat"><div class="num">{total_citations_sum}</div><div class="lbl">Citations</div></div>
-        </div>
-    </div>
-    <div class="glass"><div style="color:rgba(255,255,255,0.6);margin-bottom:12px;font-weight:600;">✦ Authors</div>
-        {''.join([f'<span class="tag">{html.escape(a.get("display_name", "Unknown"))} ({a.get("mention_count", 0)})</span>' for a in all_authors[:6]])}
-    </div>
-    <div class="glass"><div style="color:rgba(255,255,255,0.6);margin-bottom:12px;font-weight:600;">✦ Journals</div>
-        {''.join([f'<span class="tag tag-gold">{html.escape(j.get("journal", "Unknown"))} ({j.get("count", 0)})</span>' for j in all_journals[:5]])}
-    </div>
-    <div class="glass"><div style="color:rgba(255,255,255,0.6);margin-bottom:12px;font-weight:600;">✦ Geography</div>
-        {''.join([f'<span class="tag">{html.escape(c)}: {count}</span>' for c, count in list(data.get("geography", {}).get("type1_unique_countries_per_reference", {}).items())[:5]])}
-    </div>
-    <div class="footer">{get_footer(journal_name)}</div>
-</div>
-</body></html>'''
+    .normal-article { border-left: 3px solid #2ecc71 !important; }
+    .notfound-reference { border-left: 3px solid #666 !important; }
+    .suspicious-reference { border-left: 3px solid #e74c3c !important; }
+    .duplicate-reference { border-left: 3px solid #f1c40f !important; }
+    .ebook-reference { border-left: 3px solid #1abc9c !important; }
+    .repository-reference { border-left: 3px solid #9b59b6 !important; }
+    .proceedings-reference { border-left: 3px solid #f1c40f !important; }
+    .retracted-reference { border-left: 3px solid #e74c3c !important; }
+    
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.04); color: rgba(255,255,255,0.6); }
+    th { background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.8); }
+    tr:hover { background: rgba(255,255,255,0.02); }
+    .footer { text-align: center; padding: 20px; color: rgba(255,255,255,0.2); font-size: 12px; border-top: 1px solid rgba(255,255,255,0.04); margin-top: 30px; }
+    .clickable-link { color: #f7971e; text-decoration: none; transition: all 0.3s; }
+    .clickable-link:hover { color: #ffd200; }
+    
+    @media print { .sidebar { display: none; } .main-content { margin-left: 0; } }
+    @media (max-width: 768px) { .sidebar { display: none; } .main-content { margin-left: 0; padding: 20px; } }
+    """
+    
+    return generate_full_report_html(data, custom_css)
+
+# ============================================================
+# СТИЛЬ 4: SMART GLOW
+# ============================================================
 
 def generate_style_4_smart_glow(data: Dict) -> str:
     """Стиль 4: Smart Glow — умная аналитика с подсветкой"""
     
-    journal_name = data.get('journal_name', 'Chimica Techno Acta')
-    article_number = data.get('article_number', '')
+    custom_css = """
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0d1117; padding: 30px; font-family: 'Inter', sans-serif; color: #e6edf3; }
+    .report-wrapper { max-width: 1400px; margin: 0 auto; }
+    .sidebar {
+        position: fixed; left: 0; top: 0; width: 260px; height: 100vh;
+        background: #161b22; border-right: 1px solid #30363d;
+        padding: 30px 20px; overflow-y: auto; z-index: 1000;
+    }
+    .sidebar h3 { margin-bottom: 20px; font-size: 18px; font-weight: 600; color: #58a6ff; }
+    .sidebar a {
+        color: #8b949e; text-decoration: none; display: block; padding: 10px 15px;
+        margin: 5px 0; border-radius: 8px; transition: all 0.3s; font-size: 14px;
+    }
+    .sidebar a:hover { background: #21262d; color: #c9d1d9; transform: translateX(5px); }
+    .main-content { margin-left: 260px; padding: 30px 40px; }
+    .header {
+        background: linear-gradient(145deg, #161b22, #0d1117);
+        border: 1px solid #30363d; border-radius: 16px; padding: 40px; margin-bottom: 30px; text-align: center;
+        box-shadow: 0 4px 30px rgba(0,0,0,0.3);
+    }
+    .header h1 { font-size: 32px; font-weight: 700; background: linear-gradient(135deg, #58a6ff, #f0883e); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .header .date { color: #8b949e; margin-top: 10px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .metric-card {
+        background: #0d1117; border: 1px solid #30363d; border-radius: 14px; padding: 20px; text-align: center;
+        transition: all 0.3s;
+    }
+    .metric-card:hover { border-color: #58a6ff; box-shadow: 0 0 30px rgba(88,166,255,0.05); }
+    .metric-number { font-size: 36px; font-weight: bold; color: #58a6ff; }
+    .metric-percent { font-size: 12px; color: #8b949e; background: #161b22; padding: 3px 10px; border-radius: 20px; margin-top: 8px; display: inline-block; }
+    .metric-label { color: #8b949e; font-size: 14px; margin-top: 8px; }
+    .section {
+        background: #0d1117; border: 1px solid #30363d; border-radius: 14px; padding: 25px; margin-bottom: 30px;
+    }
+    .section-title { font-size: 24px; font-weight: 600; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #30363d; color: #c9d1d9; }
+    .rank-item {
+        background: #0d1117; border: 1px solid #21262d; border-radius: 10px; padding: 12px; margin-bottom: 8px;
+        transition: all 0.3s;
+    }
+    .rank-item:hover { border-color: #58a6ff; transform: translateX(5px); }
+    .rank-number { font-weight: bold; color: #58a6ff; font-size: 18px; display: inline-block; width: 40px; }
+    .rank-name { display: inline-block; width: 300px; font-weight: 500; color: #c9d1d9; }
+    .rank-count { float: right; color: #8b949e; }
+    .progress-bar-custom { background: #21262d; border-radius: 10px; height: 8px; margin-top: 8px; overflow: hidden; }
+    .progress-fill { background: linear-gradient(90deg, #58a6ff, #f0883e); height: 100%; border-radius: 10px; }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: #161b22; color: #8b949e; border: 1px solid #30363d; }
+    .badge-success { border-color: rgba(46, 204, 113, 0.3); color: #2ecc71; }
+    .badge-warning { border-color: rgba(241, 196, 15, 0.3); color: #f1c40f; }
+    .badge-danger { border-color: rgba(231, 76, 60, 0.3); color: #e74c3c; }
+    .badge-info { border-color: rgba(52, 152, 219, 0.3); color: #3498db; }
+    .badge-repository { border-color: rgba(155, 89, 182, 0.3); color: #9b59b6; }
+    .badge-book { border-color: rgba(26, 188, 156, 0.3); color: #1abc9c; }
+    .badge-proceedings { border-color: rgba(241, 196, 15, 0.3); color: #f1c40f; }
     
-    total_references = data.get('total_references', 0)
-    total_with_doi = data.get('total_with_doi', 0)
-    last_5_years = data.get('yearly_stats', {}).get('last_5_years', 0)
-    self_citations_count = data.get('self_citations_count', 0)
-    total_citations_sum = data.get('total_citations_sum', 0)
-    avg_citations = data.get('avg_citations', 0)
+    .concepts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
+    .concept-card {
+        background: #0d1117; border: 1px solid #21262d; border-radius: 10px; padding: 12px; text-align: center;
+    }
+    .concept-name { font-weight: 600; color: #58a6ff; }
+    .concept-score { font-size: 12px; color: #8b949e; margin-top: 5px; }
     
-    all_authors = data.get('author_frequency_all', {}).get('all_authors', [])
-    all_journals = data.get('journal_frequency_all', {}).get('all_journals', [])
+    .full-text-container {
+        max-height: 150px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 12px;
+        background: #0d1117; padding: 8px; border-radius: 5px; margin-top: 5px;
+        color: #8b949e; border: 1px solid #21262d;
+    }
     
-    return f'''<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Smart Glow</title>
-<style>
-*{{margin:0;padding:0;box-sizing:border-box;}}
-body{{background:#0d1117;padding:30px;font-family:'Inter',sans-serif;color:#e6edf3;}}
-.container{{max-width:1100px;margin:0 auto;}}
-.glow-card{{background:linear-gradient(145deg,#161b22,#0d1117);border-radius:20px;padding:25px;margin-bottom:18px;border:1px solid #30363d;box-shadow:0 4px 30px rgba(0,0,0,0.3);}}
-h1{{font-size:32px;font-weight:700;background:linear-gradient(135deg,#58a6ff,#f0883e);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}}
-.grid{{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;}}
-.stat{{background:#0d1117;border-radius:14px;padding:18px;text-align:center;border:1px solid #30363d;transition:all 0.3s;}}
-.stat:hover{{border-color:#58a6ff;box-shadow:0 0 30px rgba(88,166,255,0.1);}}
-.num{{font-size:28px;font-weight:700;color:#58a6ff;}}
-.lbl{{font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:1px;margin-top:4px;}}
-.tag{{display:inline-block;padding:4px 14px;margin:3px;border-radius:16px;font-size:12px;background:#161b22;border:1px solid #30363d;color:#c9d1d9;}}
-.tag-blue{{border-color:#58a6ff;color:#58a6ff;}}
-.footer{{text-align:center;color:#8b949e;font-size:11px;padding:15px;}}
-</style>
-</head>
-<body>
-<div class="container">
-    <div class="glow-card"><h1>✦ Smart Glow</h1><div style="color:#8b949e;font-size:14px;">{html.escape(journal_name)} • {get_date()}</div></div>
-    <div class="glow-card">
-        <div class="grid">
-            <div class="stat"><div class="num">{total_references}</div><div class="lbl">Total</div></div>
-            <div class="stat"><div class="num">{total_with_doi}</div><div class="lbl">DOI</div></div>
-            <div class="stat"><div class="num">{last_5_years}</div><div class="lbl">5 Years</div></div>
-            <div class="stat"><div class="num">{self_citations_count}</div><div class="lbl">Self-Cit</div></div>
-            <div class="stat"><div class="num">{total_citations_sum}</div><div class="lbl">Citations</div></div>
-        </div>
-    </div>
-    <div class="glow-card"><div style="color:#c9d1d9;margin-bottom:12px;font-weight:600;">👨‍🎓 Authors</div>
-        {''.join([f'<span class="tag">{html.escape(a.get("display_name", "Unknown"))} ({a.get("mention_count", 0)})</span>' for a in all_authors[:6]])}
-    </div>
-    <div class="glow-card"><div style="color:#c9d1d9;margin-bottom:12px;font-weight:600;">📖 Journals</div>
-        {''.join([f'<span class="tag tag-blue">{html.escape(j.get("journal", "Unknown"))} ({j.get("count", 0)})</span>' for j in all_journals[:5]])}
-    </div>
-    <div class="glow-card"><div style="color:#c9d1d9;margin-bottom:12px;font-weight:600;">🌍 Geography</div>
-        {''.join([f'<span class="tag">{html.escape(c)}: {count}</span>' for c, count in list(data.get("geography", {}).get("type1_unique_countries_per_reference", {}).items())[:5]])}
-    </div>
-    <div class="footer">{get_footer(journal_name)}</div>
-</div>
-</body></html>'''
+    .normal-article { border-left: 3px solid #2ecc71 !important; }
+    .notfound-reference { border-left: 3px solid #666 !important; }
+    .suspicious-reference { border-left: 3px solid #e74c3c !important; }
+    .duplicate-reference { border-left: 3px solid #f1c40f !important; }
+    .ebook-reference { border-left: 3px solid #1abc9c !important; }
+    .repository-reference { border-left: 3px solid #9b59b6 !important; }
+    .proceedings-reference { border-left: 3px solid #f1c40f !important; }
+    .retracted-reference { border-left: 3px solid #e74c3c !important; }
+    
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #21262d; color: #8b949e; }
+    th { background: #161b22; color: #c9d1d9; }
+    tr:hover { background: #161b22; }
+    .footer { text-align: center; padding: 20px; color: #21262d; font-size: 12px; border-top: 1px solid #21262d; margin-top: 30px; }
+    .clickable-link { color: #58a6ff; text-decoration: none; transition: all 0.3s; }
+    .clickable-link:hover { color: #f0883e; }
+    
+    @media print { .sidebar { display: none; } .main-content { margin-left: 0; } }
+    @media (max-width: 768px) { .sidebar { display: none; } .main-content { margin-left: 0; padding: 20px; } }
+    """
+    
+    return generate_full_report_html(data, custom_css)
+
+# ============================================================
+# СТИЛЬ 5: AURORA
+# ============================================================
 
 def generate_style_5_aurora(data: Dict) -> str:
     """Стиль 5: Aurora — северное сияние с плавными градиентами"""
     
-    journal_name = data.get('journal_name', 'Chimica Techno Acta')
-    article_number = data.get('article_number', '')
+    custom_css = """
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { min-height: 100vh; background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); padding: 30px; font-family: 'Segoe UI', sans-serif; color: #fff; }
+    .report-wrapper { max-width: 1400px; margin: 0 auto; }
+    .sidebar {
+        position: fixed; left: 0; top: 0; width: 260px; height: 100vh;
+        background: rgba(255,255,255,0.02); border-right: 1px solid rgba(255,255,255,0.03);
+        padding: 30px 20px; overflow-y: auto; z-index: 1000;
+        backdrop-filter: blur(10px);
+    }
+    .sidebar h3 { margin-bottom: 20px; font-size: 18px; font-weight: 600; color: rgba(255,255,255,0.6); letter-spacing: 2px; }
+    .sidebar a {
+        color: rgba(255,255,255,0.3); text-decoration: none; display: block; padding: 10px 15px;
+        margin: 5px 0; border-radius: 8px; transition: all 0.3s; font-size: 14px;
+        letter-spacing: 1px;
+    }
+    .sidebar a:hover { background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.8); transform: translateX(5px); }
+    .main-content { margin-left: 260px; padding: 30px 40px; }
+    .header {
+        background: rgba(255,255,255,0.02); border-radius: 20px; padding: 40px; margin-bottom: 30px; text-align: center;
+        border: 1px solid rgba(255,255,255,0.03);
+        position: relative; overflow: hidden;
+    }
+    .header::before {
+        content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+        background: conic-gradient(from 0deg, transparent, rgba(0,255,200,0.03), transparent, rgba(200,0,255,0.03), transparent);
+        animation: rotate_aurora 20s linear infinite; pointer-events: none;
+    }
+    @keyframes rotate_aurora { 100% { transform: rotate(360deg); } }
+    .header h1 { font-size: 32px; font-weight: 300; background: linear-gradient(90deg, #00ff87, #60efff, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; position: relative; z-index: 1; }
+    .header .date { color: rgba(255,255,255,0.2); margin-top: 10px; position: relative; z-index: 1; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .metric-card {
+        background: rgba(255,255,255,0.02); border-radius: 16px; padding: 20px; text-align: center;
+        border: 1px solid rgba(255,255,255,0.03);
+        transition: transform 0.3s;
+    }
+    .metric-card:hover { transform: translateY(-5px); border-color: rgba(0,255,200,0.1); }
+    .metric-number { font-size: 36px; font-weight: bold; background: linear-gradient(135deg, #00ff87, #60efff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .metric-percent { font-size: 12px; color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.02); padding: 3px 10px; border-radius: 20px; margin-top: 8px; display: inline-block; }
+    .metric-label { color: rgba(255,255,255,0.3); font-size: 14px; margin-top: 8px; letter-spacing: 1px; }
+    .section {
+        background: rgba(255,255,255,0.02); border-radius: 16px; padding: 25px; margin-bottom: 30px;
+        border: 1px solid rgba(255,255,255,0.03);
+        position: relative; overflow: hidden;
+    }
+    .section::before {
+        content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+        background: conic-gradient(from 0deg, transparent, rgba(0,255,200,0.02), transparent, rgba(200,0,255,0.02), transparent);
+        animation: rotate_aurora 25s linear infinite; pointer-events: none;
+    }
+    .section-title { font-size: 24px; font-weight: 600; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.03); color: rgba(255,255,255,0.6); letter-spacing: 2px; position: relative; z-index: 1; }
+    .rank-item {
+        background: rgba(255,255,255,0.01); border-radius: 10px; padding: 12px; margin-bottom: 8px;
+        border-left: 3px solid rgba(0,255,200,0.2);
+        transition: all 0.3s; position: relative; z-index: 1;
+    }
+    .rank-item:hover { background: rgba(255,255,255,0.02); transform: translateX(5px); border-left-color: rgba(0,255,200,0.5); }
+    .rank-number { font-weight: bold; color: #60efff; font-size: 18px; display: inline-block; width: 40px; }
+    .rank-name { display: inline-block; width: 300px; font-weight: 500; color: rgba(255,255,255,0.7); }
+    .rank-count { float: right; color: rgba(255,255,255,0.3); }
+    .progress-bar-custom { background: rgba(255,255,255,0.03); border-radius: 10px; height: 8px; margin-top: 8px; overflow: hidden; }
+    .progress-fill { background: linear-gradient(90deg, #00ff87, #60efff, #a78bfa); height: 100%; border-radius: 10px; }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: rgba(255,255,255,0.02); color: rgba(255,255,255,0.4); border: 1px solid rgba(255,255,255,0.03); }
+    .badge-success { border-color: rgba(0,255,135,0.2); color: #00ff87; }
+    .badge-warning { border-color: rgba(255,215,0,0.2); color: #ffd700; }
+    .badge-danger { border-color: rgba(255,100,100,0.2); color: #ff6b6b; }
+    .badge-info { border-color: rgba(96,239,255,0.2); color: #60efff; }
+    .badge-repository { border-color: rgba(167,139,250,0.2); color: #a78bfa; }
+    .badge-book { border-color: rgba(0,255,200,0.2); color: #00ffc8; }
+    .badge-proceedings { border-color: rgba(255,215,0,0.2); color: #ffd700; }
     
-    total_references = data.get('total_references', 0)
-    total_with_doi = data.get('total_with_doi', 0)
-    last_5_years = data.get('yearly_stats', {}).get('last_5_years', 0)
-    self_citations_count = data.get('self_citations_count', 0)
-    total_citations_sum = data.get('total_citations_sum', 0)
-    avg_citations = data.get('avg_citations', 0)
+    .concepts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
+    .concept-card {
+        background: rgba(255,255,255,0.01); border-radius: 10px; padding: 12px; text-align: center;
+        border: 1px solid rgba(255,255,255,0.03);
+    }
+    .concept-name { font-weight: 600; color: #60efff; }
+    .concept-score { font-size: 12px; color: rgba(255,255,255,0.2); margin-top: 5px; }
     
-    all_authors = data.get('author_frequency_all', {}).get('all_authors', [])
-    all_journals = data.get('journal_frequency_all', {}).get('all_journals', [])
+    .full-text-container {
+        max-height: 150px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 12px;
+        background: rgba(0,0,0,0.2); padding: 8px; border-radius: 5px; margin-top: 5px;
+        color: rgba(255,255,255,0.3);
+    }
     
-    return f'''<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Aurora</title>
-<style>
-*{{margin:0;padding:0;box-sizing:border-box;}}
-body{{min-height:100vh;background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);padding:30px;font-family:'Segoe UI',sans-serif;color:#fff;}}
-.container{{max-width:1100px;margin:0 auto;}}
-.aurora-card{{background:rgba(255,255,255,0.04);border-radius:20px;padding:25px;margin-bottom:18px;border:1px solid rgba(255,255,255,0.06);position:relative;overflow:hidden;}}
-.aurora-card::before{{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:conic-gradient(from 0deg,transparent,rgba(0,255,200,0.03),transparent,rgba(200,0,255,0.03),transparent);animation:rotate 20s linear infinite;pointer-events:none;}}
-@keyframes rotate{{100%{{transform:rotate(360deg);}}}}
-h1{{font-size:32px;font-weight:300;background:linear-gradient(90deg,#00ff87,#60efff,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;position:relative;z-index:1;}}
-.subtitle{{color:rgba(255,255,255,0.4);font-size:14px;position:relative;z-index:1;}}
-.grid{{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;position:relative;z-index:1;}}
-.stat{{background:rgba(255,255,255,0.03);border-radius:14px;padding:18px;text-align:center;}}
-.num{{font-size:28px;font-weight:700;background:linear-gradient(135deg,#00ff87,#60efff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}}
-.lbl{{font-size:11px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1px;margin-top:4px;}}
-.tag{{display:inline-block;padding:4px 14px;margin:3px;border-radius:16px;font-size:12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.06);color:rgba(255,255,255,0.7);position:relative;z-index:1;}}
-.footer{{text-align:center;color:rgba(255,255,255,0.2);font-size:11px;padding:15px;position:relative;z-index:1;}}
-</style>
-</head>
-<body>
-<div class="container">
-    <div class="aurora-card"><h1>✦ Aurora</h1><div class="subtitle">{html.escape(journal_name)} • {get_date()}</div></div>
-    <div class="aurora-card">
-        <div class="grid">
-            <div class="stat"><div class="num">{total_references}</div><div class="lbl">Total</div></div>
-            <div class="stat"><div class="num">{total_with_doi}</div><div class="lbl">DOI</div></div>
-            <div class="stat"><div class="num">{last_5_years}</div><div class="lbl">5 Years</div></div>
-            <div class="stat"><div class="num">{self_citations_count}</div><div class="lbl">Self-Cit</div></div>
-            <div class="stat"><div class="num">{total_citations_sum}</div><div class="lbl">Citations</div></div>
-        </div>
-    </div>
-    <div class="aurora-card"><div style="color:rgba(255,255,255,0.6);margin-bottom:12px;">👨‍🎓 Authors</div>
-        {''.join([f'<span class="tag">{html.escape(a.get("display_name", "Unknown"))} ({a.get("mention_count", 0)})</span>' for a in all_authors[:6]])}
-    </div>
-    <div class="aurora-card"><div style="color:rgba(255,255,255,0.6);margin-bottom:12px;">📖 Journals</div>
-        {''.join([f'<span class="tag">{html.escape(j.get("journal", "Unknown"))} ({j.get("count", 0)})</span>' for j in all_journals[:5]])}
-    </div>
-    <div class="aurora-card"><div style="color:rgba(255,255,255,0.6);margin-bottom:12px;">🌍 Geography</div>
-        {''.join([f'<span class="tag">{html.escape(c)}: {count}</span>' for c, count in list(data.get("geography", {}).get("type1_unique_countries_per_reference", {}).items())[:5]])}
-    </div>
-    <div class="footer">{get_footer(journal_name)}</div>
-</div>
-</body></html>'''
+    .normal-article { border-left: 3px solid #00ff87 !important; }
+    .notfound-reference { border-left: 3px solid #666 !important; }
+    .suspicious-reference { border-left: 3px solid #ff6b6b !important; }
+    .duplicate-reference { border-left: 3px solid #ffd700 !important; }
+    .ebook-reference { border-left: 3px solid #00ffc8 !important; }
+    .repository-reference { border-left: 3px solid #a78bfa !important; }
+    .proceedings-reference { border-left: 3px solid #ffd700 !important; }
+    .retracted-reference { border-left: 3px solid #ff6b6b !important; }
+    
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.02); color: rgba(255,255,255,0.3); }
+    th { background: rgba(255,255,255,0.01); color: rgba(255,255,255,0.5); }
+    tr:hover { background: rgba(255,255,255,0.01); }
+    .footer { text-align: center; padding: 20px; color: rgba(255,255,255,0.1); font-size: 12px; border-top: 1px solid rgba(255,255,255,0.02); margin-top: 30px; letter-spacing: 2px; }
+    .clickable-link { color: #60efff; text-decoration: none; transition: all 0.3s; }
+    .clickable-link:hover { color: #a78bfa; }
+    
+    @media print { .sidebar { display: none; } .main-content { margin-left: 0; } }
+    @media (max-width: 768px) { .sidebar { display: none; } .main-content { margin-left: 0; padding: 20px; } }
+    """
+    
+    return generate_full_report_html(data, custom_css)
+
+# ============================================================
+# СТИЛЬ 6: TIMELINE WAVE
+# ============================================================
 
 def generate_style_6_timeline_wave(data: Dict) -> str:
     """Стиль 6: Timeline Wave — волновая визуализация годов"""
     
-    journal_name = data.get('journal_name', 'Chimica Techno Acta')
-    article_number = data.get('article_number', '')
+    custom_css = """
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #f8f9fa; padding: 30px; font-family: 'Segoe UI', sans-serif; color: #1a1a2e; }
+    .report-wrapper { max-width: 1400px; margin: 0 auto; background: #fff; border-radius: 20px; padding: 30px; box-shadow: 0 4px 30px rgba(0,0,0,0.06); }
+    .sidebar {
+        position: fixed; left: 0; top: 0; width: 260px; height: 100vh;
+        background: #fff; border-right: 1px solid #eee;
+        padding: 30px 20px; overflow-y: auto; z-index: 1000;
+    }
+    .sidebar h3 { margin-bottom: 20px; font-size: 18px; font-weight: 600; color: #1a1a2e; }
+    .sidebar a {
+        color: #666; text-decoration: none; display: block; padding: 10px 15px;
+        margin: 5px 0; border-radius: 8px; transition: all 0.3s; font-size: 14px;
+    }
+    .sidebar a:hover { background: #f0f2f5; color: #1a1a2e; transform: translateX(5px); }
+    .main-content { margin-left: 260px; padding: 0 20px; }
+    .header {
+        background: #fff; border-radius: 16px; padding: 40px; margin-bottom: 30px; text-align: center;
+        border: 1px solid #f0f2f5;
+    }
+    .header h1 { font-size: 32px; font-weight: 700; color: #1a1a2e; }
+    .header .date { color: #999; margin-top: 10px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .metric-card {
+        background: #f8f9fa; border-radius: 14px; padding: 20px; text-align: center;
+        transition: transform 0.3s;
+    }
+    .metric-card:hover { transform: translateY(-5px); }
+    .metric-number { font-size: 36px; font-weight: bold; color: #667eea; }
+    .metric-percent { font-size: 12px; color: #155724; background: #d4edda; padding: 3px 10px; border-radius: 20px; margin-top: 8px; display: inline-block; }
+    .metric-label { color: #666; font-size: 14px; margin-top: 8px; }
+    .section {
+        background: #fff; border: 1px solid #f0f2f5; border-radius: 16px; padding: 25px; margin-bottom: 30px;
+    }
+    .section-title { font-size: 24px; font-weight: 600; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #667eea; color: #1a1a2e; }
+    .rank-item {
+        background: #f8f9fa; border-radius: 10px; padding: 12px; margin-bottom: 8px;
+        border-left: 3px solid #667eea;
+        transition: all 0.3s;
+    }
+    .rank-item:hover { background: #f0f2f5; transform: translateX(5px); }
+    .rank-number { font-weight: bold; color: #667eea; font-size: 18px; display: inline-block; width: 40px; }
+    .rank-name { display: inline-block; width: 300px; font-weight: 500; color: #1a1a2e; }
+    .rank-count { float: right; color: #666; }
+    .progress-bar-custom { background: #e9ecef; border-radius: 10px; height: 8px; margin-top: 8px; overflow: hidden; }
+    .progress-fill { background: linear-gradient(90deg, #667eea, #764ba2); height: 100%; border-radius: 10px; }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+    .badge-success { background: #d4edda; color: #155724; }
+    .badge-warning { background: #fff3cd; color: #856404; }
+    .badge-danger { background: #f8d7da; color: #721c24; }
+    .badge-info { background: #d1ecf1; color: #0c5460; }
+    .badge-repository { background: #e2d5f8; color: #5e2a9e; }
+    .badge-book { background: #d4f1e9; color: #0e6b5e; }
+    .badge-proceedings { background: #fff2c9; color: #b26b00; }
     
-    yearly_counts = data.get('yearly_stats', {}).get('yearly_counts', {})
-    yearly_stats = data.get('yearly_stats', {})
+    .concepts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
+    .concept-card {
+        background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+        border-radius: 10px; padding: 12px; text-align: center;
+        border: 1px solid #667eea30;
+    }
+    .concept-name { font-weight: 600; color: #667eea; }
+    .concept-score { font-size: 12px; color: #666; margin-top: 5px; }
     
-    years = sorted(yearly_counts.keys())
-    max_val = max(yearly_counts.values()) if yearly_counts else 1
+    .full-text-container {
+        max-height: 150px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 12px;
+        background: #f5f5f5; padding: 8px; border-radius: 5px; margin-top: 5px;
+    }
     
-    bars = ''.join([f'<div style="display:flex;flex-direction:column;align-items:center;flex:1;"><div style="height:{count/max_val*150}px;width:30px;background:linear-gradient(180deg,#667eea,#764ba2);border-radius:4px 4px 0 0;transition:height 0.5s;box-shadow:0 0 20px rgba(102,126,234,0.3);"></div><div style="font-size:11px;color:#666;margin-top:5px;">{year}</div><div style="font-size:10px;color:#999;">{count}</div></div>' for year, count in sorted(yearly_counts.items())])
+    .normal-article { background: #e8f5e9 !important; border-left: 3px solid #4caf50 !important; }
+    .notfound-reference { background: #e9ecef !important; border-left: 3px solid #6c757d !important; }
+    .suspicious-reference { background: #f8d7da !important; border-left: 3px solid #dc3545 !important; }
+    .duplicate-reference { background: #ffe5cc !important; border-left: 3px solid #fd7e14 !important; }
+    .ebook-reference { background: #d4f1e9 !important; border-left: 3px solid #0e6b5e !important; }
+    .repository-reference { background: #e2d5f8 !important; border-left: 3px solid #5e2a9e !important; }
+    .proceedings-reference { background: #fff2c9 !important; border-left: 3px solid #b26b00 !important; }
+    .retracted-reference { background: #f8d7da !important; border-left: 3px solid #dc3545 !important; }
     
-    all_authors = data.get('author_frequency_all', {}).get('all_authors', [])
-    all_journals = data.get('journal_frequency_all', {}).get('all_journals', [])
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e0e0e0; }
+    th { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+    tr:hover { background: #f5f5f5; }
+    .footer { text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 30px; }
+    .clickable-link { color: #667eea; text-decoration: none; transition: all 0.3s; }
+    .clickable-link:hover { color: #764ba2; text-decoration: underline; }
     
-    return f'''<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Timeline Wave</title>
-<style>
-*{{margin:0;padding:0;box-sizing:border-box;}}
-body{{background:#f8f9fa;padding:30px;font-family:'Segoe UI',sans-serif;}}
-.container{{max-width:1100px;margin:0 auto;background:#fff;border-radius:20px;padding:30px;box-shadow:0 4px 30px rgba(0,0,0,0.06);}}
-h1{{font-size:28px;font-weight:700;color:#1a1a2e;}}
-.subtitle{{color:#999;font-size:14px;}}
-.timeline{{display:flex;justify-content:space-around;align-items:flex-end;height:200px;padding:20px;background:#f8f9fa;border-radius:12px;margin:20px 0;}}
-.grid{{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin:20px 0;}}
-.stat{{background:#f8f9fa;border-radius:12px;padding:15px;text-align:center;}}
-.num{{font-size:24px;font-weight:700;color:#667eea;}}
-.lbl{{font-size:11px;color:#999;text-transform:uppercase;letter-spacing:1px;margin-top:4px;}}
-.tag{{display:inline-block;padding:4px 14px;margin:3px;border-radius:16px;font-size:12px;background:#f0f2f5;color:#333;}}
-.footer{{text-align:center;color:#ccc;font-size:11px;padding:15px;border-top:1px solid #eee;margin-top:20px;}}
-</style>
-</head>
-<body>
-<div class="container">
-    <h1>📊 Timeline Wave</h1>
-    <div class="subtitle">{html.escape(journal_name)} • {get_date()}</div>
-    <div class="grid">
-        <div class="stat"><div class="num">{yearly_stats.get('last_year', 0)}</div><div class="lbl">Last Year</div></div>
-        <div class="stat"><div class="num">{yearly_stats.get('last_3_years', 0)}</div><div class="lbl">3 Years</div></div>
-        <div class="stat"><div class="num">{yearly_stats.get('last_5_years', 0)}</div><div class="lbl">5 Years</div></div>
-        <div class="stat"><div class="num">{yearly_stats.get('last_10_years', 0)}</div><div class="lbl">10 Years</div></div>
-        <div class="stat"><div class="num">{yearly_stats.get('unknown_year', 0)}</div><div class="lbl">Unknown</div></div>
-    </div>
-    <div class="timeline">{bars}</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px;">
-        <div style="background:#f8f9fa;border-radius:12px;padding:15px;">
-            <div style="font-weight:600;margin-bottom:8px;">👨‍🎓 Authors</div>
-            {''.join([f'<div style="font-size:13px;padding:3px 0;border-bottom:1px solid #eee;">{html.escape(a.get("display_name", "Unknown"))} ({a.get("mention_count", 0)})</div>' for a in all_authors[:5]])}
-        </div>
-        <div style="background:#f8f9fa;border-radius:12px;padding:15px;">
-            <div style="font-weight:600;margin-bottom:8px;">📖 Journals</div>
-            {''.join([f'<div style="font-size:13px;padding:3px 0;border-bottom:1px solid #eee;">{html.escape(j.get("journal", "Unknown"))} ({j.get("count", 0)})</div>' for j in all_journals[:5]])}
-        </div>
-    </div>
-    <div class="footer">{get_footer(journal_name)}</div>
-</div>
-</body></html>'''
+    @media print { .sidebar { display: none; } .main-content { margin-left: 0; } }
+    @media (max-width: 768px) { .sidebar { display: none; } .main-content { margin-left: 0; padding: 20px; } }
+    """
+    
+    return generate_full_report_html(data, custom_css)
+
+# ============================================================
+# СТИЛЬ 7: MASONRY
+# ============================================================
 
 def generate_style_7_masonry(data: Dict) -> str:
     """Стиль 7: Masonry — плиточная раскладка как Pinterest"""
     
-    journal_name = data.get('journal_name', 'Chimica Techno Acta')
-    article_number = data.get('article_number', '')
+    custom_css = """
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #f5f7fa; padding: 30px; font-family: 'Segoe UI', sans-serif; }
+    .report-wrapper { max-width: 1400px; margin: 0 auto; }
+    .sidebar {
+        position: fixed; left: 0; top: 0; width: 260px; height: 100vh;
+        background: #fff; border-right: 1px solid #e8ecf1;
+        padding: 30px 20px; overflow-y: auto; z-index: 1000;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .sidebar h3 { margin-bottom: 20px; font-size: 18px; font-weight: 600; color: #1a1a2e; }
+    .sidebar a {
+        color: #666; text-decoration: none; display: block; padding: 10px 15px;
+        margin: 5px 0; border-radius: 8px; transition: all 0.3s; font-size: 14px;
+    }
+    .sidebar a:hover { background: #f0f2f5; color: #1a1a2e; transform: translateX(5px); }
+    .main-content { margin-left: 260px; padding: 30px 40px; }
+    .header {
+        background: #fff; border-radius: 20px; padding: 40px; margin-bottom: 30px; text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .header h1 { font-size: 32px; font-weight: 700; color: #1a1a2e; }
+    .header .date { color: #999; margin-top: 10px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .metric-card {
+        background: #fff; border-radius: 16px; padding: 20px; text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        transition: all 0.3s;
+    }
+    .metric-card:hover { transform: translateY(-5px); box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+    .metric-number { font-size: 36px; font-weight: bold; color: #667eea; }
+    .metric-percent { font-size: 12px; color: #155724; background: #d4edda; padding: 3px 10px; border-radius: 20px; margin-top: 8px; display: inline-block; }
+    .metric-label { color: #666; font-size: 14px; margin-top: 8px; }
+    .section {
+        background: #fff; border-radius: 16px; padding: 25px; margin-bottom: 30px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .section-title { font-size: 24px; font-weight: 600; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #667eea; color: #1a1a2e; }
+    .rank-item {
+        background: #f8f9fa; border-radius: 12px; padding: 12px; margin-bottom: 8px;
+        border-left: 3px solid #667eea;
+        transition: all 0.3s;
+    }
+    .rank-item:hover { transform: translateX(5px); box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+    .rank-number { font-weight: bold; color: #667eea; font-size: 18px; display: inline-block; width: 40px; }
+    .rank-name { display: inline-block; width: 300px; font-weight: 500; color: #1a1a2e; }
+    .rank-count { float: right; color: #666; }
+    .progress-bar-custom { background: #e9ecef; border-radius: 10px; height: 8px; margin-top: 8px; overflow: hidden; }
+    .progress-fill { background: linear-gradient(90deg, #667eea, #764ba2); height: 100%; border-radius: 10px; }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+    .badge-success { background: #d4edda; color: #155724; }
+    .badge-warning { background: #fff3cd; color: #856404; }
+    .badge-danger { background: #f8d7da; color: #721c24; }
+    .badge-info { background: #d1ecf1; color: #0c5460; }
+    .badge-repository { background: #e2d5f8; color: #5e2a9e; }
+    .badge-book { background: #d4f1e9; color: #0e6b5e; }
+    .badge-proceedings { background: #fff2c9; color: #b26b00; }
     
-    total_references = data.get('total_references', 0)
-    total_with_doi = data.get('total_with_doi', 0)
-    last_5_years = data.get('yearly_stats', {}).get('last_5_years', 0)
-    self_citations_count = data.get('self_citations_count', 0)
-    total_citations_sum = data.get('total_citations_sum', 0)
-    avg_citations = data.get('avg_citations', 0)
+    .concepts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
+    .concept-card {
+        background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+        border-radius: 12px; padding: 12px; text-align: center;
+        border: 1px solid #667eea30;
+    }
+    .concept-name { font-weight: 600; color: #667eea; }
+    .concept-score { font-size: 12px; color: #666; margin-top: 5px; }
     
-    all_authors = data.get('author_frequency_all', {}).get('all_authors', [])
-    all_journals = data.get('journal_frequency_all', {}).get('all_journals', [])
+    .full-text-container {
+        max-height: 150px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 12px;
+        background: #f5f5f5; padding: 8px; border-radius: 5px; margin-top: 5px;
+    }
     
-    author_cards = ''.join([f'<div style="background:#fff;border-radius:12px;padding:15px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border-left:4px solid #667eea;margin-bottom:10px;"><div style="font-weight:600;">{html.escape(a.get("display_name", "Unknown"))}</div><div style="font-size:12px;color:#666;">{a.get("mention_count", 0)} citations</div></div>' for a in all_authors[:6]])
+    .normal-article { background: #e8f5e9 !important; border-left: 3px solid #4caf50 !important; }
+    .notfound-reference { background: #e9ecef !important; border-left: 3px solid #6c757d !important; }
+    .suspicious-reference { background: #f8d7da !important; border-left: 3px solid #dc3545 !important; }
+    .duplicate-reference { background: #ffe5cc !important; border-left: 3px solid #fd7e14 !important; }
+    .ebook-reference { background: #d4f1e9 !important; border-left: 3px solid #0e6b5e !important; }
+    .repository-reference { background: #e2d5f8 !important; border-left: 3px solid #5e2a9e !important; }
+    .proceedings-reference { background: #fff2c9 !important; border-left: 3px solid #b26b00 !important; }
+    .retracted-reference { background: #f8d7da !important; border-left: 3px solid #dc3545 !important; }
     
-    return f'''<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Masonry</title>
-<style>
-*{{margin:0;padding:0;box-sizing:border-box;}}
-body{{background:#f5f7fa;padding:30px;font-family:'Segoe UI',sans-serif;}}
-.container{{max-width:1100px;margin:0 auto;}}
-h1{{font-size:28px;font-weight:700;color:#1a1a2e;}}
-.subtitle{{color:#999;font-size:14px;}}
-.masonry-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin:20px 0;}}
-.masonry-item{{background:#fff;border-radius:16px;padding:20px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.04);transition:transform 0.2s;}}
-.masonry-item:hover{{transform:translateY(-4px);box-shadow:0 4px 16px rgba(0,0,0,0.08);}}
-.num{{font-size:28px;font-weight:700;color:#667eea;}}
-.lbl{{font-size:11px;color:#999;text-transform:uppercase;letter-spacing:1px;margin-top:4px;}}
-.row{{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;}}
-.tag{{display:inline-block;padding:4px 14px;background:#f0f2f5;border-radius:16px;font-size:12px;color:#333;}}
-.footer{{text-align:center;color:#ccc;font-size:11px;padding:15px;margin-top:20px;border-top:1px solid #eee;}}
-</style>
-</head>
-<body>
-<div class="container">
-    <h1>✦ Masonry Dashboard</h1>
-    <div class="subtitle">{html.escape(journal_name)} • {get_date()}</div>
-    <div class="masonry-grid">
-        <div class="masonry-item"><div class="num">{total_references}</div><div class="lbl">Total</div></div>
-        <div class="masonry-item"><div class="num">{total_with_doi}</div><div class="lbl">DOI</div></div>
-        <div class="masonry-item"><div class="num">{last_5_years}</div><div class="lbl">5 Years</div></div>
-        <div class="masonry-item"><div class="num">{self_citations_count}</div><div class="lbl">Self-Cit</div></div>
-        <div class="masonry-item"><div class="num">{total_citations_sum}</div><div class="lbl">Citations</div></div>
-        <div class="masonry-item"><div class="num">{avg_citations:.1f}</div><div class="lbl">Avg Cit</div></div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-        <div style="background:#fff;border-radius:16px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
-            <div style="font-weight:600;margin-bottom:12px;">👨‍🎓 Authors</div>
-            {author_cards}
-        </div>
-        <div style="background:#fff;border-radius:16px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
-            <div style="font-weight:600;margin-bottom:12px;">📖 Journals</div>
-            {''.join([f'<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0f0;font-size:13px;"><span>{html.escape(j.get("journal", "Unknown"))}</span><span style="font-weight:600;color:#667eea;">{j.get("count", 0)}</span></div>' for j in all_journals[:6]])}
-        </div>
-    </div>
-    <div class="footer">{get_footer(journal_name)}</div>
-</div>
-</body></html>'''
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e0e0e0; }
+    th { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+    tr:hover { background: #f5f5f5; }
+    .footer { text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 30px; }
+    .clickable-link { color: #667eea; text-decoration: none; transition: all 0.3s; }
+    .clickable-link:hover { color: #764ba2; text-decoration: underline; }
+    
+    @media print { .sidebar { display: none; } .main-content { margin-left: 0; } }
+    @media (max-width: 768px) { .sidebar { display: none; } .main-content { margin-left: 0; padding: 20px; } }
+    """
+    
+    return generate_full_report_html(data, custom_css)
+
+# ============================================================
+# СТИЛЬ 8: HOLOGRAPHIC
+# ============================================================
 
 def generate_style_8_holographic(data: Dict) -> str:
     """Стиль 8: Holographic — голографический эффект с переливами"""
     
-    journal_name = data.get('journal_name', 'Chimica Techno Acta')
-    article_number = data.get('article_number', '')
+    custom_css = """
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { min-height: 100vh; background: linear-gradient(135deg, #0a0a1a, #1a0a2e, #0a1a2e); padding: 30px; font-family: 'Segoe UI', sans-serif; color: #fff; }
+    .report-wrapper { max-width: 1400px; margin: 0 auto; }
+    .sidebar {
+        position: fixed; left: 0; top: 0; width: 260px; height: 100vh;
+        background: linear-gradient(135deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+        backdrop-filter: blur(10px); border-right: 1px solid rgba(255,255,255,0.03);
+        padding: 30px 20px; overflow-y: auto; z-index: 1000;
+    }
+    .sidebar h3 { margin-bottom: 20px; font-size: 18px; font-weight: 600; background: linear-gradient(90deg, #ff6b6b, #ffd93d, #6bcb77, #4d96ff, #ff6b6b); background-size: 300% 100%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shimmer_holo 3s linear infinite; }
+    @keyframes shimmer_holo { 0% { background-position: 0% 50%; } 100% { background-position: 300% 50%; } }
+    .sidebar a {
+        color: rgba(255,255,255,0.3); text-decoration: none; display: block; padding: 10px 15px;
+        margin: 5px 0; border-radius: 8px; transition: all 0.3s; font-size: 14px;
+    }
+    .sidebar a:hover { background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.8); transform: translateX(5px); }
+    .main-content { margin-left: 260px; padding: 30px 40px; }
+    .header {
+        background: linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+        backdrop-filter: blur(10px); border-radius: 20px; padding: 40px; margin-bottom: 30px; text-align: center;
+        border: 1px solid rgba(255,255,255,0.03); position: relative; overflow: hidden;
+    }
+    .header::before {
+        content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+        background: conic-gradient(from 0deg, #ff6b6b, #ffd93d, #6bcb77, #4d96ff, #ff6b6b);
+        animation: spin_holo 8s linear infinite; opacity: 0.05; pointer-events: none;
+    }
+    @keyframes spin_holo { 100% { transform: rotate(360deg); } }
+    .header h1 { font-size: 32px; font-weight: 700; background: linear-gradient(90deg, #ff6b6b, #ffd93d, #6bcb77, #4d96ff, #ff6b6b); background-size: 300% 100%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shimmer_holo 3s linear infinite; position: relative; z-index: 1; }
+    .header .date { color: rgba(255,255,255,0.2); margin-top: 10px; position: relative; z-index: 1; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .metric-card {
+        background: rgba(255,255,255,0.02); backdrop-filter: blur(10px);
+        border-radius: 16px; padding: 20px; text-align: center;
+        border: 1px solid rgba(255,255,255,0.03); transition: all 0.3s;
+    }
+    .metric-card:hover { border-color: rgba(255,255,255,0.1); }
+    .metric-number { font-size: 36px; font-weight: bold; background: linear-gradient(90deg, #ff6b6b, #ffd93d); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .metric-percent { font-size: 12px; color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.02); padding: 3px 10px; border-radius: 20px; margin-top: 8px; display: inline-block; }
+    .metric-label { color: rgba(255,255,255,0.3); font-size: 14px; margin-top: 8px; }
+    .section {
+        background: rgba(255,255,255,0.02); backdrop-filter: blur(10px);
+        border-radius: 16px; padding: 25px; margin-bottom: 30px;
+        border: 1px solid rgba(255,255,255,0.03); position: relative; overflow: hidden;
+    }
+    .section::before {
+        content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+        background: conic-gradient(from 0deg, #ff6b6b, #ffd93d, #6bcb77, #4d96ff, #ff6b6b);
+        animation: spin_holo 10s linear infinite; opacity: 0.02; pointer-events: none;
+    }
+    .section-title { font-size: 24px; font-weight: 600; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.04); color: rgba(255,255,255,0.6); position: relative; z-index: 1; }
+    .rank-item {
+        background: rgba(255,255,255,0.01); border-radius: 10px; padding: 12px; margin-bottom: 8px;
+        border-left: 3px solid rgba(255,255,255,0.05); transition: all 0.3s; position: relative; z-index: 1;
+    }
+    .rank-item:hover { background: rgba(255,255,255,0.02); transform: translateX(5px); }
+    .rank-number { font-weight: bold; color: #ffd93d; font-size: 18px; display: inline-block; width: 40px; }
+    .rank-name { display: inline-block; width: 300px; font-weight: 500; color: rgba(255,255,255,0.6); }
+    .rank-count { float: right; color: rgba(255,255,255,0.2); }
+    .progress-bar-custom { background: rgba(255,255,255,0.02); border-radius: 10px; height: 8px; margin-top: 8px; overflow: hidden; }
+    .progress-fill { background: linear-gradient(90deg, #ff6b6b, #ffd93d, #6bcb77); height: 100%; border-radius: 10px; }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: rgba(255,255,255,0.02); color: rgba(255,255,255,0.3); border: 1px solid rgba(255,255,255,0.03); }
+    .badge-success { border-color: rgba(107,203,119,0.2); color: #6bcb77; }
+    .badge-warning { border-color: rgba(255,217,61,0.2); color: #ffd93d; }
+    .badge-danger { border-color: rgba(255,107,107,0.2); color: #ff6b6b; }
+    .badge-info { border-color: rgba(77,150,255,0.2); color: #4d96ff; }
+    .badge-repository { border-color: rgba(155,89,182,0.2); color: #9b59b6; }
+    .badge-book { border-color: rgba(26,188,156,0.2); color: #1abc9c; }
+    .badge-proceedings { border-color: rgba(255,217,61,0.2); color: #ffd93d; }
     
-    total_references = data.get('total_references', 0)
-    total_with_doi = data.get('total_with_doi', 0)
-    last_5_years = data.get('yearly_stats', {}).get('last_5_years', 0)
-    self_citations_count = data.get('self_citations_count', 0)
-    total_citations_sum = data.get('total_citations_sum', 0)
-    avg_citations = data.get('avg_citations', 0)
+    .concepts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
+    .concept-card {
+        background: rgba(255,255,255,0.01); border-radius: 10px; padding: 12px; text-align: center;
+        border: 1px solid rgba(255,255,255,0.03);
+    }
+    .concept-name { font-weight: 600; color: #ffd93d; }
+    .concept-score { font-size: 12px; color: rgba(255,255,255,0.2); margin-top: 5px; }
     
-    all_authors = data.get('author_frequency_all', {}).get('all_authors', [])
-    all_journals = data.get('journal_frequency_all', {}).get('all_journals', [])
+    .full-text-container {
+        max-height: 150px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 12px;
+        background: rgba(0,0,0,0.2); padding: 8px; border-radius: 5px; margin-top: 5px;
+        color: rgba(255,255,255,0.2);
+    }
     
-    return f'''<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Holographic</title>
-<style>
-*{{margin:0;padding:0;box-sizing:border-box;}}
-body{{min-height:100vh;background:linear-gradient(135deg,#0a0a1a,#1a0a2e,#0a1a2e);padding:30px;font-family:'Segoe UI',sans-serif;color:#fff;}}
-.container{{max-width:1100px;margin:0 auto;}}
-.holo{{background:linear-gradient(135deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02));border-radius:20px;padding:25px;margin-bottom:18px;border:1px solid rgba(255,255,255,0.05);backdrop-filter:blur(10px);position:relative;overflow:hidden;}}
-.holo::before{{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:conic-gradient(from 0deg,#ff6b6b,#ffd93d,#6bcb77,#4d96ff,#ff6b6b);animation:spin 8s linear infinite;opacity:0.05;pointer-events:none;}}
-@keyframes spin{{100%{{transform:rotate(360deg);}}}}
-h1{{font-size:32px;font-weight:700;background:linear-gradient(90deg,#ff6b6b,#ffd93d,#6bcb77,#4d96ff,#ff6b6b);background-size:300% 100%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 4s linear infinite;}}
-@keyframes shimmer{{0%{{background-position:0% 50%}}100%{{background-position:300% 50%}}}}
-.grid{{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;position:relative;z-index:1;}}
-.stat{{background:rgba(255,255,255,0.03);border-radius:14px;padding:18px;text-align:center;border:1px solid rgba(255,255,255,0.04);}}
-.num{{font-size:28px;font-weight:700;background:linear-gradient(90deg,#ff6b6b,#ffd93d);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}}
-.lbl{{font-size:11px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1px;margin-top:4px;}}
-.tag{{display:inline-block;padding:4px 14px;margin:3px;border-radius:16px;font-size:12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);color:rgba(255,255,255,0.7);}}
-.footer{{text-align:center;color:rgba(255,255,255,0.2);font-size:11px;padding:15px;}}
-</style>
-</head>
-<body>
-<div class="container">
-    <div class="holo"><h1>✦ HOLOGRAPHIC</h1><div style="color:rgba(255,255,255,0.4);font-size:14px;">{html.escape(journal_name)} • {get_date()}</div></div>
-    <div class="holo">
-        <div class="grid">
-            <div class="stat"><div class="num">{total_references}</div><div class="lbl">Total</div></div>
-            <div class="stat"><div class="num">{total_with_doi}</div><div class="lbl">DOI</div></div>
-            <div class="stat"><div class="num">{last_5_years}</div><div class="lbl">5 Years</div></div>
-            <div class="stat"><div class="num">{self_citations_count}</div><div class="lbl">Self-Cit</div></div>
-            <div class="stat"><div class="num">{total_citations_sum}</div><div class="lbl">Citations</div></div>
-        </div>
-    </div>
-    <div class="holo"><div style="color:rgba(255,255,255,0.6);margin-bottom:12px;">👨‍🎓 Authors</div>
-        {''.join([f'<span class="tag">{html.escape(a.get("display_name", "Unknown"))} ({a.get("mention_count", 0)})</span>' for a in all_authors[:6]])}
-    </div>
-    <div class="holo"><div style="color:rgba(255,255,255,0.6);margin-bottom:12px;">📖 Journals</div>
-        {''.join([f'<span class="tag">{html.escape(j.get("journal", "Unknown"))} ({j.get("count", 0)})</span>' for j in all_journals[:5]])}
-    </div>
-    <div class="holo"><div style="color:rgba(255,255,255,0.6);margin-bottom:12px;">🌍 Geography</div>
-        {''.join([f'<span class="tag">{html.escape(c)}: {count}</span>' for c, count in list(data.get("geography", {}).get("type1_unique_countries_per_reference", {}).items())[:5]])}
-    </div>
-    <div class="footer">{get_footer(journal_name)}</div>
-</div>
-</body></html>'''
+    .normal-article { border-left: 3px solid #6bcb77 !important; }
+    .notfound-reference { border-left: 3px solid #666 !important; }
+    .suspicious-reference { border-left: 3px solid #ff6b6b !important; }
+    .duplicate-reference { border-left: 3px solid #ffd93d !important; }
+    .ebook-reference { border-left: 3px solid #1abc9c !important; }
+    .repository-reference { border-left: 3px solid #9b59b6 !important; }
+    .proceedings-reference { border-left: 3px solid #ffd93d !important; }
+    .retracted-reference { border-left: 3px solid #ff6b6b !important; }
+    
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.02); color: rgba(255,255,255,0.3); }
+    th { background: rgba(255,255,255,0.02); color: rgba(255,255,255,0.5); }
+    tr:hover { background: rgba(255,255,255,0.01); }
+    .footer { text-align: center; padding: 20px; color: rgba(255,255,255,0.1); font-size: 12px; border-top: 1px solid rgba(255,255,255,0.02); margin-top: 30px; }
+    .clickable-link { color: rgba(255,255,255,0.4); text-decoration: none; transition: all 0.3s; }
+    .clickable-link:hover { color: #ffd93d; }
+    
+    @media print { .sidebar { display: none; } .main-content { margin-left: 0; } }
+    @media (max-width: 768px) { .sidebar { display: none; } .main-content { margin-left: 0; padding: 20px; } }
+    """
+    
+    return generate_full_report_html(data, custom_css)
+
+# ============================================================
+# СТИЛЬ 9: GEO BUBBLES
+# ============================================================
 
 def generate_style_9_geo_bubbles(data: Dict) -> str:
     """Стиль 9: Geo Bubbles — географические пузырьки"""
     
-    journal_name = data.get('journal_name', 'Chimica Techno Acta')
-    article_number = data.get('article_number', '')
+    custom_css = """
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #f0f4f8; padding: 30px; font-family: 'Segoe UI', sans-serif; }
+    .report-wrapper { max-width: 1400px; margin: 0 auto; background: #fff; border-radius: 20px; padding: 30px; box-shadow: 0 4px 30px rgba(0,0,0,0.06); }
+    .sidebar {
+        position: fixed; left: 0; top: 0; width: 260px; height: 100vh;
+        background: #fff; border-right: 1px solid #e8ecf1;
+        padding: 30px 20px; overflow-y: auto; z-index: 1000;
+    }
+    .sidebar h3 { margin-bottom: 20px; font-size: 18px; font-weight: 600; color: #1a1a2e; }
+    .sidebar a {
+        color: #666; text-decoration: none; display: block; padding: 10px 15px;
+        margin: 5px 0; border-radius: 8px; transition: all 0.3s; font-size: 14px;
+    }
+    .sidebar a:hover { background: #f0f2f5; color: #1a1a2e; transform: translateX(5px); }
+    .main-content { margin-left: 260px; padding: 0 20px; }
+    .header {
+        background: #fff; border-radius: 16px; padding: 40px; margin-bottom: 30px; text-align: center;
+        border: 1px solid #f0f2f5;
+    }
+    .header h1 { font-size: 32px; font-weight: 700; color: #1a1a2e; }
+    .header .date { color: #999; margin-top: 10px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .metric-card {
+        background: #f8f9fa; border-radius: 14px; padding: 20px; text-align: center;
+        transition: transform 0.3s;
+    }
+    .metric-card:hover { transform: translateY(-5px); }
+    .metric-number { font-size: 36px; font-weight: bold; color: #667eea; }
+    .metric-percent { font-size: 12px; color: #155724; background: #d4edda; padding: 3px 10px; border-radius: 20px; margin-top: 8px; display: inline-block; }
+    .metric-label { color: #666; font-size: 14px; margin-top: 8px; }
+    .section {
+        background: #fff; border: 1px solid #f0f2f5; border-radius: 16px; padding: 25px; margin-bottom: 30px;
+    }
+    .section-title { font-size: 24px; font-weight: 600; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #667eea; color: #1a1a2e; }
+    .rank-item {
+        background: #f8f9fa; border-radius: 10px; padding: 12px; margin-bottom: 8px;
+        border-left: 3px solid #667eea;
+        transition: all 0.3s;
+    }
+    .rank-item:hover { background: #f0f2f5; transform: translateX(5px); }
+    .rank-number { font-weight: bold; color: #667eea; font-size: 18px; display: inline-block; width: 40px; }
+    .rank-name { display: inline-block; width: 300px; font-weight: 500; color: #1a1a2e; }
+    .rank-count { float: right; color: #666; }
+    .progress-bar-custom { background: #e9ecef; border-radius: 10px; height: 8px; margin-top: 8px; overflow: hidden; }
+    .progress-fill { background: linear-gradient(90deg, #667eea, #764ba2); height: 100%; border-radius: 10px; }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+    .badge-success { background: #d4edda; color: #155724; }
+    .badge-warning { background: #fff3cd; color: #856404; }
+    .badge-danger { background: #f8d7da; color: #721c24; }
+    .badge-info { background: #d1ecf1; color: #0c5460; }
+    .badge-repository { background: #e2d5f8; color: #5e2a9e; }
+    .badge-book { background: #d4f1e9; color: #0e6b5e; }
+    .badge-proceedings { background: #fff2c9; color: #b26b00; }
     
-    total_references = data.get('total_references', 0)
-    total_with_doi = data.get('total_with_doi', 0)
-    geography = data.get('geography', {})
-    countries = list(geography.get('type1_unique_countries_per_reference', {}).items())
+    .concepts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
+    .concept-card {
+        background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+        border-radius: 10px; padding: 12px; text-align: center;
+        border: 1px solid #667eea30;
+    }
+    .concept-name { font-weight: 600; color: #667eea; }
+    .concept-score { font-size: 12px; color: #666; margin-top: 5px; }
     
-    bubbles = ''.join([f'<div style="display:flex;align-items:center;margin:6px 0;"><div style="width:100px;font-size:14px;">{html.escape(c)}</div><div style="flex:1;height:24px;background:#e9ecef;border-radius:12px;overflow:hidden;"><div style="height:100%;width:{count/max(dict(countries).values())*100}%;background:linear-gradient(90deg,#667eea,#764ba2);border-radius:12px;transition:width 0.5s;"></div></div><div style="width:40px;text-align:right;font-size:14px;font-weight:600;color:#667eea;">{count}</div></div>' for c, count in countries])
+    .full-text-container {
+        max-height: 150px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 12px;
+        background: #f5f5f5; padding: 8px; border-radius: 5px; margin-top: 5px;
+    }
     
-    all_authors = data.get('author_frequency_all', {}).get('all_authors', [])
-    collaboration_matrix = geography.get('collaboration_matrix', [])
+    .normal-article { background: #e8f5e9 !important; border-left: 3px solid #4caf50 !important; }
+    .notfound-reference { background: #e9ecef !important; border-left: 3px solid #6c757d !important; }
+    .suspicious-reference { background: #f8d7da !important; border-left: 3px solid #dc3545 !important; }
+    .duplicate-reference { background: #ffe5cc !important; border-left: 3px solid #fd7e14 !important; }
+    .ebook-reference { background: #d4f1e9 !important; border-left: 3px solid #0e6b5e !important; }
+    .repository-reference { background: #e2d5f8 !important; border-left: 3px solid #5e2a9e !important; }
+    .proceedings-reference { background: #fff2c9 !important; border-left: 3px solid #b26b00 !important; }
+    .retracted-reference { background: #f8d7da !important; border-left: 3px solid #dc3545 !important; }
     
-    return f'''<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Geo Bubbles</title>
-<style>
-*{{margin:0;padding:0;box-sizing:border-box;}}
-body{{background:#f0f4f8;padding:30px;font-family:'Segoe UI',sans-serif;}}
-.container{{max-width:1100px;margin:0 auto;background:#fff;border-radius:20px;padding:30px;box-shadow:0 4px 30px rgba(0,0,0,0.06);}}
-h1{{font-size:28px;font-weight:700;color:#1a1a2e;}}
-.subtitle{{color:#999;font-size:14px;}}
-.grid{{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:20px 0;}}
-.stat{{background:#f8f9fa;border-radius:12px;padding:15px;text-align:center;}}
-.num{{font-size:24px;font-weight:700;color:#667eea;}}
-.lbl{{font-size:11px;color:#999;text-transform:uppercase;letter-spacing:1px;margin-top:4px;}}
-.section{{background:#f8f9fa;border-radius:12px;padding:20px;margin:15px 0;}}
-.section-title{{font-weight:600;margin-bottom:12px;font-size:16px;}}
-.tag{{display:inline-block;padding:4px 14px;margin:3px;border-radius:16px;font-size:12px;background:#e8f0fe;color:#1a73e8;}}
-.footer{{text-align:center;color:#ccc;font-size:11px;padding:15px;border-top:1px solid #eee;margin-top:20px;}}
-</style>
-</head>
-<body>
-<div class="container">
-    <h1>🌍 Geo Bubbles</h1>
-    <div class="subtitle">{html.escape(journal_name)} • {get_date()}</div>
-    <div class="grid">
-        <div class="stat"><div class="num">{total_references}</div><div class="lbl">Total</div></div>
-        <div class="stat"><div class="num">{geography.get('single_country_count', 0)}</div><div class="lbl">Single</div></div>
-        <div class="stat"><div class="num">{geography.get('international_count', 0)}</div><div class="lbl">International</div></div>
-        <div class="stat"><div class="num">{geography.get('total_references_with_country', 0)}</div><div class="lbl">With Country</div></div>
-    </div>
-    <div class="section">
-        <div class="section-title">🌐 Countries Distribution</div>
-        {bubbles}
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-        <div class="section">
-            <div class="section-title">👨‍🎓 Authors</div>
-            {''.join([f'<div style="font-size:13px;padding:4px 0;border-bottom:1px solid #eee;">{html.escape(a.get("display_name", "Unknown"))} ({a.get("mention_count", 0)})</div>' for a in all_authors[:5]])}
-        </div>
-        <div class="section">
-            <div class="section-title">🤝 Collaborations</div>
-            {''.join([f'<div style="font-size:13px;padding:4px 0;border-bottom:1px solid #eee;">{html.escape(c.get("country1", ""))} + {html.escape(c.get("country2", ""))} ({c.get("count", 0)})</div>' for c in collaboration_matrix[:4]])}
-        </div>
-    </div>
-    <div class="footer">{get_footer(journal_name)}</div>
-</div>
-</body></html>'''
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e0e0e0; }
+    th { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+    tr:hover { background: #f5f5f5; }
+    .footer { text-align: center; padding: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; margin-top: 30px; }
+    .clickable-link { color: #667eea; text-decoration: none; transition: all 0.3s; }
+    .clickable-link:hover { color: #764ba2; text-decoration: underline; }
+    
+    @media print { .sidebar { display: none; } .main-content { margin-left: 0; } }
+    @media (max-width: 768px) { .sidebar { display: none; } .main-content { margin-left: 0; padding: 20px; } }
+    """
+    
+    return generate_full_report_html(data, custom_css)
+
+# ============================================================
+# СТИЛЬ 10: PARTICLES (SPACE)
+# ============================================================
 
 def generate_style_10_particles(data: Dict) -> str:
     """Стиль 10: Particles — космическая тема с частицами"""
     
-    journal_name = data.get('journal_name', 'Chimica Techno Acta')
-    article_number = data.get('article_number', '')
+    custom_css = """
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { min-height: 100vh; background: radial-gradient(ellipse at center, #1a1a2e, #0a0a1a); padding: 30px; font-family: 'Segoe UI', sans-serif; color: #fff; }
+    .report-wrapper { max-width: 1400px; margin: 0 auto; }
+    .sidebar {
+        position: fixed; left: 0; top: 0; width: 260px; height: 100vh;
+        background: rgba(255,255,255,0.01); border-right: 1px solid rgba(255,255,255,0.02);
+        padding: 30px 20px; overflow-y: auto; z-index: 1000;
+    }
+    .sidebar h3 { margin-bottom: 20px; font-size: 18px; font-weight: 600; color: rgba(255,255,255,0.3); letter-spacing: 4px; }
+    .sidebar a {
+        color: rgba(255,255,255,0.15); text-decoration: none; display: block; padding: 10px 15px;
+        margin: 5px 0; border-radius: 8px; transition: all 0.3s; font-size: 14px;
+        letter-spacing: 1px;
+    }
+    .sidebar a:hover { background: rgba(255,255,255,0.02); color: rgba(255,255,255,0.6); transform: translateX(5px); }
+    .main-content { margin-left: 260px; padding: 30px 40px; }
+    .header {
+        background: rgba(255,255,255,0.01); border-radius: 20px; padding: 40px; margin-bottom: 30px; text-align: center;
+        border: 1px solid rgba(255,255,255,0.02);
+        position: relative; overflow: hidden;
+    }
+    .header::after {
+        content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+        background: radial-gradient(circle at 20% 50%, rgba(100,100,255,0.03), transparent 70%), radial-gradient(circle at 80% 50%, rgba(255,100,100,0.03), transparent 70%);
+        pointer-events: none; border-radius: 20px;
+    }
+    .header h1 { font-size: 32px; font-weight: 300; letter-spacing: 8px; background: linear-gradient(90deg, #a78bfa, #60efff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; position: relative; z-index: 1; }
+    .header .date { color: rgba(255,255,255,0.1); margin-top: 10px; letter-spacing: 3px; position: relative; z-index: 1; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .metric-card {
+        background: rgba(255,255,255,0.01); border-radius: 16px; padding: 20px; text-align: center;
+        border: 1px solid rgba(255,255,255,0.01); transition: all 0.3s;
+    }
+    .metric-card:hover { border-color: rgba(255,255,255,0.03); }
+    .metric-number { font-size: 36px; font-weight: bold; background: linear-gradient(135deg, #a78bfa, #60efff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .metric-percent { font-size: 12px; color: rgba(255,255,255,0.15); background: rgba(255,255,255,0.01); padding: 3px 10px; border-radius: 20px; margin-top: 8px; display: inline-block; }
+    .metric-label { color: rgba(255,255,255,0.15); font-size: 14px; margin-top: 8px; letter-spacing: 2px; }
+    .section {
+        background: rgba(255,255,255,0.01); border-radius: 16px; padding: 25px; margin-bottom: 30px;
+        border: 1px solid rgba(255,255,255,0.01); position: relative; overflow: hidden;
+    }
+    .section::after {
+        content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+        background: radial-gradient(circle at 20% 50%, rgba(100,100,255,0.02), transparent 70%), radial-gradient(circle at 80% 50%, rgba(255,100,100,0.02), transparent 70%);
+        pointer-events: none; border-radius: 16px;
+    }
+    .section-title { font-size: 24px; font-weight: 300; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.02); color: rgba(255,255,255,0.3); letter-spacing: 4px; position: relative; z-index: 1; }
+    .rank-item {
+        background: rgba(255,255,255,0.005); border-radius: 10px; padding: 12px; margin-bottom: 8px;
+        border-left: 1px solid rgba(255,255,255,0.02); transition: all 0.3s; position: relative; z-index: 1;
+    }
+    .rank-item:hover { background: rgba(255,255,255,0.01); transform: translateX(5px); }
+    .rank-number { font-weight: bold; color: rgba(167,139,250,0.5); font-size: 18px; display: inline-block; width: 40px; }
+    .rank-name { display: inline-block; width: 300px; font-weight: 500; color: rgba(255,255,255,0.3); letter-spacing: 1px; }
+    .rank-count { float: right; color: rgba(255,255,255,0.1); }
+    .progress-bar-custom { background: rgba(255,255,255,0.01); border-radius: 10px; height: 8px; margin-top: 8px; overflow: hidden; }
+    .progress-fill { background: linear-gradient(90deg, rgba(167,139,250,0.5), rgba(96,239,255,0.5)); height: 100%; border-radius: 10px; }
+    .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: rgba(255,255,255,0.01); color: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.01); letter-spacing: 1px; }
+    .badge-success { border-color: rgba(46, 204, 113, 0.1); color: rgba(46, 204, 113, 0.4); }
+    .badge-warning { border-color: rgba(241, 196, 15, 0.1); color: rgba(241, 196, 15, 0.4); }
+    .badge-danger { border-color: rgba(231, 76, 60, 0.1); color: rgba(231, 76, 60, 0.4); }
+    .badge-info { border-color: rgba(52, 152, 219, 0.1); color: rgba(52, 152, 219, 0.4); }
+    .badge-repository { border-color: rgba(155, 89, 182, 0.1); color: rgba(155, 89, 182, 0.4); }
+    .badge-book { border-color: rgba(26, 188, 156, 0.1); color: rgba(26, 188, 156, 0.4); }
+    .badge-proceedings { border-color: rgba(241, 196, 15, 0.1); color: rgba(241, 196, 15, 0.4); }
     
-    total_references = data.get('total_references', 0)
-    total_with_doi = data.get('total_with_doi', 0)
-    last_5_years = data.get('yearly_stats', {}).get('last_5_years', 0)
-    self_citations_count = data.get('self_citations_count', 0)
-    total_citations_sum = data.get('total_citations_sum', 0)
-    avg_citations = data.get('avg_citations', 0)
+    .concepts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
+    .concept-card {
+        background: rgba(255,255,255,0.005); border-radius: 10px; padding: 12px; text-align: center;
+        border: 1px solid rgba(255,255,255,0.005);
+    }
+    .concept-name { font-weight: 600; color: rgba(167,139,250,0.5); }
+    .concept-score { font-size: 12px; color: rgba(255,255,255,0.08); margin-top: 5px; }
     
-    all_authors = data.get('author_frequency_all', {}).get('all_authors', [])
-    all_journals = data.get('journal_frequency_all', {}).get('all_journals', [])
+    .full-text-container {
+        max-height: 150px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 12px;
+        background: rgba(0,0,0,0.2); padding: 8px; border-radius: 5px; margin-top: 5px;
+        color: rgba(255,255,255,0.1);
+    }
     
-    return f'''<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Particles</title>
-<style>
-*{{margin:0;padding:0;box-sizing:border-box;}}
-body{{min-height:100vh;background:radial-gradient(ellipse at center,#1a1a2e,#0a0a1a);padding:30px;font-family:'Segoe UI',sans-serif;color:#fff;}}
-.container{{max-width:1100px;margin:0 auto;}}
-.particle-card{{background:rgba(255,255,255,0.02);border-radius:20px;padding:25px;margin-bottom:18px;border:1px solid rgba(255,255,255,0.03);box-shadow:0 8px 40px rgba(0,0,0,0.3);position:relative;}}
-.particle-card::after{{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:radial-gradient(circle at 20% 50%,rgba(100,100,255,0.05),transparent 70%),radial-gradient(circle at 80% 50%,rgba(255,100,100,0.05),transparent 70%);pointer-events:none;border-radius:20px;}}
-h1{{font-size:32px;font-weight:300;letter-spacing:4px;background:linear-gradient(90deg,#a78bfa,#60efff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;position:relative;z-index:1;}}
-.subtitle{{color:rgba(255,255,255,0.3);font-size:14px;position:relative;z-index:1;letter-spacing:2px;}}
-.grid{{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;position:relative;z-index:1;}}
-.stat{{background:rgba(255,255,255,0.02);border-radius:14px;padding:18px;text-align:center;border:1px solid rgba(255,255,255,0.02);}}
-.num{{font-size:28px;font-weight:700;background:linear-gradient(135deg,#a78bfa,#60efff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}}
-.lbl{{font-size:11px;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:2px;margin-top:4px;}}
-.tag{{display:inline-block;padding:4px 14px;margin:3px;border-radius:16px;font-size:12px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04);color:rgba(255,255,255,0.5);position:relative;z-index:1;}}
-.footer{{text-align:center;color:rgba(255,255,255,0.1);font-size:11px;padding:15px;letter-spacing:2px;}}
-</style>
-</head>
-<body>
-<div class="container">
-    <div class="particle-card"><h1>✦ PARTICLES</h1><div class="subtitle">{html.escape(journal_name)} • {get_date()}</div></div>
-    <div class="particle-card">
-        <div class="grid">
-            <div class="stat"><div class="num">{total_references}</div><div class="lbl">Total</div></div>
-            <div class="stat"><div class="num">{total_with_doi}</div><div class="lbl">DOI</div></div>
-            <div class="stat"><div class="num">{last_5_years}</div><div class="lbl">5 Years</div></div>
-            <div class="stat"><div class="num">{self_citations_count}</div><div class="lbl">Self-Cit</div></div>
-            <div class="stat"><div class="num">{total_citations_sum}</div><div class="lbl">Citations</div></div>
-        </div>
-    </div>
-    <div class="particle-card"><div style="color:rgba(255,255,255,0.4);margin-bottom:12px;letter-spacing:2px;">◈ AUTHORS</div>
-        {''.join([f'<span class="tag">{html.escape(a.get("display_name", "Unknown"))} ({a.get("mention_count", 0)})</span>' for a in all_authors[:6]])}
-    </div>
-    <div class="particle-card"><div style="color:rgba(255,255,255,0.4);margin-bottom:12px;letter-spacing:2px;">◈ JOURNALS</div>
-        {''.join([f'<span class="tag">{html.escape(j.get("journal", "Unknown"))} ({j.get("count", 0)})</span>' for j in all_journals[:5]])}
-    </div>
-    <div class="particle-card"><div style="color:rgba(255,255,255,0.4);margin-bottom:12px;letter-spacing:2px;">◈ GEOGRAPHY</div>
-        {''.join([f'<span class="tag">{html.escape(c)}: {count}</span>' for c, count in list(data.get("geography", {}).get("type1_unique_countries_per_reference", {}).items())[:5]])}
-    </div>
-    <div class="footer">{get_footer(journal_name)}</div>
-</div>
-</body></html>'''
+    .normal-article { border-left: 1px solid rgba(46, 204, 113, 0.2) !important; }
+    .notfound-reference { border-left: 1px solid rgba(255,255,255,0.02) !important; }
+    .suspicious-reference { border-left: 1px solid rgba(231, 76, 60, 0.2) !important; }
+    .duplicate-reference { border-left: 1px solid rgba(241, 196, 15, 0.2) !important; }
+    .ebook-reference { border-left: 1px solid rgba(26, 188, 156, 0.2) !important; }
+    .repository-reference { border-left: 1px solid rgba(155, 89, 182, 0.2) !important; }
+    .proceedings-reference { border-left: 1px solid rgba(241, 196, 15, 0.2) !important; }
+    .retracted-reference { border-left: 1px solid rgba(231, 76, 60, 0.2) !important; }
+    
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.01); color: rgba(255,255,255,0.15); }
+    th { background: rgba(255,255,255,0.005); color: rgba(255,255,255,0.3); letter-spacing: 2px; }
+    tr:hover { background: rgba(255,255,255,0.005); }
+    .footer { text-align: center; padding: 20px; color: rgba(255,255,255,0.03); font-size: 12px; border-top: 1px solid rgba(255,255,255,0.01); margin-top: 30px; letter-spacing: 4px; }
+    .clickable-link { color: rgba(167,139,250,0.3); text-decoration: none; transition: all 0.3s; }
+    .clickable-link:hover { color: rgba(96,239,255,0.5); }
+    
+    @media print { .sidebar { display: none; } .main-content { margin-left: 0; } }
+    @media (max-width: 768px) { .sidebar { display: none; } .main-content { margin-left: 0; padding: 20px; } }
+    """
+    
+    return generate_full_report_html(data, custom_css)
 
 # ============================================================
-# 4. СЛОВАРЬ ВСЕХ СТИЛЕЙ
+# РЕГИСТРАЦИЯ ВСЕХ СТИЛЕЙ
 # ============================================================
 
 STYLE_GENERATORS = {
