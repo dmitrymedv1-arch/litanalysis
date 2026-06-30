@@ -5705,8 +5705,6 @@ def main():
                 key="selected_style"
             )
             
-            # Сохраняем выбор в session_state
-            st.session_state.selected_style = selected_style
             
             # Показываем информацию о стиле
             if selected_style != "classic":
