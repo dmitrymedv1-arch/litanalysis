@@ -41,7 +41,8 @@ def safe_escape(value) -> str:
 # ОСНОВНАЯ ФУНКЦИЯ ГЕНЕРАЦИИ КЛАССИЧЕСКОГО ОТЧЕТА (ПОЛНАЯ ВЕРСИЯ)
 # ============================================================
 
-def generate_full_report_html(data: Dict, custom_css: str = None, custom_header: str = None) -> str:
+def generate_full_report_html(data: Dict, custom_css: str = None, custom_header: str = None, 
+                              primary_color: str = '#667eea', secondary_color: str = '#764ba2') -> str:
     """
     Генерирует полный HTML отчет со всеми разделами.
     Параметры:
@@ -821,7 +822,7 @@ def generate_full_report_html(data: Dict, custom_css: str = None, custom_header:
             top: 0;
             width: 260px;
             height: 100vh;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, {primary_color} 0%, {secondary_color} 100%);
             color: white;
             padding: 30px 20px;
             overflow-y: auto;
@@ -851,7 +852,7 @@ def generate_full_report_html(data: Dict, custom_css: str = None, custom_header:
             padding: 30px 40px;
         }
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, {primary_color} 0%, {secondary_color} 100%);
             color: white;
             padding: 40px;
             border-radius: 15px;
@@ -888,7 +889,7 @@ def generate_full_report_html(data: Dict, custom_css: str = None, custom_header:
         .metric-number {
             font-size: 36px;
             font-weight: bold;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, {primary_color} 0%, {secondary_color} 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -1031,7 +1032,7 @@ def generate_full_report_html(data: Dict, custom_css: str = None, custom_header:
             border-bottom: 1px solid #e0e0e0;
         }
         th {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, {primary_color} 0%, {secondary_color} 100%);
             color: white;
         }
         tr:hover {
@@ -1312,7 +1313,9 @@ def generate_full_report_html(data: Dict, custom_css: str = None, custom_header:
 
 def generate_style_0_classic(data: Dict) -> str:
     """Стиль 0: Классический (исходный дизайн)"""
-    return generate_full_report_html(data)
+    primary = data.get('primary_color', '#667eea')
+    secondary = data.get('secondary_color', '#764ba2')
+    return generate_full_report_html(data, primary_color=primary, secondary_color=secondary)
 
 # ============================================================
 # СТИЛЬ 1: GLASSMORPHISM
