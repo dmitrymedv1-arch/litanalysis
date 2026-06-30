@@ -5696,7 +5696,10 @@ def main():
         if STYLES_AVAILABLE:
             style_options = {key: info["name"] for key, info in STYLE_GENERATORS.items()}
             default_style = "classic"
-            
+
+            if 'selected_style' not in st.session_state:
+                st.session_state.selected_style = default_style
+
             selected_style = st.selectbox(
                 "Выберите дизайн HTML отчета",
                 options=list(style_options.keys()),
@@ -5704,7 +5707,6 @@ def main():
                 index=list(style_options.keys()).index(default_style) if default_style in style_options else 0,
                 key="selected_style"
             )
-            
             
             # Показываем информацию о стиле
             if selected_style != "classic":
