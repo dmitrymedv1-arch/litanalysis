@@ -4,6 +4,7 @@ styles.py - Полная система стилей для HTML-отчета
 """
 
 import colorsys
+import random
 from typing import Dict, Optional, List, Tuple
 
 # ======================== БАЗОВЫЕ УТИЛИТЫ ДЛЯ ЦВЕТОВ ========================
@@ -81,6 +82,20 @@ def inject_color_placeholders(css: str, primary: str, secondary: str = None) -> 
         # Если secondary не передан, генерируем комплементарный цвет
         css = css.replace('{{SECONDARY}}', get_complementary_color(primary))
     return css
+
+def get_random_neon_color() -> str:
+    """Генерирует случайный неоновый цвет для киберпанк темы"""
+    neon_colors = [
+        '#00ff41', # Матричный зеленый
+        '#ff00ff', # Розовый
+        '#00ffff', # Голубой
+        '#ff6600', # Оранжевый
+        '#ff0044', # Красный
+        '#ff00aa', # Пурпурный
+        '#00ffaa', # Бирюзовый
+        '#ffaa00'  # Желтый
+    ]
+    return random.choice(neon_colors)
 
 # ======================== БАЗОВЫЕ СТИЛИ (НЕ ЗАВИСЯТ ОТ ТЕМЫ) ========================
 
@@ -773,15 +788,6 @@ body::before {
     box-shadow: 0 16px 48px rgba(0,0,0,0.08);
 }
 
-/* Случайная подсветка карточек через data-атрибуты */
-.stat-card[data-type="doi"] { background: rgba(0,204,150,0.12); border-color: rgba(0,204,150,0.2); }
-.stat-card[data-type="authors"] { background: rgba(102,126,234,0.12); border-color: rgba(102,126,234,0.2); }
-.stat-card[data-type="citations"] { background: rgba(255,160,66,0.12); border-color: rgba(255,160,66,0.2); }
-.stat-card[data-type="journals"] { background: rgba(0,206,201,0.12); border-color: rgba(0,206,201,0.2); }
-.stat-card[data-type="publishers"] { background: rgba(108,92,231,0.12); border-color: rgba(108,92,231,0.2); }
-.stat-card[data-type="orcid"] { background: rgba(52,152,219,0.12); border-color: rgba(52,152,219,0.2); }
-.stat-card[data-type="selfcitations"] { background: rgba(231,76,60,0.12); border-color: rgba(231,76,60,0.2); }
-
 .stat-number {
     background: linear-gradient(135deg, {{PRIMARY}}, {{PRIMARY}}CC);
     -webkit-background-clip: text;
@@ -891,7 +897,6 @@ tr:hover {
     background: rgba(255,255,255,0.05);
 }
 
-/* Цветная кодировка для ссылок - стиль Glassmorphism */
 .normal-article {
     background: rgba(76,175,80,0.08) !important;
     border-left: 3px solid rgba(76,175,80,0.6) !important;
@@ -937,7 +942,6 @@ tr:hover {
     border-left: 3px solid rgba(220,53,69,0.6) !important;
 }
 
-/* Анимация появления с эффектом стекла */
 @keyframes glassIn {
     0% { opacity: 0; transform: translateY(30px) scale(0.96); backdrop-filter: blur(0px); }
     100% { opacity: 1; transform: translateY(0) scale(1); backdrop-filter: blur(15px); }
@@ -957,7 +961,6 @@ tr:hover {
 .section:nth-child(9) { animation-delay: 0.64s; }
 .section:nth-child(10) { animation-delay: 0.72s; }
 
-/* Дополнительный блеск на карточках */
 .stat-card::after {
     content: '';
     position: absolute;
@@ -981,18 +984,20 @@ tr:hover {
 }
 """
 
-# ======================== ТЕМА 3: NEON DARK (НЕОНОВЫЙ ТЕМНЫЙ) ========================
+# ======================== ТЕМА 3: NEON DARK (КИБЕРПАНК С НЕОНОВЫМИ КАРТОЧКАМИ) ========================
 
 NEON_DARK_CSS = """
-/* ==================== ТЕМА: NEON DARK ==================== */
+/* ==================== ТЕМА: NEON DARK - КИБЕРПАНК С ДИНАМИЧЕСКИМ НЕОНОМ ==================== */
 /* Полностью отключает пользовательские цвета */
 
 body {
     background: #0a0a0f;
     color: #e0e0e0;
     position: relative;
+    font-family: 'Courier New', 'Segoe UI', monospace;
 }
 
+/* Киберпанк сетка на фоне */
 body::before {
     content: '';
     position: fixed;
@@ -1000,10 +1005,31 @@ body::before {
     left: 0;
     right: 0;
     bottom: 0;
+    background-image: 
+        linear-gradient(rgba(0, 255, 65, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 65, 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+    animation: gridPulse 8s ease-in-out infinite alternate;
+}
+
+@keyframes gridPulse {
+    0% { opacity: 0.3; }
+    100% { opacity: 0.7; }
+}
+
+body::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     background: 
-        radial-gradient(ellipse at 20% 30%, rgba(0,255,255,0.02) 0%, transparent 50%),
+        radial-gradient(ellipse at 20% 30%, rgba(0,255,65,0.02) 0%, transparent 50%),
         radial-gradient(ellipse at 80% 70%, rgba(255,0,255,0.02) 0%, transparent 50%),
-        radial-gradient(ellipse at 50% 50%, rgba(255,255,0,0.01) 0%, transparent 50%);
+        radial-gradient(ellipse at 50% 50%, rgba(0,255,255,0.01) 0%, transparent 50%);
     pointer-events: none;
     z-index: 0;
 }
@@ -1015,46 +1041,56 @@ body::before {
 
 .sidebar {
     background: rgba(10,10,15,0.95);
-    border-right: 1px solid rgba(0,255,255,0.1);
-    box-shadow: 0 0 40px rgba(0,255,255,0.02);
+    border-right: 1px solid rgba(0,255,65,0.15);
+    box-shadow: 0 0 40px rgba(0,255,65,0.05);
     color: #e0e0e0;
+    font-family: 'Courier New', monospace;
 }
 
 .sidebar h3 {
-    color: #00ffff;
-    text-shadow: 0 0 20px rgba(0,255,255,0.3);
-    border-bottom: 1px solid rgba(0,255,255,0.1);
+    color: #00ff41;
+    text-shadow: 0 0 20px rgba(0,255,65,0.3), 0 0 40px rgba(0,255,65,0.1);
+    border-bottom: 1px solid rgba(0,255,65,0.15);
     padding-bottom: 15px;
+    font-family: 'Courier New', monospace;
+    font-weight: 700;
+    letter-spacing: 2px;
 }
 
 .sidebar a {
     color: rgba(224,224,224,0.7);
     transition: all 0.3s ease;
+    font-family: 'Courier New', monospace;
+    border-left: 2px solid transparent;
 }
 
 .sidebar a:hover {
-    color: #00ffff;
-    background: rgba(0,255,255,0.05);
-    text-shadow: 0 0 20px rgba(0,255,255,0.2);
+    color: #00ff41;
+    background: rgba(0,255,65,0.05);
+    text-shadow: 0 0 20px rgba(0,255,65,0.2);
     transform: translateX(5px);
+    border-left-color: #00ff41;
 }
 
 .sidebar a.active {
-    color: #00ffff;
-    background: rgba(0,255,255,0.08);
-    text-shadow: 0 0 20px rgba(0,255,255,0.3);
+    color: #00ff41;
+    background: rgba(0,255,65,0.08);
+    text-shadow: 0 0 20px rgba(0,255,65,0.3);
+    border-left-color: #00ff41;
 }
 
 .header {
     background: rgba(20,20,30,0.8);
-    border: 1px solid rgba(0,255,255,0.08);
-    box-shadow: 0 0 40px rgba(0,255,255,0.02);
+    border: 1px solid rgba(0,255,65,0.08);
+    box-shadow: 0 0 40px rgba(0,255,65,0.05);
     color: #e0e0e0;
 }
 
 .header h1 {
-    color: #00ffff;
-    text-shadow: 0 0 30px rgba(0,255,255,0.2);
+    color: #00ff41;
+    text-shadow: 0 0 30px rgba(0,255,65,0.2), 0 0 60px rgba(0,255,65,0.1);
+    font-family: 'Courier New', monospace;
+    letter-spacing: 3px;
 }
 
 .header .date {
@@ -1063,111 +1099,162 @@ body::before {
 
 .stat-card {
     background: rgba(20,20,30,0.6);
-    border: 1px solid rgba(0,255,255,0.05);
+    border: 1px solid rgba(0,255,65,0.05);
     box-shadow: 0 0 20px rgba(0,0,0,0.3);
     transition: all 0.4s ease;
     position: relative;
+    padding: 24px;
+    border-radius: 8px;
+    font-family: 'Courier New', monospace;
 }
+
+/* Неоновая анимация для каждой карточки - случайный цвет из генератора */
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    border-radius: 8px;
+    z-index: -1;
+    animation: neonBorder 3s linear infinite;
+    background: conic-gradient(from var(--angle), var(--neon-color1), var(--neon-color2), var(--neon-color3), var(--neon-color1));
+    opacity: 0.7;
+}
+
+.stat-card::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    border-radius: 8px;
+    z-index: -1;
+    filter: blur(15px);
+    animation: neonBorder 3s linear infinite;
+    background: conic-gradient(from var(--angle), var(--neon-color1), var(--neon-color2), var(--neon-color3), var(--neon-color1));
+    opacity: 0.3;
+}
+
+@property --angle {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
+}
+
+@keyframes neonBorder {
+    0% { --angle: 0deg; }
+    100% { --angle: 360deg; }
+}
+
+/* Устанавливаем разные неоновые цвета для карточек через data-атрибуты */
+.stat-card[data-type="doi"] { --neon-color1: #00ff41; --neon-color2: #00ffaa; --neon-color3: #00ffff; }
+.stat-card[data-type="authors"] { --neon-color1: #ff00ff; --neon-color2: #ff00aa; --neon-color3: #aa00ff; }
+.stat-card[data-type="citations"] { --neon-color1: #ff6600; --neon-color2: #ffaa00; --neon-color3: #ffff00; }
+.stat-card[data-type="journals"] { --neon-color1: #00ffff; --neon-color2: #00aaff; --neon-color3: #0066ff; }
+.stat-card[data-type="publishers"] { --neon-color1: #ff0044; --neon-color2: #ff0088; --neon-color3: #ff00aa; }
+.stat-card[data-type="orcid"] { --neon-color1: #0088ff; --neon-color2: #00ccff; --neon-color3: #00ffff; }
+.stat-card[data-type="selfcitations"] { --neon-color1: #ff0044; --neon-color2: #ff2200; --neon-color3: #ff6600; }
 
 .stat-card:hover {
-    transform: translateY(-5px);
-    border-color: rgba(0,255,255,0.2);
-    box-shadow: 0 0 40px rgba(0,255,255,0.05);
+    transform: translateY(-5px) scale(1.02);
+    border-color: rgba(0,255,65,0.15);
+    box-shadow: 0 0 60px rgba(0,255,65,0.05);
 }
 
-/* Разные неоновые цвета для разных карточек */
-.stat-card[data-type="doi"] { border-color: rgba(0,255,255,0.1); }
-.stat-card[data-type="doi"]:hover { border-color: #00ffff; box-shadow: 0 0 40px rgba(0,255,255,0.1); }
+.stat-card:hover::before {
+    opacity: 1;
+}
 
-.stat-card[data-type="authors"] { border-color: rgba(255,0,255,0.1); }
-.stat-card[data-type="authors"]:hover { border-color: #ff00ff; box-shadow: 0 0 40px rgba(255,0,255,0.1); }
-
-.stat-card[data-type="citations"] { border-color: rgba(255,255,0,0.1); }
-.stat-card[data-type="citations"]:hover { border-color: #ffff00; box-shadow: 0 0 40px rgba(255,255,0,0.1); }
-
-.stat-card[data-type="journals"] { border-color: rgba(0,255,128,0.1); }
-.stat-card[data-type="journals"]:hover { border-color: #00ff80; box-shadow: 0 0 40px rgba(0,255,128,0.1); }
-
-.stat-card[data-type="publishers"] { border-color: rgba(255,128,0,0.1); }
-.stat-card[data-type="publishers"]:hover { border-color: #ff8000; box-shadow: 0 0 40px rgba(255,128,0,0.1); }
-
-.stat-card[data-type="orcid"] { border-color: rgba(0,128,255,0.1); }
-.stat-card[data-type="orcid"]:hover { border-color: #0080ff; box-shadow: 0 0 40px rgba(0,128,255,0.1); }
-
-.stat-card[data-type="selfcitations"] { border-color: rgba(255,0,0,0.1); }
-.stat-card[data-type="selfcitations"]:hover { border-color: #ff0000; box-shadow: 0 0 40px rgba(255,0,0,0.1); }
+.stat-card:hover::after {
+    opacity: 0.5;
+}
 
 .stat-number {
-    color: #00ffff !important;
-    -webkit-text-fill-color: #00ffff !important;
+    color: #00ff41 !important;
+    -webkit-text-fill-color: #00ff41 !important;
     background: none !important;
-    text-shadow: 0 0 30px rgba(0,255,255,0.2);
+    text-shadow: 0 0 30px rgba(0,255,65,0.2), 0 0 60px rgba(0,255,65,0.1);
+    font-family: 'Courier New', monospace;
 }
 
 .stat-percent {
-    background: rgba(0,255,255,0.08);
-    color: #00ffff;
-    border: 1px solid rgba(0,255,255,0.1);
+    background: rgba(0,255,65,0.08);
+    color: #00ff41;
+    border: 1px solid rgba(0,255,65,0.15);
+    font-family: 'Courier New', monospace;
 }
 
 .stat-label {
     color: rgba(224,224,224,0.7);
+    letter-spacing: 1px;
 }
 
 .section {
     background: rgba(20,20,30,0.4);
-    border: 1px solid rgba(0,255,255,0.03);
+    border: 1px solid rgba(0,255,65,0.03);
     box-shadow: 0 0 40px rgba(0,0,0,0.2);
+    border-radius: 8px;
 }
 
 .section-title {
-    color: #00ffff;
-    border-bottom: 2px solid rgba(0,255,255,0.1);
-    text-shadow: 0 0 30px rgba(0,255,255,0.1);
+    color: #00ff41;
+    border-bottom: 2px solid rgba(0,255,65,0.1);
+    text-shadow: 0 0 30px rgba(0,255,65,0.1);
+    font-family: 'Courier New', monospace;
+    letter-spacing: 2px;
 }
 
 .rank-item {
     background: rgba(20,20,30,0.3);
-    border-left: 2px solid rgba(0,255,255,0.1);
+    border-left: 2px solid rgba(0,255,65,0.1);
     transition: all 0.3s ease;
+    font-family: 'Courier New', monospace;
 }
 
 .rank-item:hover {
-    background: rgba(0,255,255,0.03);
+    background: rgba(0,255,65,0.03);
     transform: translateX(8px);
-    border-left-color: #00ffff;
-    box-shadow: 0 0 30px rgba(0,255,255,0.02);
+    border-left-color: #00ff41;
+    box-shadow: 0 0 30px rgba(0,255,65,0.02);
 }
 
 .rank-number {
-    color: #00ffff;
-    text-shadow: 0 0 20px rgba(0,255,255,0.1);
+    color: #00ff41;
+    text-shadow: 0 0 20px rgba(0,255,65,0.1);
+    font-family: 'Courier New', monospace;
 }
 
 .progress-bar {
     background: rgba(255,255,255,0.03);
+    border-radius: 4px !important;
 }
 
 .progress-fill {
-    background: linear-gradient(90deg, #00ffff, #0080ff);
-    box-shadow: 0 0 20px rgba(0,255,255,0.1);
+    background: linear-gradient(90deg, #00ff41, #00ffaa);
+    box-shadow: 0 0 20px rgba(0,255,65,0.1);
+    border-radius: 4px !important;
 }
 
 .concept-card {
     background: rgba(20,20,30,0.3);
-    border: 1px solid rgba(0,255,255,0.05);
+    border: 1px solid rgba(0,255,65,0.05);
     transition: all 0.3s ease;
+    border-radius: 8px;
 }
 
 .concept-card:hover {
-    border-color: rgba(0,255,255,0.2);
+    border-color: rgba(0,255,65,0.2);
     transform: translateY(-3px);
-    box-shadow: 0 0 30px rgba(0,255,255,0.03);
+    box-shadow: 0 0 30px rgba(0,255,65,0.03);
 }
 
 .concept-name {
-    color: #00ffff;
-    text-shadow: 0 0 20px rgba(0,255,255,0.1);
+    color: #00ff41;
+    text-shadow: 0 0 20px rgba(0,255,65,0.1);
+    font-family: 'Courier New', monospace;
 }
 
 .concept-score {
@@ -1175,30 +1262,33 @@ body::before {
 }
 
 .clickable-link {
-    color: #00ffff;
-    text-shadow: 0 0 20px rgba(0,255,255,0.1);
+    color: #00ff41;
+    text-shadow: 0 0 20px rgba(0,255,65,0.1);
+    font-family: 'Courier New', monospace;
 }
 
 .clickable-link:hover {
     color: #ffffff;
-    text-shadow: 0 0 30px rgba(0,255,255,0.3);
+    text-shadow: 0 0 30px rgba(0,255,65,0.3);
 }
 
 .reviewer-card {
     background: rgba(20,20,30,0.4);
-    border: 1px solid rgba(0,255,255,0.05);
-    border-left: 4px solid #00ffff;
+    border: 1px solid rgba(0,255,65,0.05);
+    border-left: 4px solid #00ff41;
     box-shadow: 0 0 30px rgba(0,0,0,0.2);
+    border-radius: 8px;
 }
 
 .reviewer-card:hover {
-    background: rgba(0,255,255,0.03);
-    box-shadow: 0 0 40px rgba(0,255,255,0.02);
+    background: rgba(0,255,65,0.03);
+    box-shadow: 0 0 40px rgba(0,255,65,0.02);
 }
 
 .reviewer-name {
-    color: #00ffff;
-    text-shadow: 0 0 20px rgba(0,255,255,0.1);
+    color: #00ff41;
+    text-shadow: 0 0 20px rgba(0,255,65,0.1);
+    font-family: 'Courier New', monospace;
 }
 
 .reviewer-orcid {
@@ -1206,7 +1296,7 @@ body::before {
 }
 
 .reviewer-orcid a {
-    color: #00ffff;
+    color: #00ff41;
 }
 
 .reviewer-section-title {
@@ -1214,20 +1304,22 @@ body::before {
 }
 
 .external-id-link {
-    background: rgba(0,255,255,0.05);
-    color: #00ffff;
-    border: 1px solid rgba(0,255,255,0.05);
+    background: rgba(0,255,65,0.05);
+    color: #00ff41;
+    border: 1px solid rgba(0,255,65,0.05);
+    font-family: 'Courier New', monospace;
 }
 
 .external-id-link:hover {
-    background: rgba(0,255,255,0.1);
+    background: rgba(0,255,65,0.1);
     color: #ffffff;
 }
 
 th {
-    background: rgba(0,255,255,0.05);
-    color: #00ffff;
-    border-bottom: 2px solid rgba(0,255,255,0.05);
+    background: rgba(0,255,65,0.05);
+    color: #00ff41;
+    border-bottom: 2px solid rgba(0,255,65,0.05);
+    font-family: 'Courier New', monospace;
 }
 
 td {
@@ -1235,10 +1327,9 @@ td {
 }
 
 tr:hover {
-    background: rgba(0,255,255,0.02);
+    background: rgba(0,255,65,0.02);
 }
 
-/* Цветная кодировка для ссылок - неоновая */
 .normal-article {
     background: rgba(0,255,128,0.05) !important;
     border-left: 2px solid rgba(0,255,128,0.3) !important;
@@ -1284,17 +1375,15 @@ tr:hover {
     border-left: 2px solid rgba(255,0,0,0.3) !important;
 }
 
-/* Неоновая анимация для заголовков секций */
 @keyframes neonPulse {
-    0%, 100% { text-shadow: 0 0 20px rgba(0,255,255,0.1); }
-    50% { text-shadow: 0 0 40px rgba(0,255,255,0.3), 0 0 80px rgba(0,255,255,0.1); }
+    0%, 100% { text-shadow: 0 0 20px rgba(0,255,65,0.1); }
+    50% { text-shadow: 0 0 40px rgba(0,255,65,0.3), 0 0 80px rgba(0,255,65,0.1); }
 }
 
 .section-title {
     animation: neonPulse 4s ease-in-out infinite;
 }
 
-/* Анимация появления с неоновым свечением */
 @keyframes neonIn {
     0% { opacity: 0; transform: translateY(30px); filter: blur(10px); }
     100% { opacity: 1; transform: translateY(0); filter: blur(0px); }
@@ -1316,30 +1405,47 @@ tr:hover {
 
 .footer {
     color: rgba(224,224,224,0.3);
-    border-top-color: rgba(0,255,255,0.03);
+    border-top-color: rgba(0,255,65,0.03);
 }
 
 .confidential-banner {
     background: rgba(255,0,0,0.05);
-    border-left: 4px solid #ff0000;
-    color: #ff6666;
+    border-left: 4px solid #ff0044;
+    color: #ff0044;
     text-shadow: 0 0 20px rgba(255,0,0,0.1);
+    font-family: 'Courier New', monospace;
 }
+
+/* Дополнительные киберпанк элементы */
+.badge {
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.badge-success { background: rgba(0,255,65,0.15); color: #00ff41; border: 1px solid rgba(0,255,65,0.2); }
+.badge-warning { background: rgba(255,170,0,0.15); color: #ffaa00; border: 1px solid rgba(255,170,0,0.2); }
+.badge-danger { background: rgba(255,0,68,0.15); color: #ff0044; border: 1px solid rgba(255,0,68,0.2); }
+.badge-info { background: rgba(0,255,255,0.15); color: #00ffff; border: 1px solid rgba(0,255,255,0.2); }
+.badge-repository { background: rgba(170,0,255,0.15); color: #aa00ff; border: 1px solid rgba(170,0,255,0.2); }
+.badge-book { background: rgba(0,255,170,0.15); color: #00ffaa; border: 1px solid rgba(0,255,170,0.2); }
+.badge-proceedings { background: rgba(255,170,0,0.15); color: #ffaa00; border: 1px solid rgba(255,170,0,0.2); }
 """
 
-# ======================== ТЕМА 4: AURORA BOREALIS (СЕВЕРНОЕ СИЯНИЕ) ========================
+# ======================== ТЕМА 4: AURORA BOREALIS (ПОЛЯРНАЯ НОЧЬ/ЗИМНИЙ МОРОЗ) ========================
 
 AURORA_CSS = """
-/* ==================== ТЕМА: AURORA BOREALIS ==================== */
+/* ==================== ТЕМА: AURORA BOREALIS - АРКТИЧЕСКАЯ НОЧЬ С ЭФФЕКТОМ МОРОЗА ==================== */
 /* Полностью отключает пользовательские цвета */
 
 body {
-    background: linear-gradient(135deg, #0a1628 0%, #1a0a2e 20%, #0d1f3c 40%, #1a0a2e 60%, #0a1628 100%);
-    color: #d4e8f0;
+    background: linear-gradient(180deg, #0a1520 0%, #0d1f2d 30%, #0a1a25 60%, #0d1f2d 80%, #0a1520 100%);
+    color: #c8dce8;
     position: relative;
     overflow-x: hidden;
 }
 
+/* Снежная текстура - мелкие белые точки */
 body::before {
     content: '';
     position: fixed;
@@ -1347,22 +1453,41 @@ body::before {
     left: 0;
     right: 0;
     bottom: 0;
-    background: 
-        radial-gradient(ellipse at 15% 30%, rgba(0,255,100,0.06) 0%, transparent 30%),
-        radial-gradient(ellipse at 85% 60%, rgba(0,150,255,0.06) 0%, transparent 30%),
-        radial-gradient(ellipse at 50% 80%, rgba(200,0,255,0.03) 0%, transparent 30%),
-        radial-gradient(ellipse at 30% 70%, rgba(0,255,200,0.04) 0%, transparent 25%);
-    animation: auroraMove 12s ease-in-out infinite alternate;
+    background-image: 
+        radial-gradient(1px 1px at 5% 10%, rgba(255,255,255,0.15), transparent),
+        radial-gradient(1px 1px at 15% 30%, rgba(255,255,255,0.10), transparent),
+        radial-gradient(1.5px 1.5px at 25% 5%, rgba(255,255,255,0.20), transparent),
+        radial-gradient(1px 1px at 35% 45%, rgba(255,255,255,0.08), transparent),
+        radial-gradient(1px 1px at 45% 15%, rgba(255,255,255,0.12), transparent),
+        radial-gradient(2px 2px at 55% 35%, rgba(255,255,255,0.18), transparent),
+        radial-gradient(1px 1px at 65% 5%, rgba(255,255,255,0.10), transparent),
+        radial-gradient(1px 1px at 75% 25%, rgba(255,255,255,0.15), transparent),
+        radial-gradient(1.5px 1.5px at 85% 15%, rgba(255,255,255,0.12), transparent),
+        radial-gradient(1px 1px at 95% 40%, rgba(255,255,255,0.08), transparent),
+        radial-gradient(1px 1px at 10% 55%, rgba(255,255,255,0.10), transparent),
+        radial-gradient(1px 1px at 20% 70%, rgba(255,255,255,0.15), transparent),
+        radial-gradient(1.5px 1.5px at 30% 60%, rgba(255,255,255,0.12), transparent),
+        radial-gradient(1px 1px at 40% 80%, rgba(255,255,255,0.08), transparent),
+        radial-gradient(1px 1px at 50% 65%, rgba(255,255,255,0.18), transparent),
+        radial-gradient(2px 2px at 60% 85%, rgba(255,255,255,0.10), transparent),
+        radial-gradient(1px 1px at 70% 75%, rgba(255,255,255,0.15), transparent),
+        radial-gradient(1px 1px at 80% 90%, rgba(255,255,255,0.12), transparent),
+        radial-gradient(1.5px 1.5px at 90% 60%, rgba(255,255,255,0.18), transparent),
+        radial-gradient(1px 1px at 95% 80%, rgba(255,255,255,0.08), transparent);
+    background-size: 200px 200px;
+    background-repeat: repeat;
+    opacity: 0.3;
     pointer-events: none;
     z-index: 0;
+    animation: snowfall 20s linear infinite;
 }
 
-@keyframes auroraMove {
-    0% { transform: translateX(-5%) scale(1) rotate(0deg); opacity: 0.6; }
-    50% { transform: translateX(5%) scale(1.05) rotate(1deg); opacity: 1; }
-    100% { transform: translateX(-3%) scale(0.95) rotate(-1deg); opacity: 0.7; }
+@keyframes snowfall {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(200px); }
 }
 
+/* Полярное сияние только в хедере и футере */
 body::after {
     content: '';
     position: fixed;
@@ -1371,16 +1496,11 @@ body::after {
     right: 0;
     bottom: 0;
     background: 
-        radial-gradient(ellipse at 60% 20%, rgba(0,255,150,0.03) 0%, transparent 20%),
-        radial-gradient(ellipse at 40% 80%, rgba(100,0,255,0.03) 0%, transparent 20%);
-    animation: auroraGlow 8s ease-in-out infinite alternate;
+        radial-gradient(ellipse at 30% 10%, rgba(168,216,234,0.03) 0%, transparent 20%),
+        radial-gradient(ellipse at 70% 15%, rgba(192,192,192,0.02) 0%, transparent 20%),
+        radial-gradient(ellipse at 50% 90%, rgba(168,216,234,0.02) 0%, transparent 20%);
     pointer-events: none;
     z-index: 0;
-}
-
-@keyframes auroraGlow {
-    0% { opacity: 0.3; }
-    100% { opacity: 0.8; }
 }
 
 .report-wrapper {
@@ -1389,237 +1509,291 @@ body::after {
 }
 
 .sidebar {
-    background: rgba(10,22,40,0.85);
+    background: rgba(10,21,32,0.92);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border-right: 1px solid rgba(0,255,150,0.05);
-    color: #d4e8f0;
+    border-right: 1px solid rgba(168,216,234,0.05);
+    color: #c8dce8;
     box-shadow: 0 0 60px rgba(0,0,0,0.2);
 }
 
 .sidebar h3 {
-    color: #00ff88;
-    text-shadow: 0 0 30px rgba(0,255,136,0.15);
-    border-bottom: 1px solid rgba(0,255,136,0.05);
+    color: #a8d8ea;
+    text-shadow: 0 0 30px rgba(168,216,234,0.05);
+    border-bottom: 1px solid rgba(168,216,234,0.05);
     padding-bottom: 15px;
+    font-weight: 300;
+    letter-spacing: 2px;
 }
 
 .sidebar a {
-    color: rgba(212,232,240,0.6);
+    color: rgba(200,220,232,0.5);
     transition: all 0.3s ease;
+    border-left: 2px solid transparent;
 }
 
 .sidebar a:hover {
-    color: #00ff88;
-    background: rgba(0,255,136,0.05);
-    text-shadow: 0 0 20px rgba(0,255,136,0.1);
+    color: #a8d8ea;
+    background: rgba(168,216,234,0.03);
+    text-shadow: 0 0 20px rgba(168,216,234,0.05);
+    border-left-color: #a8d8ea;
 }
 
 .sidebar a.active {
-    color: #00ff88;
-    background: rgba(0,255,136,0.08);
-    text-shadow: 0 0 20px rgba(0,255,136,0.15);
+    color: #a8d8ea;
+    background: rgba(168,216,234,0.05);
+    text-shadow: 0 0 20px rgba(168,216,234,0.08);
+    border-left-color: #a8d8ea;
 }
 
 .header {
-    background: rgba(10,22,40,0.6);
+    background: rgba(13,31,45,0.6);
     backdrop-filter: blur(15px);
     -webkit-backdrop-filter: blur(15px);
-    border: 1px solid rgba(0,255,150,0.05);
+    border: 1px solid rgba(168,216,234,0.03);
     box-shadow: 0 0 60px rgba(0,0,0,0.1);
-    color: #d4e8f0;
+    color: #c8dce8;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Эффект полярного сияния в хедере */
+.header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(ellipse at 30% 20%, rgba(168,216,234,0.03) 0%, transparent 30%),
+                radial-gradient(ellipse at 70% 30%, rgba(192,192,192,0.02) 0%, transparent 30%);
+    animation: auroraMoveHeader 15s ease-in-out infinite alternate;
+    pointer-events: none;
+}
+
+@keyframes auroraMoveHeader {
+    0% { transform: translateX(-10%) scale(1); }
+    100% { transform: translateX(10%) scale(1.1); }
 }
 
 .header h1 {
-    color: #00ff88;
-    text-shadow: 0 0 40px rgba(0,255,136,0.1);
+    color: #a8d8ea;
+    text-shadow: 0 0 40px rgba(168,216,234,0.05);
+    font-weight: 300;
+    letter-spacing: 3px;
 }
 
 .header .date {
-    color: rgba(212,232,240,0.5);
+    color: rgba(200,220,232,0.4);
 }
 
 .stat-card {
-    background: rgba(255,255,255,0.03);
+    background: rgba(255,255,255,0.02);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,0.03);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    border: 1px solid rgba(168,216,234,0.03);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
     transition: all 0.5s ease;
+    position: relative;
+}
+
+/* Эффект инея на карточках */
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.03), transparent);
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s ease;
 }
 
 .stat-card:hover {
     transform: translateY(-8px);
-    border-color: rgba(0,255,150,0.08);
-    box-shadow: 0 16px 48px rgba(0,255,150,0.05);
+    border-color: rgba(168,216,234,0.08);
+    box-shadow: 0 16px 48px rgba(0,0,0,0.2);
+}
+
+.stat-card:hover::before {
+    opacity: 1;
 }
 
 .stat-number {
-    background: linear-gradient(135deg, #00ff88, #00ccff) !important;
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-    background-clip: text !important;
-    text-shadow: 0 0 40px rgba(0,255,136,0.1);
+    color: #a8d8ea !important;
+    -webkit-text-fill-color: #a8d8ea !important;
+    background: none !important;
+    text-shadow: 0 0 40px rgba(168,216,234,0.02);
+    font-weight: 300;
 }
 
 .stat-percent {
-    background: rgba(0,255,136,0.08);
-    color: #00ff88;
-    border: 1px solid rgba(0,255,136,0.05);
+    background: rgba(168,216,234,0.04);
+    color: #a8d8ea;
+    border: 1px solid rgba(168,216,234,0.02);
 }
 
 .stat-label {
-    color: rgba(212,232,240,0.7);
+    color: rgba(200,220,232,0.5);
+    font-weight: 300;
 }
 
 .section {
     background: rgba(255,255,255,0.02);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,0.02);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    border: 1px solid rgba(168,216,234,0.02);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.05);
 }
 
 .section-title {
-    color: #00ff88;
-    border-bottom: 2px solid rgba(0,255,136,0.05);
-    text-shadow: 0 0 30px rgba(0,255,136,0.05);
+    color: #a8d8ea;
+    border-bottom: 2px solid rgba(168,216,234,0.03);
+    text-shadow: 0 0 30px rgba(168,216,234,0.02);
+    font-weight: 300;
+    letter-spacing: 2px;
 }
 
 .rank-item {
-    background: rgba(255,255,255,0.02);
-    border-left: 2px solid rgba(0,255,136,0.05);
+    background: rgba(255,255,255,0.01);
+    border-left: 2px solid rgba(168,216,234,0.03);
     transition: all 0.4s ease;
 }
 
 .rank-item:hover {
-    background: rgba(0,255,136,0.02);
+    background: rgba(168,216,234,0.02);
     transform: translateX(8px);
-    border-left-color: rgba(0,255,136,0.2);
+    border-left-color: rgba(168,216,234,0.08);
 }
 
 .rank-number {
-    color: #00ff88;
-    text-shadow: 0 0 20px rgba(0,255,136,0.05);
+    color: #a8d8ea;
+    font-weight: 300;
 }
 
 .progress-bar {
     background: rgba(255,255,255,0.02);
+    border-radius: 4px !important;
 }
 
 .progress-fill {
-    background: linear-gradient(90deg, #00ff88, #00ccff);
-    box-shadow: 0 0 20px rgba(0,255,136,0.05);
+    background: linear-gradient(90deg, #a8d8ea, #c8dce8);
+    box-shadow: 0 0 20px rgba(168,216,234,0.02);
+    border-radius: 4px !important;
 }
 
 .concept-card {
-    background: rgba(255,255,255,0.02);
-    border: 1px solid rgba(255,255,255,0.02);
+    background: rgba(255,255,255,0.01);
+    border: 1px solid rgba(168,216,234,0.02);
     transition: all 0.4s ease;
 }
 
 .concept-card:hover {
-    border-color: rgba(0,255,136,0.05);
+    border-color: rgba(168,216,234,0.03);
     transform: translateY(-3px);
-    box-shadow: 0 0 40px rgba(0,255,136,0.02);
+    box-shadow: 0 0 40px rgba(168,216,234,0.01);
 }
 
 .concept-name {
-    color: #00ff88;
+    color: #a8d8ea;
+    font-weight: 300;
 }
 
 .concept-score {
-    color: rgba(212,232,240,0.4);
+    color: rgba(200,220,232,0.2);
 }
 
 .clickable-link {
-    color: #00ff88;
+    color: #a8d8ea;
 }
 
 .clickable-link:hover {
-    color: #00ffff;
-    text-shadow: 0 0 20px rgba(0,255,136,0.1);
+    color: #e0f0f8;
+    text-shadow: 0 0 20px rgba(168,216,234,0.02);
 }
 
 .reviewer-card {
-    background: rgba(255,255,255,0.02);
-    border: 1px solid rgba(255,255,255,0.02);
-    border-left: 4px solid rgba(0,255,136,0.1);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    background: rgba(13,31,45,0.4);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(168,216,234,0.02);
+    border-left: 4px solid rgba(168,216,234,0.03);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
 }
 
 .reviewer-card:hover {
-    background: rgba(0,255,136,0.02);
-    box-shadow: 0 8px 30px rgba(0,255,136,0.02);
+    background: rgba(168,216,234,0.02);
 }
 
 .reviewer-name {
-    color: #00ff88;
+    color: #a8d8ea;
+    font-weight: 300;
 }
 
 th {
-    background: rgba(0,255,136,0.03);
-    color: #00ff88;
-    border-bottom: 2px solid rgba(0,255,136,0.03);
+    background: rgba(168,216,234,0.02);
+    color: #a8d8ea;
+    border-bottom: 2px solid rgba(168,216,234,0.02);
+    font-weight: 300;
 }
 
 td {
-    color: rgba(212,232,240,0.6);
+    color: rgba(200,220,232,0.5);
 }
 
 tr:hover {
-    background: rgba(0,255,136,0.01);
+    background: rgba(168,216,234,0.01);
 }
 
-/* Цветная кодировка в стиле Aurora */
 .normal-article {
-    background: rgba(0,255,136,0.03) !important;
-    border-left: 2px solid rgba(0,255,136,0.15) !important;
+    border-left: 2px solid rgba(168,216,234,0.05) !important;
+    background: none !important;
 }
 
 .notfound-reference {
-    background: rgba(128,128,128,0.03) !important;
-    border-left: 2px solid rgba(128,128,128,0.15) !important;
+    border-left: 2px solid rgba(128,128,128,0.05) !important;
+    background: none !important;
 }
 
 .suspicious-reference {
-    background: rgba(255,0,100,0.03) !important;
-    border-left: 2px solid rgba(255,0,100,0.15) !important;
+    border-left: 2px solid rgba(200,100,100,0.05) !important;
+    background: none !important;
 }
 
 .duplicate-reference {
-    background: rgba(255,200,0,0.03) !important;
-    border-left: 2px solid rgba(255,200,0,0.15) !important;
+    border-left: 2px solid rgba(200,180,100,0.05) !important;
+    background: none !important;
 }
 
 .ebook-reference {
-    background: rgba(0,255,255,0.03) !important;
-    border-left: 2px solid rgba(0,255,255,0.15) !important;
+    border-left: 2px solid rgba(168,216,234,0.05) !important;
+    background: none !important;
 }
 
 .repository-reference {
-    background: rgba(200,100,255,0.03) !important;
-    border-left: 2px solid rgba(200,100,255,0.15) !important;
+    border-left: 2px solid rgba(180,160,220,0.05) !important;
+    background: none !important;
 }
 
 .preprint-reference {
-    background: rgba(200,100,255,0.03) !important;
-    border-left: 2px solid rgba(200,100,255,0.15) !important;
+    border-left: 2px solid rgba(180,160,220,0.05) !important;
+    background: none !important;
 }
 
 .proceedings-reference {
-    background: rgba(255,150,0,0.03) !important;
-    border-left: 2px solid rgba(255,150,0,0.15) !important;
+    border-left: 2px solid rgba(220,200,160,0.05) !important;
+    background: none !important;
 }
 
 .retracted-reference {
-    background: rgba(255,0,100,0.03) !important;
-    border-left: 2px solid rgba(255,0,100,0.15) !important;
+    border-left: 2px solid rgba(200,100,100,0.05) !important;
+    background: none !important;
 }
 
-/* Анимация появления с эффектом сияния */
 @keyframes auroraIn {
-    0% { opacity: 0; transform: translateY(30px); filter: blur(5px); }
+    0% { opacity: 0; transform: translateY(30px); filter: blur(2px); }
     100% { opacity: 1; transform: translateY(0); filter: blur(0px); }
 }
 
@@ -1638,19 +1812,849 @@ tr:hover {
 .section:nth-child(10) { animation-delay: 0.9s; }
 
 .footer {
-    color: rgba(212,232,240,0.2);
-    border-top-color: rgba(0,255,136,0.02);
+    color: rgba(200,220,232,0.15);
+    border-top-color: rgba(168,216,234,0.02);
 }
 
 .confidential-banner {
-    background: rgba(255,0,100,0.03);
-    border-left: 4px solid rgba(255,0,100,0.2);
-    color: #ff66aa;
-    text-shadow: 0 0 20px rgba(255,0,100,0.05);
+    background: rgba(200,100,100,0.02);
+    border-left: 4px solid rgba(200,100,100,0.05);
+    color: #b8a8a8;
+    font-weight: 300;
 }
+
+/* Стили для бейджей в арктическом стиле */
+.badge {
+    font-weight: 300;
+    letter-spacing: 0.5px;
+}
+
+.badge-success { background: rgba(168,216,234,0.05); color: #a8d8ea; border: 1px solid rgba(168,216,234,0.02); }
+.badge-warning { background: rgba(200,200,180,0.05); color: #c8c8b8; border: 1px solid rgba(200,200,180,0.02); }
+.badge-danger { background: rgba(200,100,100,0.05); color: #c8a8a8; border: 1px solid rgba(200,100,100,0.02); }
+.badge-info { background: rgba(180,200,220,0.05); color: #a8b8c8; border: 1px solid rgba(180,200,220,0.02); }
 """
 
-# ======================== ТЕМА 5: BRUTALIST (БРУТАЛИСТ) ========================
+# ======================== ТЕМА 5: OCEAN DEEP (ГЛУБИНА ОКЕАНА / ЗАТОНУВШИЙ КОРАБЛЬ) ========================
+
+OCEAN_DEEP_CSS = """
+/* ==================== ТЕМА: OCEAN DEEP - ГЛУБИНА ОКЕАНА С ЭФФЕКТОМ ЗАТОНУВШЕГО КОРАБЛЯ ==================== */
+/* Полностью отключает пользовательские цвета */
+
+body {
+    background: linear-gradient(180deg, #0a1628 0%, #0a1f1a 30%, #0a2a1a 50%, #0a1f1a 70%, #0a1628 100%);
+    color: #8db5a8;
+    min-height: 100vh;
+    position: relative;
+}
+
+/* Подводные лучи света */
+body::before {
+    content: '';
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: 
+        linear-gradient(135deg, rgba(0,180,200,0.02) 0%, transparent 30%),
+        linear-gradient(225deg, rgba(0,150,180,0.01) 0%, transparent 30%),
+        radial-gradient(ellipse at 30% 20%, rgba(0,200,180,0.02) 0%, transparent 20%),
+        radial-gradient(ellipse at 70% 80%, rgba(0,150,200,0.01) 0%, transparent 20%);
+    animation: lightBeams 15s ease-in-out infinite alternate;
+    pointer-events: none;
+    z-index: 0;
+}
+
+@keyframes lightBeams {
+    0% { transform: rotate(-5deg) scale(1); }
+    100% { transform: rotate(5deg) scale(1.05); }
+}
+
+/* Пузырьки */
+body::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+        radial-gradient(2px 2px at 10% 20%, rgba(0,255,200,0.05), transparent),
+        radial-gradient(2px 2px at 25% 40%, rgba(0,255,200,0.03), transparent),
+        radial-gradient(3px 3px at 40% 60%, rgba(0,255,200,0.04), transparent),
+        radial-gradient(2px 2px at 55% 80%, rgba(0,255,200,0.03), transparent),
+        radial-gradient(2px 2px at 70% 30%, rgba(0,255,200,0.05), transparent),
+        radial-gradient(3px 3px at 85% 50%, rgba(0,255,200,0.04), transparent),
+        radial-gradient(2px 2px at 15% 70%, rgba(0,255,200,0.03), transparent),
+        radial-gradient(2px 2px at 45% 20%, rgba(0,255,200,0.05), transparent),
+        radial-gradient(3px 3px at 65% 90%, rgba(0,255,200,0.04), transparent),
+        radial-gradient(2px 2px at 90% 10%, rgba(0,255,200,0.03), transparent);
+    background-size: 300px 300px;
+    background-repeat: repeat;
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: 0;
+    animation: bubbles 12s ease-in-out infinite alternate;
+}
+
+@keyframes bubbles {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(-200px); }
+}
+
+.report-wrapper {
+    position: relative;
+    z-index: 1;
+}
+
+.sidebar {
+    background: rgba(10,30,26,0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-right: 1px solid rgba(0,180,160,0.05);
+    color: #8db5a8;
+    box-shadow: 0 0 60px rgba(0,0,0,0.3);
+}
+
+.sidebar h3 {
+    color: #00d4aa;
+    text-shadow: 0 0 30px rgba(0,212,170,0.05);
+    border-bottom: 1px solid rgba(0,180,160,0.05);
+    padding-bottom: 15px;
+    font-weight: 300;
+    letter-spacing: 3px;
+}
+
+.sidebar a {
+    color: rgba(141,181,168,0.5);
+    transition: all 0.3s ease;
+    clip-path: polygon(0 0, 100% 0, 95% 100%, 0% 100%);
+}
+
+.sidebar a:hover {
+    color: #00d4aa;
+    background: rgba(0,212,170,0.03);
+    text-shadow: 0 0 20px rgba(0,212,170,0.05);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0% 100%);
+}
+
+.sidebar a.active {
+    color: #00d4aa;
+    background: rgba(0,212,170,0.05);
+    text-shadow: 0 0 20px rgba(0,212,170,0.08);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0% 100%);
+}
+
+.header {
+    background: rgba(10,31,26,0.6);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid rgba(0,180,160,0.03);
+    box-shadow: 0 0 60px rgba(0,0,0,0.2);
+    color: #8db5a8;
+    clip-path: polygon(0 0, 100% 0, 98% 100%, 2% 100%);
+}
+
+.header h1 {
+    color: #00d4aa;
+    text-shadow: 0 0 40px rgba(0,212,170,0.02);
+    font-weight: 300;
+    letter-spacing: 4px;
+}
+
+.header .date {
+    color: rgba(141,181,168,0.3);
+}
+
+.stat-card {
+    background: rgba(10,31,26,0.5);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(0,180,160,0.02);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    transition: all 0.5s ease;
+    clip-path: polygon(0 0, 100% 0, 97% 100%, 3% 100%);
+    position: relative;
+}
+
+/* Налет на карточках (эффект затонувшего корабля) */
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(180deg, rgba(0,180,160,0.02), transparent 50%, rgba(0,180,160,0.01));
+    border-radius: inherit;
+    pointer-events: none;
+}
+
+.stat-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    border-color: rgba(0,212,170,0.05);
+    box-shadow: 0 16px 48px rgba(0,0,0,0.3);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0% 100%);
+}
+
+.stat-number {
+    background: linear-gradient(135deg, #00d4aa, #00b894) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+    text-shadow: 0 0 40px rgba(0,212,170,0.02);
+    font-weight: 300;
+}
+
+.stat-percent {
+    background: rgba(0,212,170,0.04);
+    color: #00d4aa;
+    border: 1px solid rgba(0,212,170,0.02);
+}
+
+.stat-label {
+    color: rgba(141,181,168,0.5);
+    font-weight: 300;
+}
+
+.section {
+    background: rgba(10,31,26,0.3);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(0,180,160,0.01);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+}
+
+.section-title {
+    color: #00d4aa;
+    border-bottom: 2px solid rgba(0,212,170,0.03);
+    text-shadow: 0 0 30px rgba(0,212,170,0.01);
+    font-weight: 300;
+    letter-spacing: 3px;
+}
+
+.rank-item {
+    background: rgba(255,255,255,0.01);
+    border-left: 2px solid rgba(0,212,170,0.03);
+    transition: all 0.4s ease;
+    clip-path: polygon(0 0, 100% 0, 98% 100%, 2% 100%);
+}
+
+.rank-item:hover {
+    background: rgba(0,212,170,0.01);
+    transform: translateX(8px);
+    border-left-color: rgba(0,212,170,0.05);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0% 100%);
+}
+
+.rank-number {
+    color: #00d4aa;
+    font-weight: 300;
+}
+
+.progress-bar {
+    background: rgba(255,255,255,0.01);
+    border-radius: 4px !important;
+}
+
+.progress-fill {
+    background: linear-gradient(90deg, #00b894, #00d4aa);
+    box-shadow: 0 0 20px rgba(0,212,170,0.02);
+    border-radius: 4px !important;
+}
+
+.concept-card {
+    background: rgba(255,255,255,0.01);
+    border: 1px solid rgba(0,180,160,0.01);
+    transition: all 0.4s ease;
+    clip-path: polygon(0 0, 100% 0, 95% 100%, 5% 100%);
+}
+
+.concept-card:hover {
+    border-color: rgba(0,212,170,0.02);
+    transform: translateY(-3px);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0% 100%);
+}
+
+.concept-name {
+    color: #00d4aa;
+    font-weight: 300;
+}
+
+.concept-score {
+    color: rgba(141,181,168,0.2);
+}
+
+.clickable-link {
+    color: #00d4aa;
+}
+
+.clickable-link:hover {
+    color: #00ffcc;
+    text-shadow: 0 0 20px rgba(0,212,170,0.02);
+}
+
+.reviewer-card {
+    background: rgba(10,31,26,0.4);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(0,180,160,0.01);
+    border-left: 4px solid rgba(0,212,170,0.03);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    clip-path: polygon(0 0, 100% 0, 98% 100%, 2% 100%);
+}
+
+.reviewer-card:hover {
+    background: rgba(0,212,170,0.01);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0% 100%);
+}
+
+.reviewer-name {
+    color: #00d4aa;
+    font-weight: 300;
+}
+
+th {
+    background: rgba(0,212,170,0.02);
+    color: #00d4aa;
+    border-bottom: 2px solid rgba(0,212,170,0.02);
+    font-weight: 300;
+}
+
+td {
+    color: rgba(141,181,168,0.5);
+}
+
+tr:hover {
+    background: rgba(0,212,170,0.01);
+}
+
+.normal-article {
+    border-left: 2px solid rgba(0,200,180,0.03) !important;
+    background: none !important;
+}
+
+.notfound-reference {
+    border-left: 2px solid rgba(128,128,128,0.03) !important;
+    background: none !important;
+}
+
+.suspicious-reference {
+    border-left: 2px solid rgba(255,100,100,0.03) !important;
+    background: none !important;
+}
+
+.duplicate-reference {
+    border-left: 2px solid rgba(255,200,100,0.03) !important;
+    background: none !important;
+}
+
+.ebook-reference {
+    border-left: 2px solid rgba(0,212,170,0.03) !important;
+    background: none !important;
+}
+
+.repository-reference {
+    border-left: 2px solid rgba(150,100,200,0.03) !important;
+    background: none !important;
+}
+
+.preprint-reference {
+    border-left: 2px solid rgba(150,100,200,0.03) !important;
+    background: none !important;
+}
+
+.proceedings-reference {
+    border-left: 2px solid rgba(200,180,100,0.03) !important;
+    background: none !important;
+}
+
+.retracted-reference {
+    border-left: 2px solid rgba(255,100,100,0.03) !important;
+    background: none !important;
+}
+
+@keyframes oceanIn {
+    0% { opacity: 0; transform: translateY(30px) scale(0.98) rotateX(2deg); }
+    100% { opacity: 1; transform: translateY(0) scale(1) rotateX(0deg); }
+}
+
+.section {
+    animation: oceanIn 0.7s ease-out forwards;
+    perspective: 1000px;
+}
+
+.section:nth-child(2) { animation-delay: 0.1s; }
+.section:nth-child(3) { animation-delay: 0.2s; }
+.section:nth-child(4) { animation-delay: 0.3s; }
+.section:nth-child(5) { animation-delay: 0.4s; }
+.section:nth-child(6) { animation-delay: 0.5s; }
+.section:nth-child(7) { animation-delay: 0.6s; }
+.section:nth-child(8) { animation-delay: 0.7s; }
+.section:nth-child(9) { animation-delay: 0.8s; }
+.section:nth-child(10) { animation-delay: 0.9s; }
+
+.footer {
+    color: rgba(141,181,168,0.1);
+    border-top-color: rgba(0,212,170,0.01);
+}
+
+.confidential-banner {
+    background: rgba(255,100,100,0.02);
+    border-left: 4px solid rgba(255,100,100,0.05);
+    color: #8db5a8;
+    font-weight: 300;
+}
+
+.badge {
+    font-weight: 300;
+    letter-spacing: 0.5px;
+}
+
+.badge-success { background: rgba(0,212,170,0.05); color: #00d4aa; border: 1px solid rgba(0,212,170,0.02); }
+.badge-warning { background: rgba(255,200,100,0.05); color: #c8b888; border: 1px solid rgba(255,200,100,0.02); }
+.badge-danger { background: rgba(255,100,100,0.05); color: #c88888; border: 1px solid rgba(255,100,100,0.02); }
+.badge-info { background: rgba(0,180,200,0.05); color: #00b8c8; border: 1px solid rgba(0,180,200,0.02); }
+"""
+
+# ======================== ТЕМА 6: COSMIC (РЕТРО-КОСМОС 70-Х) ========================
+
+COSMIC_CSS = """
+/* ==================== ТЕМА: COSMIC - РЕТРО-ФУТУРИСТИЧЕСКИЙ КОСМОС 70-Х ==================== */
+/* Полностью отключает пользовательские цвета */
+
+body {
+    background: linear-gradient(180deg, #0a0a1a 0%, #0d0d2b 30%, #0f0f2d 50%, #0d0d2b 70%, #0a0a1a 100%);
+    color: #c8c8d8;
+    position: relative;
+    overflow-x: hidden;
+    font-family: 'Georgia', 'Times New Roman', serif;
+}
+
+/* Винтажная зернистость */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+        radial-gradient(1px 1px at 10% 20%, rgba(255,255,200,0.06), transparent),
+        radial-gradient(1px 1px at 30% 50%, rgba(255,255,200,0.04), transparent),
+        radial-gradient(1.5px 1.5px at 50% 30%, rgba(255,255,200,0.08), transparent),
+        radial-gradient(1px 1px at 70% 60%, rgba(255,255,200,0.05), transparent),
+        radial-gradient(1px 1px at 90% 40%, rgba(255,255,200,0.07), transparent),
+        radial-gradient(1px 1px at 20% 70%, rgba(255,255,200,0.04), transparent),
+        radial-gradient(1.5px 1.5px at 40% 90%, rgba(255,255,200,0.06), transparent),
+        radial-gradient(1px 1px at 60% 10%, rgba(255,255,200,0.08), transparent),
+        radial-gradient(1px 1px at 80% 80%, rgba(255,255,200,0.05), transparent);
+    background-size: 200px 200px;
+    background-repeat: repeat;
+    opacity: 0.2;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Ретро-элементы (круги, орбиты) */
+body::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        radial-gradient(circle at 20% 30%, rgba(255,215,0,0.02) 0%, transparent 15%),
+        radial-gradient(circle at 80% 70%, rgba(255,107,53,0.02) 0%, transparent 15%),
+        radial-gradient(circle at 50% 50%, rgba(0,212,255,0.01) 0%, transparent 20%),
+        radial-gradient(circle at 70% 20%, rgba(255,215,0,0.01) 0%, transparent 12%),
+        radial-gradient(circle at 30% 80%, rgba(255,107,53,0.01) 0%, transparent 12%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.report-wrapper {
+    position: relative;
+    z-index: 1;
+}
+
+.sidebar {
+    background: rgba(10,10,26,0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-right: 2px solid rgba(255,215,0,0.03);
+    color: #c8c8d8;
+    box-shadow: 0 0 60px rgba(0,0,0,0.3);
+}
+
+.sidebar h3 {
+    color: #ffd700;
+    text-shadow: 0 0 30px rgba(255,215,0,0.05);
+    border-bottom: 2px solid rgba(255,215,0,0.05);
+    padding-bottom: 15px;
+    font-family: 'Georgia', serif;
+    font-weight: 700;
+    letter-spacing: 4px;
+}
+
+.sidebar a {
+    color: rgba(200,200,216,0.5);
+    transition: all 0.3s ease;
+    font-family: 'Georgia', serif;
+    border: 1px solid transparent;
+    padding: 10px 15px;
+}
+
+.sidebar a:hover {
+    color: #ffd700;
+    background: rgba(255,215,0,0.03);
+    text-shadow: 0 0 20px rgba(255,215,0,0.05);
+    border-color: rgba(255,215,0,0.05);
+}
+
+.sidebar a.active {
+    color: #ffd700;
+    background: rgba(255,215,0,0.05);
+    text-shadow: 0 0 20px rgba(255,215,0,0.08);
+    border-color: rgba(255,215,0,0.08);
+}
+
+.header {
+    background: rgba(13,13,43,0.6);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 2px solid rgba(255,215,0,0.02);
+    box-shadow: 0 0 60px rgba(0,0,0,0.2);
+    color: #c8c8d8;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Ретро-орбита в хедере */
+.header::before {
+    content: '✦ ✧ ✦';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 60px;
+    color: rgba(255,215,0,0.02);
+    letter-spacing: 100px;
+    pointer-events: none;
+    animation: orbitRotate 20s linear infinite;
+}
+
+@keyframes orbitRotate {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.header h1 {
+    color: #ffd700;
+    text-shadow: 0 0 40px rgba(255,215,0,0.02);
+    font-family: 'Georgia', serif;
+    font-weight: 700;
+    letter-spacing: 5px;
+}
+
+.header .date {
+    color: rgba(200,200,216,0.3);
+}
+
+.stat-card {
+    background: rgba(20,20,50,0.4);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,215,0,0.02);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    transition: all 0.5s ease;
+    border-radius: 0 !important;
+    /* Винтажная рамка с уголками */
+    position: relative;
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: -1px;
+    width: 30px;
+    height: 30px;
+    border-top: 2px solid rgba(255,215,0,0.05);
+    border-left: 2px solid rgba(255,215,0,0.05);
+}
+
+.stat-card::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    right: -1px;
+    width: 30px;
+    height: 30px;
+    border-bottom: 2px solid rgba(255,215,0,0.05);
+    border-right: 2px solid rgba(255,215,0,0.05);
+}
+
+.stat-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    border-color: rgba(255,215,0,0.05);
+    box-shadow: 0 0 60px rgba(255,215,0,0.02);
+}
+
+.stat-card:hover::before,
+.stat-card:hover::after {
+    border-color: rgba(255,215,0,0.1);
+}
+
+.stat-number {
+    color: #ffd700 !important;
+    -webkit-text-fill-color: #ffd700 !important;
+    background: none !important;
+    text-shadow: 0 0 40px rgba(255,215,0,0.02);
+    font-family: 'Georgia', serif;
+    font-weight: 700;
+}
+
+.stat-percent {
+    background: rgba(255,215,0,0.04);
+    color: #ffd700;
+    border: 1px solid rgba(255,215,0,0.02);
+    font-family: 'Georgia', serif;
+}
+
+.stat-label {
+    color: rgba(200,200,216,0.5);
+    font-family: 'Georgia', serif;
+    font-weight: 300;
+}
+
+.section {
+    background: rgba(20,20,50,0.2);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,215,0,0.01);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+    border-radius: 0 !important;
+    position: relative;
+}
+
+/* Уголки для секций */
+.section::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: -1px;
+    width: 40px;
+    height: 40px;
+    border-top: 2px solid rgba(255,215,0,0.02);
+    border-left: 2px solid rgba(255,215,0,0.02);
+}
+
+.section::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    right: -1px;
+    width: 40px;
+    height: 40px;
+    border-bottom: 2px solid rgba(255,215,0,0.02);
+    border-right: 2px solid rgba(255,215,0,0.02);
+}
+
+.section-title {
+    color: #ffd700;
+    border-bottom: 2px solid rgba(255,215,0,0.02);
+    text-shadow: 0 0 30px rgba(255,215,0,0.01);
+    font-family: 'Georgia', serif;
+    font-weight: 700;
+    letter-spacing: 3px;
+}
+
+.rank-item {
+    background: rgba(255,255,255,0.01);
+    border-left: 3px solid rgba(255,215,0,0.02);
+    transition: all 0.4s ease;
+    font-family: 'Georgia', serif;
+}
+
+.rank-item:hover {
+    background: rgba(255,215,0,0.01);
+    transform: translateX(8px);
+    border-left-color: rgba(255,215,0,0.05);
+}
+
+.rank-number {
+    color: #ffd700;
+    font-family: 'Georgia', serif;
+}
+
+.progress-bar {
+    background: rgba(255,255,255,0.01);
+    border-radius: 0 !important;
+    height: 4px;
+}
+
+.progress-fill {
+    background: linear-gradient(90deg, #ffd700, #ff6b35);
+    border-radius: 0 !important;
+}
+
+.concept-card {
+    background: rgba(255,255,255,0.01);
+    border: 1px solid rgba(255,215,0,0.01);
+    transition: all 0.4s ease;
+    border-radius: 0 !important;
+}
+
+.concept-card:hover {
+    border-color: rgba(255,215,0,0.02);
+    transform: translateY(-3px);
+}
+
+.concept-name {
+    color: #ffd700;
+    font-family: 'Georgia', serif;
+}
+
+.concept-score {
+    color: rgba(200,200,216,0.2);
+}
+
+.clickable-link {
+    color: #ffd700;
+    font-family: 'Georgia', serif;
+    border-bottom: 1px dotted rgba(255,215,0,0.02);
+}
+
+.clickable-link:hover {
+    color: #ff6b35;
+    text-shadow: 0 0 20px rgba(255,215,0,0.02);
+}
+
+.reviewer-card {
+    background: rgba(20,20,50,0.3);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,215,0,0.01);
+    border-left: 4px solid rgba(255,215,0,0.02);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    border-radius: 0 !important;
+}
+
+.reviewer-card:hover {
+    background: rgba(255,215,0,0.01);
+}
+
+.reviewer-name {
+    color: #ffd700;
+    font-family: 'Georgia', serif;
+}
+
+th {
+    background: rgba(255,215,0,0.02);
+    color: #ffd700;
+    border-bottom: 2px solid rgba(255,215,0,0.02);
+    font-family: 'Georgia', serif;
+}
+
+td {
+    color: rgba(200,200,216,0.5);
+}
+
+tr:hover {
+    background: rgba(255,215,0,0.01);
+}
+
+.normal-article {
+    border-left: 3px solid rgba(255,215,0,0.03) !important;
+    background: none !important;
+}
+
+.notfound-reference {
+    border-left: 3px solid rgba(128,128,128,0.03) !important;
+    background: none !important;
+}
+
+.suspicious-reference {
+    border-left: 3px solid rgba(255,100,100,0.03) !important;
+    background: none !important;
+}
+
+.duplicate-reference {
+    border-left: 3px solid rgba(255,200,100,0.03) !important;
+    background: none !important;
+}
+
+.ebook-reference {
+    border-left: 3px solid rgba(0,200,200,0.03) !important;
+    background: none !important;
+}
+
+.repository-reference {
+    border-left: 3px solid rgba(150,100,200,0.03) !important;
+    background: none !important;
+}
+
+.preprint-reference {
+    border-left: 3px solid rgba(150,100,200,0.03) !important;
+    background: none !important;
+}
+
+.proceedings-reference {
+    border-left: 3px solid rgba(200,180,100,0.03) !important;
+    background: none !important;
+}
+
+.retracted-reference {
+    border-left: 3px solid rgba(255,100,100,0.03) !important;
+    background: none !important;
+}
+
+@keyframes cosmicIn {
+    0% { opacity: 0; transform: translateY(20px) scale(0.98) rotateX(2deg); }
+    100% { opacity: 1; transform: translateY(0) scale(1) rotateX(0deg); }
+}
+
+.section {
+    animation: cosmicIn 0.8s ease-out forwards;
+    perspective: 1000px;
+}
+
+.section:nth-child(2) { animation-delay: 0.1s; }
+.section:nth-child(3) { animation-delay: 0.2s; }
+.section:nth-child(4) { animation-delay: 0.3s; }
+.section:nth-child(5) { animation-delay: 0.4s; }
+.section:nth-child(6) { animation-delay: 0.5s; }
+.section:nth-child(7) { animation-delay: 0.6s; }
+.section:nth-child(8) { animation-delay: 0.7s; }
+.section:nth-child(9) { animation-delay: 0.8s; }
+.section:nth-child(10) { animation-delay: 0.9s; }
+
+.footer {
+    color: rgba(200,200,216,0.1);
+    border-top: 2px solid rgba(255,215,0,0.01);
+}
+
+.confidential-banner {
+    background: rgba(255,100,100,0.02);
+    border-left: 4px solid rgba(255,100,100,0.03);
+    color: #c8b8b8;
+    font-family: 'Georgia', serif;
+}
+
+.badge {
+    font-family: 'Georgia', serif;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.badge-success { background: rgba(255,215,0,0.05); color: #ffd700; border: 1px solid rgba(255,215,0,0.02); }
+.badge-warning { background: rgba(255,200,100,0.05); color: #ffcc66; border: 1px solid rgba(255,200,100,0.02); }
+.badge-danger { background: rgba(255,100,100,0.05); color: #ff8888; border: 1px solid rgba(255,100,100,0.02); }
+.badge-info { background: rgba(0,200,200,0.05); color: #66cccc; border: 1px solid rgba(0,200,200,0.02); }
+"""
+
+# ======================== ТЕМА 7: BRUTALIST (БРУТАЛИСТ) ========================
 
 BRUTALIST_CSS = """
 /* ==================== ТЕМА: BRUTALIST ==================== */
@@ -1698,7 +2702,7 @@ body {
 .sidebar a.active {
     color: #f5f0eb;
     background: none;
-    border-left: 4px solid #ff6600;
+    border-left: 4px solid #ff0000;
     padding-left: 12px;
 }
 
@@ -1849,8 +2853,8 @@ body {
 }
 
 .clickable-link:hover {
-    color: #ff6600;
-    border-bottom-color: #ff6600;
+    color: #ff0000;
+    border-bottom-color: #ff0000;
 }
 
 .reviewer-card {
@@ -1918,7 +2922,6 @@ tr:hover {
     background: #faf8f5;
 }
 
-/* Цветная кодировка - брутальная */
 .normal-article {
     background: rgba(0,200,100,0.05) !important;
     border-left: 6px solid #00cc66 !important;
@@ -1936,7 +2939,7 @@ tr:hover {
 
 .duplicate-reference {
     background: rgba(255,100,0,0.05) !important;
-    border-left: 6px solid #ff6600 !important;
+    border-left: 6px solid #ff0000 !important;
 }
 
 .ebook-reference {
@@ -1964,7 +2967,6 @@ tr:hover {
     border-left: 6px solid #cc0033 !important;
 }
 
-/* Анимация появления - резкая */
 @keyframes brutalIn {
     0% { opacity: 0; transform: translateX(-20px); }
     100% { opacity: 1; transform: translateX(0); }
@@ -1992,7 +2994,7 @@ tr:hover {
 
 .confidential-banner {
     background: #1a1a1a;
-    border-left: 6px solid #ff6600;
+    border-left: 6px solid #ff0000;
     color: #f5f0eb;
     border-radius: 0 !important;
     font-weight: 900;
@@ -2001,7 +3003,7 @@ tr:hover {
 }
 """
 
-# ======================== ТЕМА 6: MINIMALIST WHITE (МИНИМАЛИСТИЧНЫЙ БЕЛЫЙ) ========================
+# ======================== ТЕМА 8: MINIMALIST WHITE (МИНИМАЛИСТИЧНЫЙ БЕЛЫЙ) ========================
 
 MINIMALIST_WHITE_CSS = """
 /* ==================== ТЕМА: MINIMALIST WHITE ==================== */
@@ -2258,7 +3260,6 @@ tr:hover {
     background: #fafafa;
 }
 
-/* Цветная кодировка - минималистичная (только левая граница) */
 .normal-article {
     border-left: 3px solid #1a1a1a !important;
     background: none !important;
@@ -2304,7 +3305,6 @@ tr:hover {
     background: none !important;
 }
 
-/* Анимация появления - очень плавная */
 @keyframes minimalIn {
     0% { opacity: 0; }
     100% { opacity: 1; }
@@ -2334,653 +3334,6 @@ tr:hover {
     border-left: 4px solid #cc0033;
     color: #1a1a1a;
     border-radius: 0 !important;
-}
-"""
-
-# ======================== ТЕМА 7: OCEAN DEEP (ГЛУБИНА ОКЕАНА) ========================
-
-OCEAN_DEEP_CSS = """
-/* ==================== ТЕМА: OCEAN DEEP ==================== */
-/* Полностью отключает пользовательские цвета */
-
-body {
-    background: linear-gradient(180deg, #0a1628 0%, #0d2137 25%, #0f2d45 50%, #0d2137 75%, #0a1628 100%);
-    color: #b8d4e8;
-    min-height: 100vh;
-}
-
-body::before {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: 
-        radial-gradient(ellipse at 20% 40%, rgba(0,100,200,0.03) 0%, transparent 40%),
-        radial-gradient(ellipse at 80% 60%, rgba(0,200,180,0.02) 0%, transparent 40%),
-        radial-gradient(ellipse at 50% 80%, rgba(0,50,150,0.02) 0%, transparent 30%);
-    pointer-events: none;
-    z-index: 0;
-}
-
-@keyframes oceanShimmer {
-    0% { opacity: 0.3; transform: translateY(-10px); }
-    50% { opacity: 0.7; transform: translateY(10px); }
-    100% { opacity: 0.3; transform: translateY(-10px); }
-}
-
-.report-wrapper {
-    position: relative;
-    z-index: 1;
-}
-
-.sidebar {
-    background: rgba(10,22,40,0.9);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-right: 1px solid rgba(100,200,255,0.05);
-    color: #b8d4e8;
-    box-shadow: 0 0 60px rgba(0,0,0,0.2);
-}
-
-.sidebar h3 {
-    color: #48cae4;
-    text-shadow: 0 0 30px rgba(72,202,228,0.1);
-    border-bottom: 1px solid rgba(72,202,228,0.05);
-    padding-bottom: 15px;
-}
-
-.sidebar a {
-    color: rgba(184,212,232,0.5);
-    transition: all 0.3s ease;
-}
-
-.sidebar a:hover {
-    color: #48cae4;
-    background: rgba(72,202,228,0.03);
-    text-shadow: 0 0 20px rgba(72,202,228,0.05);
-}
-
-.sidebar a.active {
-    color: #48cae4;
-    background: rgba(72,202,228,0.05);
-    text-shadow: 0 0 20px rgba(72,202,228,0.08);
-}
-
-.header {
-    background: rgba(15,45,69,0.6);
-    backdrop-filter: blur(15px);
-    -webkit-backdrop-filter: blur(15px);
-    border: 1px solid rgba(100,200,255,0.03);
-    box-shadow: 0 0 60px rgba(0,0,0,0.1);
-    color: #b8d4e8;
-}
-
-.header h1 {
-    color: #48cae4;
-    text-shadow: 0 0 40px rgba(72,202,228,0.05);
-}
-
-.header .date {
-    color: rgba(184,212,232,0.4);
-}
-
-.stat-card {
-    background: rgba(10,22,40,0.6);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(100,200,255,0.03);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
-    transition: all 0.5s ease;
-    position: relative;
-    overflow: hidden;
-}
-
-.stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(180deg, rgba(72,202,228,0.02), transparent);
-    border-radius: inherit;
-    pointer-events: none;
-}
-
-.stat-card:hover {
-    transform: translateY(-8px);
-    border-color: rgba(72,202,228,0.08);
-    box-shadow: 0 16px 48px rgba(0,0,0,0.2);
-}
-
-.stat-number {
-    background: linear-gradient(135deg, #48cae4, #00b4d8) !important;
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-    background-clip: text !important;
-    text-shadow: 0 0 40px rgba(72,202,228,0.05);
-}
-
-.stat-percent {
-    background: rgba(72,202,228,0.06);
-    color: #48cae4;
-    border: 1px solid rgba(72,202,228,0.03);
-}
-
-.stat-label {
-    color: rgba(184,212,232,0.6);
-}
-
-.section {
-    background: rgba(10,22,40,0.4);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(100,200,255,0.02);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.08);
-}
-
-.section-title {
-    color: #48cae4;
-    border-bottom: 2px solid rgba(72,202,228,0.05);
-    text-shadow: 0 0 30px rgba(72,202,228,0.03);
-}
-
-.rank-item {
-    background: rgba(255,255,255,0.02);
-    border-left: 2px solid rgba(72,202,228,0.05);
-    transition: all 0.4s ease;
-}
-
-.rank-item:hover {
-    background: rgba(72,202,228,0.02);
-    transform: translateX(8px);
-    border-left-color: rgba(72,202,228,0.15);
-}
-
-.rank-number {
-    color: #48cae4;
-}
-
-.progress-bar {
-    background: rgba(255,255,255,0.02);
-}
-
-.progress-fill {
-    background: linear-gradient(90deg, #00b4d8, #48cae4);
-    box-shadow: 0 0 20px rgba(72,202,228,0.05);
-}
-
-.concept-card {
-    background: rgba(255,255,255,0.02);
-    border: 1px solid rgba(100,200,255,0.02);
-    transition: all 0.4s ease;
-}
-
-.concept-card:hover {
-    border-color: rgba(72,202,228,0.05);
-    transform: translateY(-3px);
-}
-
-.concept-name {
-    color: #48cae4;
-}
-
-.concept-score {
-    color: rgba(184,212,232,0.3);
-}
-
-.clickable-link {
-    color: #48cae4;
-}
-
-.clickable-link:hover {
-    color: #00b4d8;
-    text-shadow: 0 0 20px rgba(72,202,228,0.05);
-}
-
-.reviewer-card {
-    background: rgba(10,22,40,0.5);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(100,200,255,0.02);
-    border-left: 4px solid rgba(72,202,228,0.05);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-}
-
-.reviewer-card:hover {
-    background: rgba(72,202,228,0.02);
-}
-
-.reviewer-name {
-    color: #48cae4;
-}
-
-th {
-    background: rgba(72,202,228,0.03);
-    color: #48cae4;
-    border-bottom: 2px solid rgba(72,202,228,0.03);
-}
-
-td {
-    color: rgba(184,212,232,0.6);
-}
-
-tr:hover {
-    background: rgba(72,202,228,0.01);
-}
-
-/* Цветная кодировка - океанская */
-.normal-article {
-    background: rgba(0,200,200,0.02) !important;
-    border-left: 2px solid rgba(0,200,200,0.1) !important;
-}
-
-.notfound-reference {
-    background: rgba(128,128,128,0.02) !important;
-    border-left: 2px solid rgba(128,128,128,0.1) !important;
-}
-
-.suspicious-reference {
-    background: rgba(255,0,50,0.02) !important;
-    border-left: 2px solid rgba(255,0,50,0.1) !important;
-}
-
-.duplicate-reference {
-    background: rgba(255,150,0,0.02) !important;
-    border-left: 2px solid rgba(255,150,0,0.1) !important;
-}
-
-.ebook-reference {
-    background: rgba(72,202,228,0.02) !important;
-    border-left: 2px solid rgba(72,202,228,0.1) !important;
-}
-
-.repository-reference {
-    background: rgba(150,100,255,0.02) !important;
-    border-left: 2px solid rgba(150,100,255,0.1) !important;
-}
-
-.preprint-reference {
-    background: rgba(150,100,255,0.02) !important;
-    border-left: 2px solid rgba(150,100,255,0.1) !important;
-}
-
-.proceedings-reference {
-    background: rgba(255,200,0,0.02) !important;
-    border-left: 2px solid rgba(255,200,0,0.1) !important;
-}
-
-.retracted-reference {
-    background: rgba(255,0,50,0.02) !important;
-    border-left: 2px solid rgba(255,0,50,0.1) !important;
-}
-
-/* Анимация появления с эффектом глубины */
-@keyframes oceanIn {
-    0% { opacity: 0; transform: translateY(30px) scale(0.98); }
-    100% { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-.section {
-    animation: oceanIn 0.7s ease-out forwards;
-}
-
-.section:nth-child(2) { animation-delay: 0.1s; }
-.section:nth-child(3) { animation-delay: 0.2s; }
-.section:nth-child(4) { animation-delay: 0.3s; }
-.section:nth-child(5) { animation-delay: 0.4s; }
-.section:nth-child(6) { animation-delay: 0.5s; }
-.section:nth-child(7) { animation-delay: 0.6s; }
-.section:nth-child(8) { animation-delay: 0.7s; }
-.section:nth-child(9) { animation-delay: 0.8s; }
-.section:nth-child(10) { animation-delay: 0.9s; }
-
-.footer {
-    color: rgba(184,212,232,0.15);
-    border-top-color: rgba(72,202,228,0.02);
-}
-
-.confidential-banner {
-    background: rgba(255,0,50,0.02);
-    border-left: 4px solid rgba(255,0,50,0.1);
-    color: #ff6688;
-}
-"""
-
-# ======================== ТЕМА 8: COSMIC (КОСМИЧЕСКИЙ) ========================
-
-COSMIC_CSS = """
-/* ==================== ТЕМА: COSMIC ==================== */
-/* Полностью отключает пользовательские цвета */
-
-body {
-    background: #0a0a0f;
-    color: #d4d4e8;
-    position: relative;
-    overflow-x: hidden;
-}
-
-/* Звезды */
-body::before {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-image: 
-        radial-gradient(1px 1px at 5% 10%, rgba(255,255,255,0.8), transparent),
-        radial-gradient(1px 1px at 15% 30%, rgba(255,255,255,0.6), transparent),
-        radial-gradient(1.5px 1.5px at 25% 5%, rgba(255,255,255,0.9), transparent),
-        radial-gradient(1px 1px at 35% 45%, rgba(255,255,255,0.5), transparent),
-        radial-gradient(1px 1px at 45% 15%, rgba(255,255,255,0.7), transparent),
-        radial-gradient(2px 2px at 55% 35%, rgba(255,255,255,0.8), transparent),
-        radial-gradient(1px 1px at 65% 5%, rgba(255,255,255,0.6), transparent),
-        radial-gradient(1px 1px at 75% 25%, rgba(255,255,255,0.9), transparent),
-        radial-gradient(1.5px 1.5px at 85% 15%, rgba(255,255,255,0.7), transparent),
-        radial-gradient(1px 1px at 95% 40%, rgba(255,255,255,0.5), transparent),
-        radial-gradient(1px 1px at 10% 55%, rgba(255,255,255,0.6), transparent),
-        radial-gradient(1px 1px at 20% 70%, rgba(255,255,255,0.8), transparent),
-        radial-gradient(1.5px 1.5px at 30% 60%, rgba(255,255,255,0.7), transparent),
-        radial-gradient(1px 1px at 40% 80%, rgba(255,255,255,0.5), transparent),
-        radial-gradient(1px 1px at 50% 65%, rgba(255,255,255,0.9), transparent),
-        radial-gradient(2px 2px at 60% 85%, rgba(255,255,255,0.6), transparent),
-        radial-gradient(1px 1px at 70% 75%, rgba(255,255,255,0.8), transparent),
-        radial-gradient(1px 1px at 80% 90%, rgba(255,255,255,0.7), transparent),
-        radial-gradient(1.5px 1.5px at 90% 60%, rgba(255,255,255,0.9), transparent),
-        radial-gradient(1px 1px at 95% 80%, rgba(255,255,255,0.5), transparent);
-    background-size: 200px 200px;
-    background-repeat: repeat;
-    opacity: 0.3;
-    pointer-events: none;
-    z-index: 0;
-    animation: twinkle 4s ease-in-out infinite alternate;
-}
-
-@keyframes twinkle {
-    0% { opacity: 0.2; }
-    100% { opacity: 0.5; }
-}
-
-body::after {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: 
-        radial-gradient(ellipse at 30% 40%, rgba(200,100,255,0.02) 0%, transparent 30%),
-        radial-gradient(ellipse at 70% 60%, rgba(100,100,255,0.02) 0%, transparent 30%),
-        radial-gradient(ellipse at 50% 80%, rgba(255,100,200,0.01) 0%, transparent 20%);
-    pointer-events: none;
-    z-index: 0;
-}
-
-.report-wrapper {
-    position: relative;
-    z-index: 1;
-}
-
-.sidebar {
-    background: rgba(10,10,15,0.92);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-right: 1px solid rgba(200,100,255,0.05);
-    color: #d4d4e8;
-    box-shadow: 0 0 60px rgba(0,0,0,0.3);
-}
-
-.sidebar h3 {
-    color: #c084fc;
-    text-shadow: 0 0 30px rgba(192,132,252,0.1);
-    border-bottom: 1px solid rgba(192,132,252,0.05);
-    padding-bottom: 15px;
-}
-
-.sidebar a {
-    color: rgba(212,212,232,0.5);
-    transition: all 0.3s ease;
-}
-
-.sidebar a:hover {
-    color: #c084fc;
-    background: rgba(192,132,252,0.03);
-    text-shadow: 0 0 20px rgba(192,132,252,0.05);
-}
-
-.sidebar a.active {
-    color: #c084fc;
-    background: rgba(192,132,252,0.05);
-    text-shadow: 0 0 20px rgba(192,132,252,0.08);
-}
-
-.header {
-    background: rgba(20,15,30,0.6);
-    backdrop-filter: blur(15px);
-    -webkit-backdrop-filter: blur(15px);
-    border: 1px solid rgba(200,100,255,0.03);
-    box-shadow: 0 0 60px rgba(0,0,0,0.15);
-    color: #d4d4e8;
-}
-
-.header h1 {
-    color: #c084fc;
-    text-shadow: 0 0 40px rgba(192,132,252,0.05);
-}
-
-.header .date {
-    color: rgba(212,212,232,0.4);
-}
-
-.stat-card {
-    background: rgba(20,15,30,0.5);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(200,100,255,0.02);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
-    transition: all 0.5s ease;
-}
-
-.stat-card:hover {
-    transform: scale(1.02);
-    border-color: rgba(200,100,255,0.05);
-    box-shadow: 0 0 40px rgba(192,132,252,0.03);
-}
-
-.stat-number {
-    background: linear-gradient(135deg, #c084fc, #818cf8) !important;
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-    background-clip: text !important;
-    text-shadow: 0 0 40px rgba(192,132,252,0.05);
-}
-
-.stat-percent {
-    background: rgba(192,132,252,0.05);
-    color: #c084fc;
-    border: 1px solid rgba(192,132,252,0.02);
-}
-
-.stat-label {
-    color: rgba(212,212,232,0.5);
-}
-
-.section {
-    background: rgba(20,15,30,0.3);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(200,100,255,0.01);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.08);
-}
-
-.section-title {
-    color: #c084fc;
-    border-bottom: 2px solid rgba(192,132,252,0.03);
-    text-shadow: 0 0 30px rgba(192,132,252,0.02);
-}
-
-.rank-item {
-    background: rgba(255,255,255,0.01);
-    border-left: 2px solid rgba(192,132,252,0.03);
-    transition: all 0.4s ease;
-}
-
-.rank-item:hover {
-    background: rgba(192,132,252,0.01);
-    transform: translateX(8px);
-    border-left-color: rgba(192,132,252,0.08);
-}
-
-.rank-number {
-    color: #c084fc;
-}
-
-.progress-bar {
-    background: rgba(255,255,255,0.01);
-}
-
-.progress-fill {
-    background: linear-gradient(90deg, #818cf8, #c084fc);
-    box-shadow: 0 0 20px rgba(192,132,252,0.03);
-}
-
-.concept-card {
-    background: rgba(255,255,255,0.01);
-    border: 1px solid rgba(200,100,255,0.01);
-    transition: all 0.4s ease;
-}
-
-.concept-card:hover {
-    border-color: rgba(192,132,252,0.03);
-    transform: translateY(-3px);
-}
-
-.concept-name {
-    color: #c084fc;
-}
-
-.concept-score {
-    color: rgba(212,212,232,0.2);
-}
-
-.clickable-link {
-    color: #c084fc;
-}
-
-.clickable-link:hover {
-    color: #a78bfa;
-    text-shadow: 0 0 20px rgba(192,132,252,0.03);
-}
-
-.reviewer-card {
-    background: rgba(20,15,30,0.4);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(200,100,255,0.01);
-    border-left: 4px solid rgba(192,132,252,0.03);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-}
-
-.reviewer-card:hover {
-    background: rgba(192,132,252,0.01);
-}
-
-.reviewer-name {
-    color: #c084fc;
-}
-
-th {
-    background: rgba(192,132,252,0.02);
-    color: #c084fc;
-    border-bottom: 2px solid rgba(192,132,252,0.02);
-}
-
-td {
-    color: rgba(212,212,232,0.5);
-}
-
-tr:hover {
-    background: rgba(192,132,252,0.01);
-}
-
-/* Цветная кодировка - космическая */
-.normal-article {
-    background: rgba(100,200,255,0.01) !important;
-    border-left: 2px solid rgba(100,200,255,0.05) !important;
-}
-
-.notfound-reference {
-    background: rgba(128,128,128,0.01) !important;
-    border-left: 2px solid rgba(128,128,128,0.05) !important;
-}
-
-.suspicious-reference {
-    background: rgba(255,50,100,0.01) !important;
-    border-left: 2px solid rgba(255,50,100,0.05) !important;
-}
-
-.duplicate-reference {
-    background: rgba(255,200,50,0.01) !important;
-    border-left: 2px solid rgba(255,200,50,0.05) !important;
-}
-
-.ebook-reference {
-    background: rgba(100,200,255,0.01) !important;
-    border-left: 2px solid rgba(100,200,255,0.05) !important;
-}
-
-.repository-reference {
-    background: rgba(200,100,255,0.01) !important;
-    border-left: 2px solid rgba(200,100,255,0.05) !important;
-}
-
-.preprint-reference {
-    background: rgba(200,100,255,0.01) !important;
-    border-left: 2px solid rgba(200,100,255,0.05) !important;
-}
-
-.proceedings-reference {
-    background: rgba(255,200,100,0.01) !important;
-    border-left: 2px solid rgba(255,200,100,0.05) !important;
-}
-
-.retracted-reference {
-    background: rgba(255,50,100,0.01) !important;
-    border-left: 2px solid rgba(255,50,100,0.05) !important;
-}
-
-/* Анимация появления с эффектом парения */
-@keyframes cosmicIn {
-    0% { opacity: 0; transform: translateY(20px) scale(0.98) rotateX(5deg); }
-    100% { opacity: 1; transform: translateY(0) scale(1) rotateX(0deg); }
-}
-
-.section {
-    animation: cosmicIn 0.8s ease-out forwards;
-    perspective: 1000px;
-}
-
-.section:nth-child(2) { animation-delay: 0.1s; }
-.section:nth-child(3) { animation-delay: 0.2s; }
-.section:nth-child(4) { animation-delay: 0.3s; }
-.section:nth-child(5) { animation-delay: 0.4s; }
-.section:nth-child(6) { animation-delay: 0.5s; }
-.section:nth-child(7) { animation-delay: 0.6s; }
-.section:nth-child(8) { animation-delay: 0.7s; }
-.section:nth-child(9) { animation-delay: 0.8s; }
-.section:nth-child(10) { animation-delay: 0.9s; }
-
-.footer {
-    color: rgba(212,212,232,0.1);
-    border-top-color: rgba(200,100,255,0.01);
-}
-
-.confidential-banner {
-    background: rgba(255,50,100,0.02);
-    border-left: 4px solid rgba(255,50,100,0.05);
-    color: #ff6688;
-    text-shadow: 0 0 20px rgba(255,50,100,0.02);
 }
 """
 
@@ -3197,7 +3550,6 @@ tr:hover {
     background: rgba(196,168,152,0.05);
 }
 
-/* Цветная кодировка - терраццо */
 .normal-article {
     background: rgba(100,200,150,0.05) !important;
     border-left: 3px solid rgba(100,200,150,0.3) !important;
@@ -3243,7 +3595,6 @@ tr:hover {
     border-left: 3px solid rgba(200,50,50,0.3) !important;
 }
 
-/* Анимация появления - теплая */
 @keyframes terrazzoIn {
     0% { opacity: 0; transform: scale(0.98); }
     100% { opacity: 1; transform: scale(1); }
@@ -3349,7 +3700,6 @@ body {
     overflow: hidden;
 }
 
-/* Разные углы наклона */
 .stat-card:nth-child(6n+1) { transform: rotate(0.3deg) translateY(-2px); }
 .stat-card:nth-child(6n+2) { transform: rotate(-0.2deg) translateY(1px); }
 .stat-card:nth-child(6n+3) { transform: rotate(0.5deg) translateY(-1px); }
@@ -3362,7 +3712,6 @@ body {
     box-shadow: 0 12px 40px rgba(0,0,0,0.08);
 }
 
-/* Цветная кодировка категорий */
 .stat-card[data-type="doi"] { border-top: 4px solid #00b894; }
 .stat-card[data-type="authors"] { border-top: 4px solid #6c5ce7; }
 .stat-card[data-type="citations"] { border-top: 4px solid #fdcb6e; }
@@ -3542,7 +3891,6 @@ tr:hover {
     background: #f8f9fa;
 }
 
-/* Цветная кодировка - современная */
 .normal-article {
     background: rgba(0,184,148,0.04) !important;
     border-left: 4px solid #00b894 !important;
@@ -3588,7 +3936,6 @@ tr:hover {
     border-left: 4px solid #e17055 !important;
 }
 
-/* Анимация появления - пружинистая */
 @keyframes modernIn {
     0% { opacity: 0; transform: scale(0.96); }
     50% { transform: scale(1.01); }
@@ -3679,7 +4026,6 @@ body {
     color: rgba(45,52,54,0.3);
 }
 
-/* Каждая секция - свой дуотен */
 #overview .stat-card { background: linear-gradient(135deg, #667eea08, #764ba208); }
 #overview .stat-number { background: linear-gradient(135deg, #667eea, #764ba2) !important; }
 #overview .section-title { border-color: #667eea; }
@@ -3861,7 +4207,6 @@ tr:hover {
     background: #fafafa;
 }
 
-/* Цветная кодировка - дуотон */
 .normal-article {
     border-left: 4px solid #00b894 !important;
     background: none !important;
@@ -3907,7 +4252,6 @@ tr:hover {
     background: none !important;
 }
 
-/* Анимация появления */
 @keyframes duotoneIn {
     0% { opacity: 0; transform: translateY(15px); }
     100% { opacity: 1; transform: translateY(0); }
@@ -4003,7 +4347,6 @@ body {
     color: rgba(45,52,54,0.4);
 }
 
-/* Разные стили для разных секций */
 #overview .stat-card { border-radius: 12px; background: rgba(255,255,255,0.9); }
 #identifiers .stat-card { border-radius: 20px; background: rgba(255,255,255,0.85); box-shadow: 0 8px 32px rgba(0,0,0,0.02); }
 #authors .stat-card { border-radius: 4px; background: white; box-shadow: 0 2px 12px rgba(0,0,0,0.02); }
@@ -4084,7 +4427,6 @@ body {
     padding-bottom: 12px;
 }
 
-/* Разные стили для rank-item в разных секциях */
 #overview .rank-item { border-radius: 8px; }
 #authors .rank-item { border-radius: 16px; border-left: 4px solid {{PRIMARY}} !important; }
 #journals .rank-item { border-radius: 4px; border-left: 6px solid {{SECONDARY}} !important; }
@@ -4200,7 +4542,6 @@ tr:hover {
     background: {{PRIMARY}}04;
 }
 
-/* Цветная кодировка - морфинг */
 .normal-article {
     background: rgba(0,184,148,0.06) !important;
     border-left: 4px solid #00b894 !important;
@@ -4388,22 +4729,22 @@ THEMES_INFO = {
         'css_generator': 'generate_glassmorphism_css'
     },
     'neon_dark': {
-        'name': 'Neon Dark',
-        'description': 'Неоновый темный с динамическим свечением',
+        'name': 'Neon Dark - Cyberpunk',
+        'description': 'Киберпанк с динамическими неоновыми карточками и бегущим свечением',
         'uses_primary': False,
         'uses_secondary': False,
         'css_generator': 'generate_neon_dark_css'
     },
     'aurora': {
-        'name': 'Aurora Borealis',
-        'description': 'Северное сияние с анимированными градиентами',
+        'name': 'Aurora Borealis - Arctic Night',
+        'description': 'Арктическая ночь с эффектом инея и полярным сиянием в хедере',
         'uses_primary': False,
         'uses_secondary': False,
         'css_generator': 'generate_aurora_css'
     },
     'brutalist': {
         'name': 'Brutalist',
-        'description': 'Брутальный архитектурный стиль',
+        'description': 'Брутальный архитектурный стиль с красными акцентами',
         'uses_primary': False,
         'uses_secondary': False,
         'css_generator': 'generate_brutalist_css'
@@ -4416,43 +4757,43 @@ THEMES_INFO = {
         'css_generator': 'generate_minimalist_white_css'
     },
     'ocean_deep': {
-        'name': 'Ocean Deep',
-        'description': 'Глубина океана с синим градиентом',
+        'name': 'Ocean Deep - Sunken Wreck',
+        'description': 'Глубина океана с эффектом затонувшего корабля и пузырьками',
         'uses_primary': False,
         'uses_secondary': False,
         'css_generator': 'generate_ocean_deep_css'
     },
     'cosmic': {
-        'name': 'Cosmic',
-        'description': 'Космический со звездами и туманностями',
+        'name': 'Cosmic - Retro Space 70s',
+        'description': 'Ретро-футуристический космос 70-х с винтажной эстетикой',
         'uses_primary': False,
         'uses_secondary': False,
         'css_generator': 'generate_cosmic_css'
     },
     'terrazzo': {
         'name': 'Terrazzo',
-        'description': 'Терраццо с теплой текстурой',
+        'description': 'Терраццо с теплой текстурой и керамической плиткой',
         'uses_primary': False,
         'uses_secondary': False,
         'css_generator': 'generate_terrazzo_css'
     },
     'modern_cards': {
         'name': 'Modern Cards',
-        'description': 'Современные карточки с наклоном',
+        'description': 'Современные карточки с наклоном и тенями нового поколения',
         'uses_primary': False,
         'uses_secondary': False,
         'css_generator': 'generate_modern_cards_css'
     },
     'duotone': {
         'name': 'Duotone',
-        'description': 'Двухцветный дизайн для каждой секции',
+        'description': 'Двухцветный дизайн для каждой секции с контрастными парами',
         'uses_primary': False,
         'uses_secondary': False,
         'css_generator': 'generate_duotone_css'
     },
     'morphing': {
         'name': 'Morphing',
-        'description': 'Морфинг с разными стилями секций',
+        'description': 'Морфинг с разными стилями секций и плавными переходами',
         'uses_primary': True,
         'uses_secondary': True,
         'css_generator': 'generate_morphing_css'
