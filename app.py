@@ -1539,13 +1539,13 @@ def fetch_crossref(doi: str) -> Optional[Dict]:
     except:
         return None
 
-@retry(stop=stop_after_attempt(4), wait=wait_random(min=1, max=4))
+@retry(stop=stop_after_attempt(4), wait=wait_random(min=1, max=2))
 def fetch_openalex(doi: str) -> Optional[Dict]:
     """Request to OpenAlex API - OPTIMIZED with faster retry"""
     try:
         encoded_doi = requests.utils.quote(doi)
         url = f"https://api.openalex.org/works/doi/{encoded_doi}"
-        response = requests.get(url, timeout=8)
+        response = requests.get(url, timeout=10)
         if response.status_code == 200:
             return response.json()
         return None
@@ -1556,7 +1556,7 @@ def fetch_openalex_concepts(work_id: str) -> List[Dict]:
     """Extract concepts from OpenAlex"""
     try:
         url = f"https://api.openalex.org/works/{work_id}"
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, timeout=8)
         if response.status_code == 200:
             data = response.json()
             return data.get('concepts', [])
