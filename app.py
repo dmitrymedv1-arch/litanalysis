@@ -1028,6 +1028,9 @@ if 'language' not in st.session_state:
 # Initialize bad DOIs cache in session state
 if 'bad_dois' not in st.session_state:
     st.session_state.bad_dois = set()
+if 'bad_dois_attempts' not in st.session_state:
+    from collections import defaultdict
+    st.session_state.bad_dois_attempts = defaultdict(int)
 
 # Initialize journal and article number in session state
 if 'journal_name' not in st.session_state:
@@ -1539,17 +1542,33 @@ def fetch_crossref(doi: str) -> Optional[Dict]:
     except:
         return None
 
-@retry(stop=stop_after_attempt(4), wait=wait_random(min=1, max=5))
+@retry(stop=stop_after_attempt(4), wait=wait_exponential(multiplier=2, min=1, max=10))
 def fetch_openalex(doi: str) -> Optional[Dict]:
-    """Request to OpenAlex API - OPTIMIZED with faster retry"""
+    """Request to OpenAlex API with EXPONENTIAL BACKOFF and improved error handling"""
     try:
         encoded_doi = requests.utils.quote(doi)
         url = f"https://api.openalex.org/works/doi/{encoded_doi}"
-        response = requests.get(url, timeout=12)
+        headers = {
+            'User-Agent': 'LiteratureAnalyzer/2.0 (mailto:analyzer@example.com)',
+            'Accept': 'application/json'
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        
         if response.status_code == 200:
             return response.json()
+        elif response.status_code == 429:
+            # Rate limit - will retry with exponential backoff
+            return None
+        elif response.status_code in [500, 502, 503, 504]:
+            # Server errors - will retry
+            return None
+        else:
+            # 404 or other errors - DOI not found or invalid
+            return None
+    except requests.exceptions.Timeout:
+        # Timeout - will retry
         return None
-    except:
+    except Exception:
         return None
 
 def fetch_openalex_concepts(work_id: str) -> List[Dict]:
@@ -3098,7 +3117,7 @@ def analyze_all_references(references: List[str], batch_size: int = 50, paper_au
 
 # ======================== OPTIMIZED BATCH PROCESSING ========================
 def analyze_reference_batch_optimized(references: List[str], progress_callback=None, paper_authors: Set[str] = None, batch_num: int = 0, total_batches: int = 1) -> List[Dict]:
-    """Analyze batch of references using optimized ThreadPoolExecutor with full OpenAlex support for journals and publishers"""
+    """Analyze batch of references using optimized ThreadPoolExecutor with CACHED functions"""
     results = []
     batch_size = len(references)
     
@@ -3112,28 +3131,29 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
         if doi:
             dois_with_indices.append((idx, doi))
     
-    # Step 2: Fetch data using ThreadPoolExecutor (optimized approach)
+    # Step 2: Fetch data using ThreadPoolExecutor with CACHED functions
     crossref_results = {}
     openalex_results = {}
     
     if dois_with_indices:
-        # OPTIMIZATION 1: Single global ThreadPoolExecutor for all DOIs in batch
+        # OPTIMIZATION: Single global ThreadPoolExecutor for all DOIs in batch
         with ThreadPoolExecutor(max_workers=2) as executor:
             futures = {}
             for idx, doi in dois_with_indices:
-                # Check if DOI is in bad cache
-                if doi in st.session_state.bad_dois:
+                # Check if DOI is in bad cache with attempts counter
+                if doi in st.session_state.bad_dois_attempts and st.session_state.bad_dois_attempts[doi] >= 3:
                     futures[(idx, 'crossref')] = None
                     futures[(idx, 'openalex')] = None
                 else:
-                    futures[(idx, 'crossref')] = executor.submit(fetch_crossref, doi)
-                    futures[(idx, 'openalex')] = executor.submit(fetch_openalex, doi)
+                    # Используем КЭШИРОВАННЫЕ функции вместо прямых вызовов
+                    futures[(idx, 'crossref')] = executor.submit(cache_crossref_lookup, doi)
+                    futures[(idx, 'openalex')] = executor.submit(cache_openalex_lookup, doi)
             
             # Collect results
             for (idx, api_type), future in futures.items():
                 if future is not None:
                     try:
-                        result = future.result(timeout=15)
+                        result = future.result(timeout=20)  # Увеличенный таймаут
                         if api_type == 'crossref':
                             crossref_results[idx] = result
                         else:
@@ -3149,10 +3169,14 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                     else:
                         openalex_results[idx] = None
             
-            # Mark bad DOIs for caching
+            # Mark bad DOIs with attempts counter (not permanently blocked)
             for idx, doi in dois_with_indices:
                 if crossref_results.get(idx) is None and openalex_results.get(idx) is None:
-                    st.session_state.bad_dois.add(doi)
+                    if 'bad_dois_attempts' not in st.session_state:
+                        st.session_state.bad_dois_attempts = defaultdict(int)
+                    st.session_state.bad_dois_attempts[doi] += 1
+                    if st.session_state.bad_dois_attempts[doi] >= 3:
+                        st.session_state.bad_dois.add(doi)
     
     # Step 3: Build results for each reference
     for idx, ref in enumerate(references):
@@ -3534,8 +3558,6 @@ def analyze_all_references_optimized(references: List[str], batch_size: int = 50
     
     def update_progress(batch_num, ref_idx, batch_len, total_batches):
         """Update progress with dynamic coloring based on actual metrics"""
-        nonlocal total_dois_found, total_api_success, processed_refs
-        
         # This is called from inside the batch, need to update counts carefully
         # We'll use a simpler approach: update after each batch completion
         pass
@@ -3726,6 +3748,10 @@ def analyze_all_references_optimized(references: List[str], batch_size: int = 50
         
         # Also update the main Streamlit progress bar for compatibility
         st.progress(progress_percent / 100)
+        
+        # ⭐ КРИТИЧНО: задержка между батчами для соблюдения rate limit
+        if batch_num < total_batches - 1:
+            time.sleep(1.5)  # Пауза между батчами
     
     status_container.update(label="✅ Analysis completed!", state="complete")
     
@@ -3748,18 +3774,302 @@ def analyze_all_references_optimized(references: List[str], batch_size: int = 50
     
     return all_results
 
-# ======================== CACHING ========================
-@st.cache_data(ttl=3600, show_spinner=False)
-def cache_crossref_lookup(doi: str) -> Optional[Dict]:
-    """Cached Crossref request"""
-    return fetch_crossref(doi)
+def calculate_analysis_statistics(results: List[Dict]) -> Dict:
+    """
+    Calculate detailed statistics about API coverage after analysis
+    """
+    stats = {
+        'total': len(results),
+        'both': 0,
+        'crossref_only': 0,
+        'openalex_only': 0,
+        'none': 0,
+        'has_doi': 0,
+        'no_doi': 0
+    }
+    
+    for result in results:
+        if result.get('doi'):
+            stats['has_doi'] += 1
+            if result.get('crossref_status') and result.get('openalex_status'):
+                stats['both'] += 1
+            elif result.get('crossref_status'):
+                stats['crossref_only'] += 1
+            elif result.get('openalex_status'):
+                stats['openalex_only'] += 1
+            else:
+                stats['none'] += 1
+        else:
+            stats['no_doi'] += 1
+    
+    # Calculate percentages
+    total_with_doi = stats['has_doi']
+    if total_with_doi > 0:
+        stats['both_pct'] = (stats['both'] / total_with_doi) * 100
+        stats['crossref_only_pct'] = (stats['crossref_only'] / total_with_doi) * 100
+        stats['openalex_only_pct'] = (stats['openalex_only'] / total_with_doi) * 100
+        stats['none_pct'] = (stats['none'] / total_with_doi) * 100
+    else:
+        stats['both_pct'] = 0
+        stats['crossref_only_pct'] = 0
+        stats['openalex_only_pct'] = 0
+        stats['none_pct'] = 0
+    
+    # Calculate overall coverage
+    stats['coverage'] = ((stats['both'] + stats['crossref_only'] + stats['openalex_only']) / stats['total'] * 100) if stats['total'] > 0 else 0
+    
+    return stats
 
-@st.cache_data(ttl=3600, show_spinner=False)
+def display_analysis_statistics(stats: Dict):
+    """
+    Display analysis statistics with color coding and progress bars
+    """
+    total = stats['total']
+    both = stats['both']
+    crossref_only = stats['crossref_only']
+    openalex_only = stats['openalex_only']
+    none = stats['none']
+    coverage = stats.get('coverage', 0)
+    
+    # Определяем цвета для разных статусов
+    both_color = "#00CC96"  # Зеленый
+    crossref_color = "#FFA042"  # Оранжевый
+    openalex_color = "#00B5F1"  # Голубой
+    none_color = "#FF6B6B"  # Красный
+    
+    # HTML для отображения статистики
+    stats_html = f"""
+    <style>
+    .analysis-stats {{
+        background: white;
+        border-radius: 15px;
+        padding: 20px;
+        margin: 15px 0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }}
+    .stats-header {{
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 15px;
+        color: #333;
+    }}
+    .stats-grid {{
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 15px;
+    }}
+    .stat-item {{
+        padding: 12px;
+        border-radius: 10px;
+        background: #f8f9fa;
+        text-align: center;
+        transition: transform 0.2s;
+    }}
+    .stat-item:hover {{
+        transform: translateY(-2px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }}
+    .stat-number {{
+        font-size: 28px;
+        font-weight: bold;
+        display: block;
+    }}
+    .stat-label {{
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+    }}
+    .stat-percent {{
+        font-size: 14px;
+        font-weight: 500;
+        margin-top: 3px;
+    }}
+    .progress-container {{
+        margin-top: 15px;
+        background: #f0f0f0;
+        border-radius: 20px;
+        overflow: hidden;
+        height: 30px;
+        display: flex;
+        position: relative;
+    }}
+    .progress-segment {{
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 600;
+        color: white;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        transition: width 0.5s ease;
+        position: relative;
+    }}
+    .progress-segment:first-child {{
+        border-radius: 20px 0 0 20px;
+    }}
+    .progress-segment:last-child {{
+        border-radius: 0 20px 20px 0;
+    }}
+    .progress-segment:only-child {{
+        border-radius: 20px;
+    }}
+    .progress-tooltip {{
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0,0,0,0.8);
+        color: white;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 11px;
+        white-space: nowrap;
+        opacity: 0;
+        transition: opacity 0.3s;
+        pointer-events: none;
+    }}
+    .progress-segment:hover .progress-tooltip {{
+        opacity: 1;
+    }}
+    .legend {{
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        margin-top: 12px;
+        justify-content: center;
+    }}
+    .legend-item {{
+        display: flex;
+        align-items: center;
+        font-size: 12px;
+        color: #555;
+    }}
+    .legend-color {{
+        width: 14px;
+        height: 14px;
+        border-radius: 4px;
+        margin-right: 6px;
+    }}
+    .coverage-badge {{
+        display: inline-block;
+        padding: 4px 14px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 600;
+        margin-left: 10px;
+    }}
+    .coverage-excellent {{ background: #d4edda; color: #155724; }}
+    .coverage-good {{ background: #d1ecf1; color: #0c5460; }}
+    .coverage-moderate {{ background: #fff3cd; color: #856404; }}
+    .coverage-low {{ background: #f8d7da; color: #721c24; }}
+    </style>
+    
+    <div class="analysis-stats">
+        <div class="stats-header">
+            📊 API Coverage Analysis
+            <span style="font-size: 14px; font-weight: normal; color: #666; margin-left: 10px;">
+                Total: {total} references
+            </span>
+            <span class="coverage-badge {'coverage-excellent' if coverage >= 80 else 'coverage-good' if coverage >= 60 else 'coverage-moderate' if coverage >= 40 else 'coverage-low'}">
+                Coverage: {coverage:.1f}%
+            </span>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-item" style="border-left: 4px solid {both_color};">
+                <span class="stat-number" style="color: {both_color};">{both}</span>
+                <span class="stat-label">Crossref + OpenAlex</span>
+                <span class="stat-percent" style="color: {both_color};">{stats.get('both_pct', 0):.1f}%</span>
+            </div>
+            <div class="stat-item" style="border-left: 4px solid {crossref_color};">
+                <span class="stat-number" style="color: {crossref_color};">{crossref_only}</span>
+                <span class="stat-label">Only Crossref</span>
+                <span class="stat-percent" style="color: {crossref_color};">{stats.get('crossref_only_pct', 0):.1f}%</span>
+            </div>
+            <div class="stat-item" style="border-left: 4px solid {openalex_color};">
+                <span class="stat-number" style="color: {openalex_color};">{openalex_only}</span>
+                <span class="stat-label">Only OpenAlex</span>
+                <span class="stat-percent" style="color: {openalex_color};">{stats.get('openalex_only_pct', 0):.1f}%</span>
+            </div>
+            <div class="stat-item" style="border-left: 4px solid {none_color};">
+                <span class="stat-number" style="color: {none_color};">{none}</span>
+                <span class="stat-label">No Data</span>
+                <span class="stat-percent" style="color: {none_color};">{stats.get('none_pct', 0):.1f}%</span>
+            </div>
+        </div>
+        
+        <div class="progress-container">
+            <div class="progress-segment" style="width: {stats.get('both_pct', 0)}%; background: {both_color};">
+                {f'{both} ({stats.get("both_pct", 0):.0f}%)' if stats.get("both_pct", 0) > 5 else ''}
+                <span class="progress-tooltip">Crossref + OpenAlex: {both}</span>
+            </div>
+            <div class="progress-segment" style="width: {stats.get('crossref_only_pct', 0)}%; background: {crossref_color};">
+                {f'{crossref_only} ({stats.get("crossref_only_pct", 0):.0f}%)' if stats.get("crossref_only_pct", 0) > 5 else ''}
+                <span class="progress-tooltip">Only Crossref: {crossref_only}</span>
+            </div>
+            <div class="progress-segment" style="width: {stats.get('openalex_only_pct', 0)}%; background: {openalex_color};">
+                {f'{openalex_only} ({stats.get("openalex_only_pct", 0):.0f}%)' if stats.get("openalex_only_pct", 0) > 5 else ''}
+                <span class="progress-tooltip">Only OpenAlex: {openalex_only}</span>
+            </div>
+            <div class="progress-segment" style="width: {stats.get('none_pct', 0)}%; background: {none_color};">
+                {f'{none} ({stats.get("none_pct", 0):.0f}%)' if stats.get("none_pct", 0) > 5 else ''}
+                <span class="progress-tooltip">No Data: {none}</span>
+            </div>
+        </div>
+        
+        <div class="legend">
+            <span class="legend-item">
+                <span class="legend-color" style="background: {both_color};"></span>
+                Both APIs
+            </span>
+            <span class="legend-item">
+                <span class="legend-color" style="background: {crossref_color};"></span>
+                Only Crossref
+            </span>
+            <span class="legend-item">
+                <span class="legend-color" style="background: {openalex_color};"></span>
+                Only OpenAlex
+            </span>
+            <span class="legend-item">
+                <span class="legend-color" style="background: {none_color};"></span>
+                No Data
+            </span>
+            <span class="legend-item" style="font-weight: 500;">
+                🎯 Coverage: {coverage:.1f}%
+            </span>
+        </div>
+    </div>
+    """
+    
+    st.markdown(stats_html, unsafe_allow_html=True)
+    
+    # Дополнительная информация для улучшения
+    if none > 0:
+        st.info(f"💡 {none} references have no data. Try running analysis again to fetch missing data from APIs.")
+    
+    if crossref_only > 0:
+        st.info(f"🔄 {crossref_only} references have only Crossref data. Re-run to fetch OpenAlex data.")
+    
+    if openalex_only > 0:
+        st.info(f"🔄 {openalex_only} references have only OpenAlex data. Re-run to fetch Crossref data.")
+    
+    if both == total:
+        st.success("🎉 Perfect! All references have data from both APIs!")
+
+# ======================== CACHING ========================
+@st.cache_data(ttl=600, show_spinner=False)  # Увеличен TTL до 2 часов
+def cache_openalex_lookup(doi: str) -> Optional[Dict]:
+    """Cached OpenAlex request with extended TTL"""
+    return fetch_openalex(doi)
+
+@st.cache_data(ttl=600, show_spinner=False)
 def cache_openalex_lookup(doi: str) -> Optional[Dict]:
     """Cached OpenAlex request"""
     return fetch_openalex(doi)
 
-@st.cache_data(ttl=7200, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def cache_issn_lookup(issn: str) -> Optional[Dict]:
     """Cached ISSN Portal request"""
     try:
@@ -5667,7 +5977,6 @@ def main():
                 else:
                     with st.spinner(get_text('searching_duplicates')):
                         duplicates = find_duplicate_references(references)
-                        duplicates = find_duplicate_references(references)
                         if duplicates:
                             st.warning(get_text('found_duplicates').format(len(duplicates)))
                             with st.expander(get_text('view_duplicates')):
@@ -5689,9 +5998,21 @@ def main():
                         results = analyze_all_references(references, batch_size, paper_authors if paper_authors else None)
                         st.session_state['results'] = results
                         st.session_state['analysis_complete'] = True
+                        
+                        # ✅ НОВЫЙ КОД: Расчет и отображение статистики
+                        analysis_stats = calculate_analysis_statistics(results)
+                        st.session_state['analysis_stats'] = analysis_stats  # Сохраняем для других вкладок
+                        
+                        # Отображаем статистику
+                        display_analysis_statistics(analysis_stats)
                     
                     st.success(get_text('analysis_complete').format(len([r for r in results if r['doi']]), len(results)))
                     st.balloons()
+                    
+                    # ✅ ДОПОЛНИТЕЛЬНО: Совет по улучшению
+                    if analysis_stats['both'] < analysis_stats['total']:
+                        st.info("💡 For better coverage, click 'Start Enhanced Analysis' again to fetch missing data from APIs.")
+                    
                     st.info(get_text('go_to_analytics'))
             else:
                 st.warning(get_text('enter_reference_list'))
@@ -5700,6 +6021,11 @@ def main():
     
     with tab2:
         if 'analysis_complete' in st.session_state and st.session_state['analysis_complete']:
+            # Отображаем статистику анализа
+            if 'analysis_stats' in st.session_state:
+                display_analysis_statistics(st.session_state['analysis_stats'])
+                st.markdown("---")
+            
             results = st.session_state['results']
             paper_authors = st.session_state.get('paper_authors', set())
             
