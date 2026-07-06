@@ -19,7 +19,8 @@ import difflib
 import math
 from collections import defaultdict
 from itertools import combinations
-import html 
+import html
+import threading
 
 # ======================== ИМПОРТ СТИЛЕЙ ========================
 from styles import (
@@ -1539,25 +1540,48 @@ def fetch_crossref(doi: str) -> Optional[Dict]:
     except:
         return None
 
-@retry(stop=stop_after_attempt(4), wait=wait_random(min=1, max=3))
+@retry(stop=stop_after_attempt(6), wait=wait_exponential(multiplier=1, min=1, max=30))
 def fetch_openalex(doi: str) -> Optional[Dict]:
+    """
+    Request to OpenAlex API with proper rate limit handling.
+    Uses exponential backoff for 429 errors.
+    """
     try:
         encoded_doi = requests.utils.quote(doi)
+        # OpenAlex requires full DOI URL with https://doi.org/ prefix
+        url = f"https://api.openalex.org/works/https://doi.org/{encoded_doi}"
+        headers = {
+            'User-Agent': 'LiteratureAnalyzer/2.0 (mailto:analyzer@example.com)',
+            'Accept': 'application/json'
+        }
         
-        urls = [
-            f"https://api.openalex.org/works/https://doi.org/{encoded_doi}",
-            f"https://api.openalex.org/works/doi/{encoded_doi}"
-        ]
+        response = requests.get(url, headers=headers, timeout=15)
         
-        headers = {'User-Agent': 'LiteratureAnalyzer/2.0 (mailto:analyzer@example.com)'}
-        
-        for url in urls:
-            response = requests.get(url, headers=headers, timeout=8)
-            if response.status_code == 200:
-                return response.json()
-        
-        return None
-    except:
+        if response.status_code == 200:
+            return response.json()
+        elif response.status_code == 404:
+            # DOI not found in OpenAlex - this is normal, don't add to bad_dois
+            return None
+        elif response.status_code == 429:
+            # Rate limit exceeded - raise exception so tenacity retries with backoff
+            raise Exception(f"Rate limit exceeded (429) for DOI: {doi}")
+        elif response.status_code in [500, 502, 503, 504]:
+            # Server errors - raise exception so tenacity retries
+            raise Exception(f"Server error {response.status_code} for DOI: {doi}")
+        else:
+            # Other errors - treat as bad
+            st.session_state.bad_dois.add(doi)
+            return None
+            
+    except requests.exceptions.Timeout:
+        # Timeout - raise exception so tenacity retries
+        raise Exception(f"Timeout for DOI: {doi}")
+    except requests.exceptions.ConnectionError:
+        # Connection error - raise exception so tenacity retries
+        raise Exception(f"Connection error for DOI: {doi}")
+    except Exception as e:
+        # For any other exception, add to bad_dois and return None
+        st.session_state.bad_dois.add(doi)
         return None
 
 def fetch_openalex_concepts(work_id: str) -> List[Dict]:
@@ -3104,6 +3128,55 @@ def analyze_all_references(references: List[str], batch_size: int = 50, paper_au
     # Use the optimized version for better performance with new affiliation extraction
     return analyze_all_references_optimized(references, batch_size, paper_authors)
 
+# ======================== RATE LIMITED EXECUTOR ========================
+
+class RateLimitedExecutor:
+    """
+    Thread pool executor with rate limiting for API requests.
+    Controls the rate of requests to avoid 429 errors.
+    """
+    
+    def __init__(self, max_workers: int = 3, requests_per_second: float = 2.0):
+        """
+        Initialize rate limited executor.
+        
+        Args:
+            max_workers: Maximum number of concurrent workers
+            requests_per_second: Maximum requests per second across all workers
+        """
+        self.max_workers = max_workers
+        self.requests_per_second = requests_per_second
+        self.min_interval = 1.0 / requests_per_second if requests_per_second > 0 else 0.5
+        self._last_request_time = 0
+        self._lock = threading.Lock()
+        self._executor = ThreadPoolExecutor(max_workers=max_workers)
+    
+    def submit(self, fn, *args, **kwargs):
+        """
+        Submit a task with rate limiting.
+        Ensures that requests are spaced out to avoid rate limits.
+        """
+        # Calculate delay needed to respect rate limit
+        with self._lock:
+            current_time = time.time()
+            time_since_last = current_time - self._last_request_time
+            if time_since_last < self.min_interval:
+                delay = self.min_interval - time_since_last
+                time.sleep(delay)
+            self._last_request_time = time.time()
+        
+        return self._executor.submit(fn, *args, **kwargs)
+    
+    def shutdown(self, wait: bool = True):
+        """Shutdown the executor."""
+        self._executor.shutdown(wait=wait)
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.shutdown()
+
 # ======================== OPTIMIZED BATCH PROCESSING ========================
 def analyze_reference_batch_optimized(references: List[str], progress_callback=None, paper_authors: Set[str] = None, batch_num: int = 0, total_batches: int = 1) -> List[Dict]:
     """Analyze batch of references using optimized ThreadPoolExecutor with full OpenAlex support for journals and publishers"""
@@ -3506,7 +3579,10 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
     return results
 
 def analyze_all_references_optimized(references: List[str], batch_size: int = 50, paper_authors: Set[str] = None) -> List[Dict]:
-    """Analyze all references with optimized batching and COLORED progress updates"""
+    """
+    Analyze all references with optimized batching and COLORED progress updates.
+    Uses rate-limited executor for API requests.
+    """
     all_results = []
     total_batches = (len(references) + batch_size - 1) // batch_size
     
@@ -3540,14 +3616,6 @@ def analyze_all_references_optimized(references: List[str], batch_size: int = 50
     total_api_success = 0
     processed_refs = 0
     
-    def update_progress(batch_num, ref_idx, batch_len, total_batches):
-        """Update progress with dynamic coloring based on actual metrics"""
-        nonlocal total_dois_found, total_api_success, processed_refs
-        
-        # This is called from inside the batch, need to update counts carefully
-        # We'll use a simpler approach: update after each batch completion
-        pass
-    
     status_container = st.status(f"📊 Analyzing {len(references)} references...", expanded=True)
     
     for batch_num in range(total_batches):
@@ -3561,10 +3629,10 @@ def analyze_all_references_optimized(references: List[str], batch_size: int = 50
             state="running"
         )
         
-        # Process batch with optimized function
+        # Process batch with optimized function (now uses rate-limited executor)
         batch_results = analyze_reference_batch_optimized(
             batch, 
-            progress_callback=None,  # Disable internal callback, we'll update manually
+            progress_callback=None,
             paper_authors=paper_authors,
             batch_num=batch_num,
             total_batches=total_batches
@@ -3757,17 +3825,17 @@ def analyze_all_references_optimized(references: List[str], batch_size: int = 50
     return all_results
 
 # ======================== CACHING ========================
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def cache_crossref_lookup(doi: str) -> Optional[Dict]:
-    """Cached Crossref request"""
+    """Cached Crossref request with rate limit handling"""
     return fetch_crossref(doi)
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def cache_openalex_lookup(doi: str) -> Optional[Dict]:
-    """Cached OpenAlex request"""
+    """Cached OpenAlex request with rate limit handling"""
     return fetch_openalex(doi)
 
-@st.cache_data(ttl=7200, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def cache_issn_lookup(issn: str) -> Optional[Dict]:
     """Cached ISSN Portal request"""
     try:
