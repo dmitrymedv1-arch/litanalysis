@@ -1539,7 +1539,7 @@ def fetch_crossref(doi: str) -> Optional[Dict]:
     except:
         return None
 
-@retry(stop=stop_after_attempt(6), wait=wait_random(min=1, max=4))
+@retry(stop=stop_after_attempt(4), wait=wait_random(min=1, max=5))
 def fetch_openalex(doi: str) -> Optional[Dict]:
     """Request to OpenAlex API - OPTIMIZED with faster retry"""
     try:
@@ -3118,7 +3118,7 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
     
     if dois_with_indices:
         # OPTIMIZATION 1: Single global ThreadPoolExecutor for all DOIs in batch
-        with ThreadPoolExecutor(max_workers=3) as executor:
+        with ThreadPoolExecutor(max_workers=2) as executor:
             futures = {}
             for idx, doi in dois_with_indices:
                 # Check if DOI is in bad cache
