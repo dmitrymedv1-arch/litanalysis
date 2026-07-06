@@ -2417,23 +2417,42 @@ def analyze_author_frequency_all(results: List[Dict]) -> Dict:
     }
 
 def analyze_orcid_coverage(results: List[Dict]) -> Dict:
-    """Analyze ORCID coverage"""
-    total_authors = 0
-    authors_with_orcid = 0
+    """Analyze ORCID coverage based on UNIQUE authors"""
+    unique_authors = {}  # compare_name -> author_info
     orcid_by_country = Counter()
     
     for result in results:
         for author in result.get('authors', []):
-            total_authors += 1
-            if author.get('orcid'):
-                authors_with_orcid += 1
-                # Get countries from author (list of countries)
-                countries = author.get('countries', [])
-                if not countries and author.get('primary_country'):
-                    countries = [author['primary_country']]
-                for country in countries:
-                    if country:
-                        orcid_by_country[country] += 1
+            compare_name = author.get('compare_name', '')
+            if not compare_name:
+                continue
+            
+            # Check if this is a new unique author
+            if compare_name not in unique_authors:
+                unique_authors[compare_name] = {
+                    'display_name': author.get('display_name', compare_name),
+                    'orcid': author.get('orcid', ''),
+                    'countries': author.get('countries', [])
+                }
+            else:
+                # Merge countries if needed
+                existing = unique_authors[compare_name]
+                if not existing['orcid'] and author.get('orcid'):
+                    existing['orcid'] = author.get('orcid')
+                for country in author.get('countries', []):
+                    if country and country not in existing['countries']:
+                        existing['countries'].append(country)
+    
+    # Count unique authors with ORCID
+    total_authors = len(unique_authors)
+    authors_with_orcid = sum(1 for a in unique_authors.values() if a.get('orcid'))
+    
+    # Count ORCID by country (based on unique authors)
+    for author in unique_authors.values():
+        if author.get('orcid'):
+            for country in author.get('countries', []):
+                if country:
+                    orcid_by_country[country] += 1
     
     coverage_percent = (authors_with_orcid / total_authors * 100) if total_authors > 0 else 0
     
