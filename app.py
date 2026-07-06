@@ -3437,7 +3437,7 @@ def analyze_all_references(references: List[str], batch_size: int = 50, paper_au
 
 # ======================== OPTIMIZED BATCH PROCESSING ========================
 def analyze_reference_batch_optimized(references: List[str], progress_callback=None, paper_authors: Set[str] = None, batch_num: int = 0, total_batches: int = 1) -> List[Dict]:
-    """Analyze batch of references using optimized ThreadPoolExecutor with full OpenAlex support for journals and publishers"""
+    """Analyze batch of references using optimized ThreadPoolExecutor with CACHED functions"""
     results = []
     batch_size = len(references)
     
@@ -3459,17 +3459,15 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
         with ThreadPoolExecutor(max_workers=2) as executor:
             futures = {}
             for idx, doi in dois_with_indices:
-                # Check if DOI is in bad cache with attempts counter
-                if doi in st.session_state.bad_dois_attempts and st.session_state.bad_dois_attempts[doi] >= 3:
-                    continue
-                # Используем КЭШИРОВАННЫЕ функции вместо прямых вызовов
+                # ✅ ИСПОЛЬЗУЕМ КЭШИРОВАННЫЕ ФУНКЦИИ
+                # cache_crossref_lookup и cache_openalex_lookup уже имеют @st.cache_data
                 futures[(idx, 'crossref')] = executor.submit(cache_crossref_lookup, doi)
                 futures[(idx, 'openalex')] = executor.submit(cache_openalex_lookup, doi)
             
             # Collect results
             for (idx, api_type), future in futures.items():
                 try:
-                    result = future.result(timeout=20)  # Увеличенный таймаут
+                    result = future.result(timeout=20)
                     if api_type == 'crossref':
                         crossref_results[idx] = result
                     else:
@@ -3480,14 +3478,23 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                     else:
                         openalex_results[idx] = None
             
-            # Mark bad DOIs with attempts counter (not permanently blocked)
+            # ✅ ОБНОВЛЯЕМ СТАТИСТИКУ ПОПЫТОК
             for idx, doi in dois_with_indices:
-                if crossref_results.get(idx) is None and openalex_results.get(idx) is None:
+                crossref_success = crossref_results.get(idx) is not None
+                openalex_success = openalex_results.get(idx) is not None
+                
+                if not crossref_success and not openalex_success:
                     st.session_state.bad_dois_attempts[doi] += 1
                     if st.session_state.bad_dois_attempts[doi] >= 3:
                         st.session_state.bad_dois.add(doi)
+                else:
+                    # Сбрасываем счетчик при успехе
+                    if doi in st.session_state.bad_dois_attempts:
+                        st.session_state.bad_dois_attempts[doi] = 0
+                    if doi in st.session_state.bad_dois:
+                        st.session_state.bad_dois.discard(doi)
     
-    # Step 3: Build results for each reference
+    # Step 3: Build results for each reference (остается без изменений)
     for idx, ref in enumerate(references):
         identifiers = ref_doi_map[idx]
         doi = identifiers['doi']
@@ -3523,10 +3530,9 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
             'references_count': 0,
             'citations_count': 0,
             'is_suspicious_doi': False,
-            # NEW FIELDS FOR TYPE DETECTION
-            'is_repository': False,      # type == "repository" OR "posted_content" OR has arXiv ID
-            'is_ebook': False,           # type == "ebook platform" OR raw_type == "book-chapter"
-            'is_proceedings': False,     # raw_type == "proceedings-article"
+            'is_repository': False,
+            'is_ebook': False,
+            'is_proceedings': False,
             'openalex_type': None,
             'openalex_raw_type': None
         }
