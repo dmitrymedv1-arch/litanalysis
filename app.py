@@ -713,6 +713,19 @@ TEXTS = {
         'ref_colors_icons': "Icons only",
         'ref_colors_themed': "Themed (follows primary color)",
         'ref_colors_text': "Text only",
+        
+        # New for Incremental Enrichment
+        'analysis_run': "Analysis Run",
+        'converged': "✅ CONVERGED! All references have full data!",
+        'enrichment_progress': "🔄 Data enrichment in progress",
+        'run_again_to_enrich': "💡 Run analysis again to enrich remaining references",
+        'enrichment_history': "📊 Enrichment History",
+        'reset_cache': "🗑️ Reset cache & cumulative data",
+        'cache_cleared': "✅ Cache and cumulative data cleared!",
+        'both_sources': "Crossref + OpenAlex",
+        'only_crossref_source': "Only Crossref",
+        'only_openalex_source': "Only OpenAlex",
+        'not_found_source': "Not found",
     },
     'ru': {
         # General UI
@@ -1005,6 +1018,19 @@ TEXTS = {
         'ref_colors_icons': "Только иконки",
         'ref_colors_themed': "Тематический (следует primary цвету)",
         'ref_colors_text': "Только текст",
+        
+        # New for Incremental Enrichment
+        'analysis_run': "Запуск анализа",
+        'converged': "✅ КОНВЕРГЕНЦИЯ! Все ссылки имеют полные данные!",
+        'enrichment_progress': "🔄 Идет обогащение данных",
+        'run_again_to_enrich': "💡 Запустите анализ снова для обогащения оставшихся ссылок",
+        'enrichment_history': "📊 История обогащения",
+        'reset_cache': "🗑️ Сбросить кэш и кумулятивные данные",
+        'cache_cleared': "✅ Кэш и кумулятивные данные очищены!",
+        'both_sources': "Crossref + OpenAlex",
+        'only_crossref_source': "Только Crossref",
+        'only_openalex_source': "Только OpenAlex",
+        'not_found_source': "Не найдено",
     }
 }
 
@@ -1029,6 +1055,10 @@ if 'language' not in st.session_state:
 if 'bad_dois' not in st.session_state:
     st.session_state.bad_dois = set()
 
+# Initialize bad DOIs attempts counter in session state
+if 'bad_dois_attempts' not in st.session_state:
+    st.session_state.bad_dois_attempts = defaultdict(int)
+
 # Initialize journal and article number in session state
 if 'journal_name' not in st.session_state:
     st.session_state.journal_name = ''
@@ -1049,6 +1079,25 @@ if 'design_theme' not in st.session_state:
 # Initialize reference color style in session state
 if 'reference_color_style' not in st.session_state:
     st.session_state.reference_color_style = 'full'
+
+# ======================== НОВЫЕ ИНИЦИАЛИЗАЦИИ ДЛЯ ИНКРЕМЕНТАЛЬНОГО ОБОГАЩЕНИЯ ========================
+# Initialize cumulative results for incremental enrichment
+if 'cumulative_results' not in st.session_state:
+    st.session_state.cumulative_results = {}  # doi -> result_data
+if 'analysis_runs' not in st.session_state:
+    st.session_state.analysis_runs = 0
+if 'last_run_stats' not in st.session_state:
+    st.session_state.last_run_stats = {
+        'total': 0,
+        'both': 0,
+        'crossref_only': 0,
+        'openalex_only': 0,
+        'none': 0
+    }
+if 'converged' not in st.session_state:
+    st.session_state.converged = False  # Достигнут ли максимум
+if 'stats_history' not in st.session_state:
+    st.session_state.stats_history = []
 
 # ======================== COUNTRY CODES MAPPING ========================
 COUNTRY_CODES = {
@@ -1520,6 +1569,128 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# ======================== НОВЫЕ ФУНКЦИИ ДЛЯ ИНКРЕМЕНТАЛЬНОГО ОБОГАЩЕНИЯ ========================
+
+def update_cumulative_results(new_results: List[Dict]) -> Dict:
+    """
+    Обновляет кумулятивные результаты новыми данными.
+    Возвращает обновленную статистику.
+    """
+    # Обновляем cumulative_results новыми данными
+    for result in new_results:
+        doi = result.get('doi')
+        if not doi:
+            continue
+        
+        # Если DOI уже есть в кумулятивных данных, обновляем только если новые данные лучше
+        if doi in st.session_state.cumulative_results:
+            existing = st.session_state.cumulative_results[doi]
+            
+            # Обновляем только если новые данные имеют больше информации
+            new_has_both = result.get('crossref_status') and result.get('openalex_status')
+            existing_has_both = existing.get('crossref_status') and existing.get('openalex_status')
+            
+            # Если новые данные лучше (есть оба или хотя бы один, которого не было)
+            if (new_has_both and not existing_has_both) or \
+               (result.get('crossref_status') and not existing.get('crossref_status')) or \
+               (result.get('openalex_status') and not existing.get('openalex_status')):
+                # Мержим данные
+                merged = existing.copy()
+                
+                # Обновляем статусы
+                merged['crossref_status'] = merged.get('crossref_status') or result.get('crossref_status')
+                merged['openalex_status'] = merged.get('openalex_status') or result.get('openalex_status')
+                
+                # Обновляем данные если они есть
+                if result.get('crossref_data') and not merged.get('crossref_data'):
+                    merged['crossref_data'] = result['crossref_data']
+                if result.get('openalex_data') and not merged.get('openalex_data'):
+                    merged['openalex_data'] = result['openalex_data']
+                
+                # Обновляем другие поля
+                for field in ['journal', 'year', 'publisher', 'type', 'authors', 'authors_display']:
+                    if result.get(field) and not merged.get(field):
+                        merged[field] = result[field]
+                    elif result.get(field) and merged.get(field):
+                        # Если есть оба, выбираем более полные
+                        if len(str(result[field])) > len(str(merged[field])):
+                            merged[field] = result[field]
+                
+                # Обновляем флаги
+                for flag in ['is_retracted', 'is_preprint', 'is_repository', 'is_ebook', 'is_proceedings', 'is_suspicious_doi']:
+                    if result.get(flag) and not merged.get(flag):
+                        merged[flag] = result[flag]
+                
+                st.session_state.cumulative_results[doi] = merged
+        else:
+            # Новый DOI - сохраняем полностью
+            st.session_state.cumulative_results[doi] = result
+    
+    # Подсчитываем статистику по кумулятивным данным
+    stats = calculate_cumulative_stats()
+    
+    # Проверяем конвергенцию (достигнут ли максимум)
+    check_convergence(stats)
+    
+    return stats
+
+def calculate_cumulative_stats() -> Dict:
+    """Подсчет статистики по кумулятивным данным"""
+    stats = {
+        'total': len(st.session_state.cumulative_results),
+        'both': 0,
+        'crossref_only': 0,
+        'openalex_only': 0,
+        'none': 0
+    }
+    
+    for doi, data in st.session_state.cumulative_results.items():
+        crossref = data.get('crossref_status', False)
+        openalex = data.get('openalex_status', False)
+        
+        if crossref and openalex:
+            stats['both'] += 1
+        elif crossref:
+            stats['crossref_only'] += 1
+        elif openalex:
+            stats['openalex_only'] += 1
+        else:
+            stats['none'] += 1
+    
+    return stats
+
+def check_convergence(stats: Dict):
+    """
+    Проверяем, достигнут ли максимум.
+    Считаем, что конвергенция достигнута, если:
+    - OpenAlex_only = 0 (все DOI есть в OpenAlex)
+    - Crossref_only = 0 (все DOI есть в Crossref)
+    - Или после 5 запусков без изменений
+    """
+    total = stats['total']
+    
+    # Если все DOI имеют оба источника
+    if stats['both'] == total and total > 0:
+        st.session_state.converged = True
+        return
+    
+    # Если нет Only OpenAlex и нет Only Crossref
+    if stats['openalex_only'] == 0 and stats['crossref_only'] == 0 and total > 0:
+        st.session_state.converged = True
+        return
+    
+    # Если после 5 запусков статистика не улучшается
+    st.session_state.analysis_runs += 1
+    if st.session_state.analysis_runs >= 5:
+        # Проверяем, были ли изменения за последние 3 запуска
+        if hasattr(st.session_state, 'stats_history'):
+            if len(st.session_state.stats_history) >= 3:
+                recent = st.session_state.stats_history[-3:]
+                # Если все три запуска показали одинаковую статистику
+                if (recent[0]['both'] == recent[1]['both'] == recent[2]['both'] and
+                    recent[0]['crossref_only'] == recent[1]['crossref_only'] == recent[2]['crossref_only']):
+                    st.session_state.converged = True
+
 # ======================== OPTIMIZED API REQUESTS ========================
 @retry(stop=stop_after_attempt(6), wait=wait_exponential(multiplier=1, min=1, max=10))
 def fetch_crossref(doi: str) -> Optional[Dict]:
@@ -1539,18 +1710,46 @@ def fetch_crossref(doi: str) -> Optional[Dict]:
     except:
         return None
 
-@retry(stop=stop_after_attempt(4), wait=wait_random(min=1, max=3))
-def fetch_openalex(doi: str) -> Optional[Dict]:
-    """Request to OpenAlex API - OPTIMIZED with faster retry"""
+@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=2, min=2, max=15))
+def fetch_openalex_with_retry(doi: str) -> Optional[Dict]:
+    """Request to OpenAlex API with EXPONENTIAL BACKOFF"""
     try:
         encoded_doi = requests.utils.quote(doi)
         url = f"https://api.openalex.org/works/doi/{encoded_doi}"
-        response = requests.get(url, timeout=8)
+        headers = {
+            'User-Agent': 'LiteratureAnalyzer/2.0 (mailto:analyzer@example.com)',
+            'Accept': 'application/json'
+        }
+        response = requests.get(url, headers=headers, timeout=15)
+        
         if response.status_code == 200:
             return response.json()
+        elif response.status_code == 429:
+            # Rate limit - ждем и повторяем
+            time.sleep(2)
+            return None
+        elif response.status_code in [500, 502, 503, 504]:
+            # Server errors - повторяем
+            time.sleep(1)
+            return None
+        else:
+            # 404 - DOI не найден
+            return None
+    except requests.exceptions.Timeout:
+        # Таймаут - повторяем
         return None
-    except:
+    except Exception:
         return None
+
+@st.cache_data(ttl=7200, show_spinner=False)
+def cache_crossref_lookup(doi: str) -> Optional[Dict]:
+    """Cached Crossref request"""
+    return fetch_crossref(doi)
+
+@st.cache_data(ttl=7200, show_spinner=False)
+def cache_openalex_lookup(doi: str) -> Optional[Dict]:
+    """Cached OpenAlex request with retry"""
+    return fetch_openalex_with_retry(doi)
 
 def fetch_openalex_concepts(work_id: str) -> List[Dict]:
     """Extract concepts from OpenAlex"""
@@ -1823,13 +2022,6 @@ def merge_authors_from_results(results: List[Dict]) -> List[Dict]:
     return result_list
 
 # ======================== HELPER FUNCTIONS FOR AUTHOR PROCESSING ========================
-
-# OLD FUNCTIONS REMOVED:
-# - clean_affiliation() - REMOVED (replaced by extract_country_from_affiliation_string)
-# - get_country_from_affiliation() - REMOVED (replaced by extract_country_from_affiliation_string)
-# - extract_authors_from_crossref() - REPLACED by extract_authors_with_affiliations_from_crossref
-# - extract_authors_from_openalex() - REPLACED by extract_authors_with_affiliations_from_openalex
-# - merge_authors() - REPLACED by merge_authors_from_results
 
 def format_orcid_id(orcid: str) -> str:
     """Format ORCID ID to full URL"""
@@ -3112,28 +3304,35 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
         if doi:
             dois_with_indices.append((idx, doi))
     
-    # Step 2: Fetch data using ThreadPoolExecutor (optimized approach)
+    # Step 2: Fetch data using ThreadPoolExecutor (optimized approach with CACHED functions)
     crossref_results = {}
     openalex_results = {}
     
     if dois_with_indices:
         # OPTIMIZATION 1: Single global ThreadPoolExecutor for all DOIs in batch
-        with ThreadPoolExecutor(max_workers=3) as executor:
+        with ThreadPoolExecutor(max_workers=2) as executor:
             futures = {}
             for idx, doi in dois_with_indices:
-                # Check if DOI is in bad cache
-                if doi in st.session_state.bad_dois:
+                # Проверяем bad_dois с учетом счетчика попыток
+                skip = False
+                if doi in st.session_state.bad_dois_attempts and st.session_state.bad_dois_attempts[doi] >= 3:
+                    skip = True
+                elif doi in st.session_state.bad_dois:
+                    skip = True
+                
+                if not skip:
+                    # Используем КЭШИРОВАННЫЕ функции вместо прямых вызовов
+                    futures[(idx, 'crossref')] = executor.submit(cache_crossref_lookup, doi)
+                    futures[(idx, 'openalex')] = executor.submit(cache_openalex_lookup, doi)
+                else:
                     futures[(idx, 'crossref')] = None
                     futures[(idx, 'openalex')] = None
-                else:
-                    futures[(idx, 'crossref')] = executor.submit(fetch_crossref, doi)
-                    futures[(idx, 'openalex')] = executor.submit(fetch_openalex, doi)
             
             # Collect results
             for (idx, api_type), future in futures.items():
                 if future is not None:
                     try:
-                        result = future.result(timeout=15)
+                        result = future.result(timeout=20)  # Увеличенный таймаут
                         if api_type == 'crossref':
                             crossref_results[idx] = result
                         else:
@@ -3149,10 +3348,12 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                     else:
                         openalex_results[idx] = None
             
-            # Mark bad DOIs for caching
+            # Обновляем счетчики попыток для неудачных DOI
             for idx, doi in dois_with_indices:
                 if crossref_results.get(idx) is None and openalex_results.get(idx) is None:
-                    st.session_state.bad_dois.add(doi)
+                    st.session_state.bad_dois_attempts[doi] += 1
+                    if st.session_state.bad_dois_attempts[doi] >= 3:
+                        st.session_state.bad_dois.add(doi)
     
     # Step 3: Build results for each reference
     for idx, ref in enumerate(references):
@@ -3571,6 +3772,10 @@ def analyze_all_references_optimized(references: List[str], batch_size: int = 50
                 total_api_success += 1
         
         all_results.extend(batch_results)
+        
+        # Добавляем задержку между батчами для соблюдения rate limit
+        if batch_num < total_batches - 1:
+            time.sleep(1.5)  # Пауза между батчами
         
         # Calculate current progress and metrics
         progress_percent = (processed_refs / len(references)) * 100
@@ -4473,8 +4678,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
         else:
             return key
     
-    # Load logo
-    logo_base64 = ""
+    # Load logo    logo_base64 = ""
     try:
         with open("logo.png", "rb") as img_file:
             logo_base64 = base64.b64encode(img_file.read()).decode()
@@ -5514,7 +5718,7 @@ def main():
         current_color_style = st.session_state.get('reference_color_style', 'full')
         
         color_style = st.selectbox(
-            get_text('reference_colors'),  # Непустой label
+            get_text('reference_colors'),
             options=list(color_style_options.keys()),
             format_func=lambda x: color_style_options[x],
             index=list(color_style_options.keys()).index(current_color_style)
@@ -5624,6 +5828,21 @@ def main():
         # ========== SETTINGS (LAST) ==========
         st.markdown(f"## {get_text('settings')}")
         batch_size = st.slider(get_text('batch_size'), 10, 100, 50, help=get_text('batch_size_help'))
+        
+        # ========== НОВАЯ КНОПКА: СБРОСИТЬ КЭШ ==========
+        st.markdown("---")
+        if st.button(get_text('reset_cache'), use_container_width=True):
+            # Очищаем кэш Streamlit
+            st.cache_data.clear()
+            # Сбрасываем кумулятивные данные
+            st.session_state.cumulative_results = {}
+            st.session_state.analysis_runs = 0
+            st.session_state.converged = False
+            st.session_state.stats_history = []
+            st.session_state.bad_dois = set()
+            st.session_state.bad_dois_attempts = defaultdict(int)
+            st.success(get_text('cache_cleared'))
+            st.rerun()
     
     st.image("logo.png", width=250)
     st.markdown("---")
@@ -5685,14 +5904,128 @@ def main():
                     st.session_state['analysis_started'] = True
                     
                     with st.spinner(get_text('analysis_started')):
-                        # Use the optimized analysis function
-                        results = analyze_all_references(references, batch_size, paper_authors if paper_authors else None)
-                        st.session_state['results'] = results
+                        # Используем оптимизированную функцию с КЭШИРОВАННЫМИ вызовами
+                        new_results = analyze_all_references_optimized(
+                            references, 
+                            batch_size, 
+                            paper_authors if paper_authors else None
+                        )
+                        
+                        # ========== НОВЫЙ КОД: ИНКРЕМЕНТАЛЬНОЕ ОБНОВЛЕНИЕ ==========
+                        # Обновляем кумулятивные результаты
+                        current_stats = update_cumulative_results(new_results)
+                        
+                        # Сохраняем историю для отслеживания прогресса
+                        if not hasattr(st.session_state, 'stats_history'):
+                            st.session_state.stats_history = []
+                        st.session_state.stats_history.append(current_stats.copy())
+                        
+                        # Сохраняем результаты в session_state для отображения
+                        st.session_state['results'] = list(st.session_state.cumulative_results.values())
                         st.session_state['analysis_complete'] = True
+                        st.session_state['last_run_stats'] = current_stats
+                        
+                        # ========== РАСШИРЕННОЕ СООБЩЕНИЕ ОБ УСПЕХЕ ==========
+                        total_refs = len(st.session_state.cumulative_results)
+                        both = current_stats['both']
+                        crossref_only = current_stats['crossref_only']
+                        openalex_only = current_stats['openalex_only']
+                        none = current_stats['none']
+                        
+                        # Создаем прогресс-бар с детальной статистикой
+                        success_html = f"""
+                        <div style="background: #d4edda; border: 2px solid #28a745; border-radius: 12px; padding: 20px; margin: 15px 0;">
+                            <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                                <span style="font-size: 28px;">✅</span>
+                                <div>
+                                    <div style="font-size: 18px; font-weight: bold; color: #155724;">
+                                        {get_text('analysis_complete').format(total_refs, len(references))}
+                                    </div>
+                                    <div style="display: flex; gap: 20px; margin-top: 10px; flex-wrap: wrap;">
+                                        <div style="background: #28a745; color: white; padding: 4px 14px; border-radius: 20px; font-weight: bold;">
+                                            🟢 {both} {get_text('both_sources')}
+                                        </div>
+                                        <div style="background: #ffc107; color: #856404; padding: 4px 14px; border-radius: 20px; font-weight: bold;">
+                                            🟡 {crossref_only} {get_text('only_crossref_source')}
+                                        </div>
+                                        <div style="background: #17a2b8; color: white; padding: 4px 14px; border-radius: 20px; font-weight: bold;">
+                                            🔵 {openalex_only} {get_text('only_openalex_source')}
+                                        </div>
+                                        <div style="background: #dc3545; color: white; padding: 4px 14px; border-radius: 20px; font-weight: bold;">
+                                            🔴 {none} {get_text('not_found_source')}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        """
+                        
+                        # Добавляем индикатор прогресса конвергенции
+                        if not st.session_state.converged:
+                            progress_percent = (both / len(references) * 100) if len(references) > 0 else 0
+                            convergence_html = f"""
+                            <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 10px; padding: 15px; margin: 10px 0;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                                    <span style="font-weight: bold;">{get_text('enrichment_progress')}:</span>
+                                    <span>{both}/{len(references)} {get_text('references')} have both sources ({progress_percent:.1f}%)</span>
+                                    <span style="font-size: 12px; color: #856404;">
+                                        {crossref_only} {get_text('only_crossref_source')} • {openalex_only} {get_text('only_openalex_source')}
+                                    </span>
+                                </div>
+                                <div style="background: #e9ecef; border-radius: 10px; height: 8px; margin-top: 8px; overflow: hidden;">
+                                    <div style="background: linear-gradient(90deg, #28a745, #20c997); height: 100%; width: {min(progress_percent, 100)}%; transition: width 0.5s;"></div>
+                                </div>
+                                <div style="font-size: 12px; color: #856404; margin-top: 5px;">
+                                    💡 {get_text('run_again_to_enrich')}
+                                </div>
+                            </div>
+                            """
+                            st.markdown(convergence_html, unsafe_allow_html=True)
+                        else:
+                            converged_html = f"""
+                            <div style="background: #d4edda; border: 2px solid #28a745; border-radius: 12px; padding: 20px; margin: 15px 0;">
+                                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                                    <span style="font-size: 28px;">🎉</span>
+                                    <div>
+                                        <div style="font-size: 18px; font-weight: bold; color: #155724;">
+                                            {get_text('converged')}
+                                        </div>
+                                        <div style="display: flex; gap: 20px; margin-top: 10px; flex-wrap: wrap;">
+                                            <div style="background: #28a745; color: white; padding: 4px 14px; border-radius: 20px; font-weight: bold;">
+                                                🟢 {both} {get_text('both_sources')}
+                                            </div>
+                                            <div style="background: #6c757d; color: white; padding: 4px 14px; border-radius: 20px; font-weight: bold;">
+                                                ⚪ 0 {get_text('only_crossref_source')}
+                                            </div>
+                                            <div style="background: #6c757d; color: white; padding: 4px 14px; border-radius: 20px; font-weight: bold;">
+                                                ⚪ 0 {get_text('only_openalex_source')}
+                                            </div>
+                                            <div style="background: #dc3545; color: white; padding: 4px 14px; border-radius: 20px; font-weight: bold;">
+                                                🔴 {none} {get_text('not_found_source')}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            """
+                            st.markdown(converged_html, unsafe_allow_html=True)
+                        
+                        st.markdown(success_html, unsafe_allow_html=True)
+                        
+                        # Показываем историю прогресса
+                        if hasattr(st.session_state, 'stats_history') and len(st.session_state.stats_history) > 1:
+                            with st.expander(get_text('enrichment_history')):
+                                history_df = pd.DataFrame(st.session_state.stats_history)
+                                history_df.index = [f"{get_text('analysis_run')} {i+1}" for i in range(len(history_df))]
+                                st.dataframe(history_df, use_container_width=True)
+                                
+                                # График прогресса
+                                st.line_chart(history_df[['both', 'crossref_only', 'openalex_only']])
+                        
+                        st.balloons()
+                        st.info(get_text('go_to_analytics'))
                     
-                    st.success(get_text('analysis_complete').format(len([r for r in results if r['doi']]), len(results)))
-                    st.balloons()
-                    st.info(get_text('go_to_analytics'))
+                    # ... остальной код ...
             else:
                 st.warning(get_text('enter_reference_list'))
         
