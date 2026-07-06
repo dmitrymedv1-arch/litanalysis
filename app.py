@@ -3172,7 +3172,7 @@ def analyze_all_references_optimized(references: List[str], batch_size: int = 50
         )
         
         # Process batch with optimized function (now uses CACHED functions)
-        batch_results = analyze_reference_batch(
+        batch_results = analyze_reference_batch_optimized(
             batch, 
             progress_callback=None,  # Disable internal callback, we'll update manually
             paper_authors=paper_authors,
