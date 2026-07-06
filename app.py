@@ -1029,6 +1029,10 @@ if 'language' not in st.session_state:
 if 'bad_dois' not in st.session_state:
     st.session_state.bad_dois = set()
 
+# Инициализация счетчика попыток для bad DOIs
+if 'bad_dois_attempts' not in st.session_state:
+    st.session_state.bad_dois_attempts = defaultdict(int)
+    
 # Initialize journal and article number in session state
 if 'journal_name' not in st.session_state:
     st.session_state.journal_name = ''
@@ -1040,6 +1044,10 @@ if 'orcid_cache' not in st.session_state:
     st.session_state.orcid_cache = {}
 if 'propose_reviewers' not in st.session_state:
     st.session_state.propose_reviewers = False
+
+# Инициализация статистики анализа
+if 'analysis_stats' not in st.session_state:
+    st.session_state.analysis_stats = {}
 
 # ======================== НОВЫЕ ИНИЦИАЛИЗАЦИИ ДЛЯ ТЕМ ========================
 # Initialize design theme in session state
@@ -1539,17 +1547,35 @@ def fetch_crossref(doi: str) -> Optional[Dict]:
     except:
         return None
 
-@retry(stop=stop_after_attempt(4), wait=wait_random(min=1, max=3))
+@retry(stop=stop_after_attempt(4), wait=wait_exponential(multiplier=2, min=0.5, max=15))
 def fetch_openalex(doi: str) -> Optional[Dict]:
-    """Request to OpenAlex API - OPTIMIZED with faster retry"""
+    """Request to OpenAlex API with EXPONENTIAL BACKOFF and improved error handling"""
     try:
         encoded_doi = requests.utils.quote(doi)
         url = f"https://api.openalex.org/works/doi/{encoded_doi}"
-        response = requests.get(url, timeout=8)
+        headers = {
+            'User-Agent': 'LiteratureAnalyzer/2.0 (mailto:analyzer@example.com)',
+            'Accept': 'application/json'
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        
         if response.status_code == 200:
             return response.json()
+        elif response.status_code == 429:
+            # Rate limit - wait and retry
+            time.sleep(2)
+            return None
+        elif response.status_code in [500, 502, 503, 504]:
+            # Server errors - retry
+            time.sleep(1)
+            return None
+        else:
+            # 404 - DOI not found
+            return None
+    except requests.exceptions.Timeout:
+        # Timeout - retry
         return None
-    except:
+    except Exception:
         return None
 
 def fetch_openalex_concepts(work_id: str) -> List[Dict]:
@@ -3097,408 +3123,10 @@ def analyze_all_references(references: List[str], batch_size: int = 50, paper_au
     return analyze_all_references_optimized(references, batch_size, paper_authors)
 
 # ======================== OPTIMIZED BATCH PROCESSING ========================
-def analyze_reference_batch_optimized(references: List[str], progress_callback=None, paper_authors: Set[str] = None, batch_num: int = 0, total_batches: int = 1) -> List[Dict]:
-    """Analyze batch of references using optimized ThreadPoolExecutor with full OpenAlex support for journals and publishers"""
-    results = []
-    batch_size = len(references)
-    
-    # Step 1: Extract all DOIs with their indices
-    dois_with_indices = []
-    ref_doi_map = {}
-    for idx, ref in enumerate(references):
-        identifiers = extract_identifiers(ref)
-        doi = identifiers['doi']
-        ref_doi_map[idx] = {'doi': doi, 'identifiers': identifiers}
-        if doi:
-            dois_with_indices.append((idx, doi))
-    
-    # Step 2: Fetch data using ThreadPoolExecutor (optimized approach)
-    crossref_results = {}
-    openalex_results = {}
-    
-    if dois_with_indices:
-        # OPTIMIZATION 1: Single global ThreadPoolExecutor for all DOIs in batch
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            futures = {}
-            for idx, doi in dois_with_indices:
-                # Check if DOI is in bad cache
-                if doi in st.session_state.bad_dois:
-                    futures[(idx, 'crossref')] = None
-                    futures[(idx, 'openalex')] = None
-                else:
-                    futures[(idx, 'crossref')] = executor.submit(fetch_crossref, doi)
-                    futures[(idx, 'openalex')] = executor.submit(fetch_openalex, doi)
-            
-            # Collect results
-            for (idx, api_type), future in futures.items():
-                if future is not None:
-                    try:
-                        result = future.result(timeout=15)
-                        if api_type == 'crossref':
-                            crossref_results[idx] = result
-                        else:
-                            openalex_results[idx] = result
-                    except Exception:
-                        if api_type == 'crossref':
-                            crossref_results[idx] = None
-                        else:
-                            openalex_results[idx] = None
-                else:
-                    if api_type == 'crossref':
-                        crossref_results[idx] = None
-                    else:
-                        openalex_results[idx] = None
-            
-            # Mark bad DOIs for caching
-            for idx, doi in dois_with_indices:
-                if crossref_results.get(idx) is None and openalex_results.get(idx) is None:
-                    st.session_state.bad_dois.add(doi)
-    
-    # Step 3: Build results for each reference
-    for idx, ref in enumerate(references):
-        identifiers = ref_doi_map[idx]
-        doi = identifiers['doi']
-        
-        # Get fetched data (if any)
-        crossref_data = crossref_results.get(idx) if dois_with_indices else None
-        openalex_data = openalex_results.get(idx) if dois_with_indices else None
-        
-        result = {
-            'original_text': ref,
-            'doi': doi,
-            'identifiers': identifiers,
-            'crossref_data': None,
-            'openalex_data': None,
-            'crossref_status': False,
-            'openalex_status': False,
-            'authors': [],
-            'authors_display': [],
-            'journal': None,
-            'journal_from': None,
-            'year': None,
-            'type': None,
-            'raw_type': None,
-            'publisher': None,
-            'publisher_from': None,
-            'crossmark_issues': [],
-            'is_preprint': False,
-            'has_erratum': False,
-            'is_retracted': False,
-            'is_self_citation': False,
-            'issn': None,
-            'license': None,
-            'references_count': 0,
-            'citations_count': 0,
-            'is_suspicious_doi': False,
-            # NEW FIELDS FOR TYPE DETECTION
-            'is_repository': False,      # type == "repository" OR "posted_content" OR has arXiv ID
-            'is_ebook': False,           # type == "ebook platform" OR raw_type == "book-chapter"
-            'is_proceedings': False,     # raw_type == "proceedings-article"
-            'openalex_type': None,
-            'openalex_raw_type': None
-        }
-        
-        if doi:
-            # Check for suspicious DOI
-            if crossref_data is None and openalex_data is None:
-                result['is_suspicious_doi'] = True
-                result['crossmark_issues'].append('⚠️ Attention: invalid/suspicious DOI (not found in Crossref or OpenAlex)')
-            
-            # ==================== PROCESS OPENALEX DATA FIRST (PREFERRED) ====================
-            if openalex_data:
-                result['openalex_data'] = openalex_data
-                result['openalex_status'] = True
-                
-                # Extract OpenAlex type and raw_type
-                openalex_type = openalex_data.get('type', '') or ''
-                raw_type = openalex_data.get('raw_type', '') or openalex_data.get('primary_location', {}).get('raw_type', '') or ''
-                
-                result['openalex_type'] = openalex_type
-                result['openalex_raw_type'] = raw_type
-                result['type'] = openalex_type
-                result['raw_type'] = raw_type
-                
-                # ========== IMPROVED TYPE DETECTION ==========
-                primary_location = openalex_data.get('primary_location', {})
-                source = primary_location.get('source', {})
-                source_type = source.get('type', '') or '' if source else ''
-                
-                # 1. PROCEEDINGS DETECTION
-                if raw_type == 'proceedings-article':
-                    result['is_proceedings'] = True
-                    result['crossmark_issues'].append('📊 Conference proceedings')
-                
-                # 2. EBOOK DETECTION
-                elif raw_type == 'book-chapter' and source_type == 'ebook platform':
-                    result['is_ebook'] = True
-                    result['crossmark_issues'].append('📖 Electronic book')
-                
-                if not result['is_ebook'] and openalex_data.get('host_venue'):
-                    host_venue = openalex_data['host_venue']
-                    if isinstance(host_venue, dict):
-                        venue_type = host_venue.get('type', '') or ''
-                        if venue_type == 'ebook platform':
-                            result['is_ebook'] = True
-                            result['crossmark_issues'].append('📖 Electronic book (from series)')
-                
-                # 3. REPOSITORY / PREPRINT DETECTION
-                repository_raw_types = ['posted-content', 'posted_content', 'preprint']
-                repository_source_types = ['repository']
-                
-                if raw_type.lower() in repository_raw_types:
-                    result['is_repository'] = True
-                    result['is_preprint'] = True
-                    result['crossmark_issues'].append('📚 Repository / Preprint')
-                elif source_type.lower() in repository_source_types:
-                    result['is_repository'] = True
-                    result['is_preprint'] = True
-                    result['crossmark_issues'].append('📚 Repository / Preprint')
-                
-                # 4. RETRACTION DETECTION
-                if openalex_data.get('is_retracted') is True:
-                    result['is_retracted'] = True
-                    result['crossmark_issues'].append('⚠️ This article has been RETRACTED')
-                
-                # ========== EXTRACT AUTHORS FROM OPENALEX (NEW LOGIC) ==========
-                authors_data = extract_authors_with_affiliations_from_openalex(openalex_data)
-                
-                for auth in authors_data:
-                    # Check if author already exists by compare_name
-                    existing = False
-                    for existing_auth in result['authors']:
-                        if existing_auth.get('compare_name') == auth['compare_name']:
-                            # Merge affiliations
-                            existing_aff_names = [aff['name'] for aff in existing_auth.get('affiliations', [])]
-                            for aff in auth.get('affiliations', []):
-                                if aff['name'] not in existing_aff_names:
-                                    existing_auth['affiliations'].append(aff)
-                                    if aff['country'] and aff['country'] not in existing_auth['countries']:
-                                        existing_auth['countries'].append(aff['country'])
-                                    existing_auth['institutions'].append(aff['name'])
-                            existing = True
-                            break
-                    
-                    if not existing:
-                        result['authors'].append(auth)
-                        result['authors_display'].append(auth['display_name'])
-            
-            # ==================== PROCESS CROSSREF DATA AS FALLBACK ====================
-            if crossref_data:
-                result['crossref_data'] = crossref_data
-                result['crossref_status'] = True
-                
-                # Only extract authors if OpenAlex didn't provide data or provided incomplete data
-                if not result['authors']:
-                    authors_data = extract_authors_with_affiliations_from_crossref(crossref_data)
-                    for auth in authors_data:
-                        result['authors'].append(auth)
-                        result['authors_display'].append(auth['display_name'])
-                
-                # Extract journal from Crossref
-                if 'container-title' in crossref_data and crossref_data['container-title']:
-                    journal_name = crossref_data['container-title'][0]
-                    if journal_name and journal_name.strip():
-                        result['journal'] = journal_name.strip()
-                        result['journal_from'] = 'crossref'
-                
-                # Extract ISSN from Crossref
-                if 'ISSN' in crossref_data and crossref_data['ISSN']:
-                    result['issn'] = crossref_data['ISSN'][0]
-                
-                # Extract year from Crossref
-                if not result['year'] and 'issued' in crossref_data and 'date-parts' in crossref_data['issued']:
-                    date_parts = crossref_data['issued']['date-parts']
-                    if date_parts and date_parts[0] and len(date_parts[0]) > 0:
-                        result['year'] = date_parts[0][0]
-                
-                # Extract publication type
-                if not result['type'] and 'type' in crossref_data:
-                    result['type'] = crossref_data['type']
-                
-                # Extract publisher from Crossref
-                if not result['publisher'] and 'publisher' in crossref_data and crossref_data['publisher']:
-                    publisher_name = crossref_data['publisher']
-                    if publisher_name and publisher_name.strip():
-                        result['publisher'] = publisher_name.strip()
-                        result['publisher_from'] = 'crossref'
-                
-                # Extract license
-                if 'license' in crossref_data:
-                    result['license'] = crossref_data['license'][0].get('URL', '') if crossref_data['license'] else None
-                
-                # Extract citation count
-                if 'is-referenced-by-count' in crossref_data:
-                    result['citations_count'] = crossref_data['is-referenced-by-count']
-                
-                # Extract Crossmark issues
-                if 'crossmark' in crossref_data:
-                    for cm in crossref_data.get('crossmark', []):
-                        if 'type' in cm:
-                            result['crossmark_issues'].append(cm['type'])
-            
-            # ========== EXTRACT JOURNAL AND PUBLISHER FROM OPENALEX (if not set) ==========
-            if openalex_data:
-                # Extract journal from OpenAlex
-                journal_from_openalex = None
-                
-                if openalex_data.get('host_venue'):
-                    host_venue = openalex_data['host_venue']
-                    if isinstance(host_venue, dict):
-                        if host_venue.get('display_name'):
-                            journal_from_openalex = host_venue['display_name'].strip()
-                        elif host_venue.get('name'):
-                            journal_from_openalex = host_venue['name'].strip()
-                
-                if not journal_from_openalex and openalex_data.get('primary_location'):
-                    primary = openalex_data['primary_location']
-                    if isinstance(primary, dict):
-                        if primary.get('source') and isinstance(primary['source'], dict):
-                            if primary['source'].get('display_name'):
-                                journal_from_openalex = primary['source']['display_name'].strip()
-                            elif primary['source'].get('name'):
-                                journal_from_openalex = primary['source']['name'].strip()
-                
-                if not journal_from_openalex and openalex_data.get('locations'):
-                    for loc in openalex_data['locations']:
-                        if isinstance(loc, dict) and loc.get('source'):
-                            source_obj = loc['source']
-                            if isinstance(source_obj, dict):
-                                if source_obj.get('display_name'):
-                                    journal_from_openalex = source_obj['display_name'].strip()
-                                    break
-                                elif source_obj.get('name'):
-                                    journal_from_openalex = source_obj['name'].strip()
-                                    break
-                
-                if journal_from_openalex and journal_from_openalex.strip():
-                    if not result['journal']:
-                        result['journal'] = journal_from_openalex
-                        result['journal_from'] = 'openalex'
-                    elif result['journal'] and journal_from_openalex != result['journal']:
-                        if len(journal_from_openalex) > len(result['journal']):
-                            result['journal'] = journal_from_openalex
-                            result['journal_from'] = 'openalex_override'
-                
-                # Extract publisher from OpenAlex
-                publisher_from_openalex = None
-                
-                if openalex_data.get('host_venue'):
-                    host_venue = openalex_data['host_venue']
-                    if isinstance(host_venue, dict):
-                        if host_venue.get('publisher'):
-                            publisher_from_openalex = host_venue['publisher'].strip()
-                        elif host_venue.get('publisher_name'):
-                            publisher_from_openalex = host_venue['publisher_name'].strip()
-                
-                if not publisher_from_openalex and openalex_data.get('primary_location'):
-                    primary = openalex_data['primary_location']
-                    if isinstance(primary, dict) and primary.get('source'):
-                        source_obj = primary['source']
-                        if isinstance(source_obj, dict):
-                            if source_obj.get('publisher'):
-                                publisher_from_openalex = source_obj['publisher'].strip()
-                            elif source_obj.get('publisher_name'):
-                                publisher_from_openalex = source_obj['publisher_name'].strip()
-                
-                if not publisher_from_openalex and openalex_data.get('locations'):
-                    for loc in openalex_data['locations']:
-                        if isinstance(loc, dict) and loc.get('source'):
-                            source_obj = loc['source']
-                            if isinstance(source_obj, dict):
-                                if source_obj.get('publisher'):
-                                    publisher_from_openalex = source_obj['publisher'].strip()
-                                    break
-                                elif source_obj.get('publisher_name'):
-                                    publisher_from_openalex = source_obj['publisher_name'].strip()
-                                    break
-                
-                if not publisher_from_openalex and openalex_data.get('host_organization'):
-                    host_org = openalex_data['host_organization']
-                    if isinstance(host_org, dict):
-                        if host_org.get('display_name'):
-                            publisher_from_openalex = host_org['display_name'].strip()
-                        elif host_org.get('name'):
-                            publisher_from_openalex = host_org['name'].strip()
-                    elif isinstance(host_org, str):
-                        publisher_from_openalex = host_org.strip()
-                
-                if not publisher_from_openalex and openalex_data.get('host_organization_name'):
-                    publisher_from_openalex = openalex_data['host_organization_name'].strip()
-                
-                if publisher_from_openalex and publisher_from_openalex.strip():
-                    if not result['publisher']:
-                        result['publisher'] = publisher_from_openalex
-                        result['publisher_from'] = 'openalex'
-                    elif result['publisher'] and publisher_from_openalex != result['publisher']:
-                        if len(publisher_from_openalex) > len(result['publisher']):
-                            result['publisher'] = publisher_from_openalex
-                            result['publisher_from'] = 'openalex_override'
-                
-                # Extract reference count
-                if 'referenced_works_count' in openalex_data:
-                    result['references_count'] = openalex_data['referenced_works_count']
-                
-                # Extract citation count (take max from both sources)
-                if 'cited_by_count' in openalex_data:
-                    result['citations_count'] = max(result['citations_count'], openalex_data['cited_by_count'])
-                
-                # Extract year from OpenAlex (if not already set)
-                if not result['year'] and 'publication_year' in openalex_data:
-                    result['year'] = openalex_data['publication_year']
-        
-        # ========== FALLBACK: arXiv ID AS REPOSITORY ==========
-        if identifiers.get('arxiv') and not result['is_repository']:
-            result['is_repository'] = True
-            result['is_preprint'] = True
-            result['crossmark_issues'].append('📚 arXiv preprint')
-        
-        # ========== SELF-CITATION DETECTION ==========
-        if paper_authors and result['authors']:
-            for author in result['authors']:
-                for paper_author in paper_authors:
-                    paper_norm, _ = normalize_author_name(paper_author)
-                    if author['compare_name'] == paper_norm:
-                        result['is_self_citation'] = True
-                        break
-        
-        # Merge authors (deduplicate using the new merge function)
-        if result['authors']:
-            # We need to merge within this single reference
-            temp_merge = defaultdict(lambda: {
-                'display_name': '', 'compare_name': '', 'orcid': '',
-                'affiliations': [], 'countries': [], 'institutions': []
-            })
-            
-            for author in result['authors']:
-                comp_name = author.get('compare_name', '')
-                if not comp_name:
-                    continue
-                
-                if not temp_merge[comp_name]['display_name']:
-                    temp_merge[comp_name]['display_name'] = author.get('display_name', '')
-                    temp_merge[comp_name]['compare_name'] = comp_name
-                    temp_merge[comp_name]['orcid'] = author.get('orcid', '')
-                
-                for aff in author.get('affiliations', []):
-                    if aff not in temp_merge[comp_name]['affiliations']:
-                        temp_merge[comp_name]['affiliations'].append(aff)
-                        temp_merge[comp_name]['institutions'].append(aff['name'])
-                        if aff.get('country') and aff['country'] not in temp_merge[comp_name]['countries']:
-                            temp_merge[comp_name]['countries'].append(aff['country'])
-            
-            result['authors'] = list(temp_merge.values())
-            result['authors_display'] = [a['display_name'] for a in result['authors']]
-        
-        results.append(result)
-        
-        # Update progress less frequently (only at batch level)
-        if progress_callback and idx % 10 == 0:
-            progress_callback(batch_num, idx, batch_size, total_batches)
-    
-    return results
+def analyze_reference_batch_optimized
 
 def analyze_all_references_optimized(references: List[str], batch_size: int = 50, paper_authors: Set[str] = None) -> List[Dict]:
-    """Analyze all references with optimized batching and COLORED progress updates"""
+    """Analyze all references with optimized batching, CACHED functions, and DELAY between batches"""
     all_results = []
     total_batches = (len(references) + batch_size - 1) // batch_size
     
@@ -3532,14 +3160,6 @@ def analyze_all_references_optimized(references: List[str], batch_size: int = 50
     total_api_success = 0
     processed_refs = 0
     
-    def update_progress(batch_num, ref_idx, batch_len, total_batches):
-        """Update progress with dynamic coloring based on actual metrics"""
-        nonlocal total_dois_found, total_api_success, processed_refs
-        
-        # This is called from inside the batch, need to update counts carefully
-        # We'll use a simpler approach: update after each batch completion
-        pass
-    
     status_container = st.status(f"📊 Analyzing {len(references)} references...", expanded=True)
     
     for batch_num in range(total_batches):
@@ -3553,7 +3173,7 @@ def analyze_all_references_optimized(references: List[str], batch_size: int = 50
             state="running"
         )
         
-        # Process batch with optimized function
+        # Process batch with optimized function (now uses CACHED functions)
         batch_results = analyze_reference_batch_optimized(
             batch, 
             progress_callback=None,  # Disable internal callback, we'll update manually
@@ -3726,6 +3346,10 @@ def analyze_all_references_optimized(references: List[str], batch_size: int = 50
         
         # Also update the main Streamlit progress bar for compatibility
         st.progress(progress_percent / 100)
+        
+        # ⭐ КРИТИЧНО: задержка между батчами для соблюдения rate limit
+        if batch_num < total_batches - 1:
+            time.sleep(1.5)  # Пауза между батчами
     
     status_container.update(label="✅ Analysis completed!", state="complete")
     
@@ -4315,6 +3939,301 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
         'avg_citations': sum(r.get('citations_count', 0) for r in results) / total_references if total_references else 0,
         'publisher_sources': publisher_sources
     }
+
+def calculate_analysis_statistics(results: List[Dict]) -> Dict:
+    """
+    Calculate detailed statistics about API coverage after analysis
+    
+    Returns:
+        Dict with keys: total, both, crossref_only, openalex_only, none,
+                       has_doi, no_doi, both_pct, crossref_only_pct,
+                       openalex_only_pct, none_pct
+    """
+    stats = {
+        'total': len(results),
+        'both': 0,
+        'crossref_only': 0,
+        'openalex_only': 0,
+        'none': 0,
+        'has_doi': 0,
+        'no_doi': 0
+    }
+    
+    for result in results:
+        if result.get('doi'):
+            stats['has_doi'] += 1
+            if result.get('crossref_status') and result.get('openalex_status'):
+                stats['both'] += 1
+            elif result.get('crossref_status'):
+                stats['crossref_only'] += 1
+            elif result.get('openalex_status'):
+                stats['openalex_only'] += 1
+            else:
+                stats['none'] += 1
+        else:
+            stats['no_doi'] += 1
+    
+    # Calculate percentages
+    total_with_doi = stats['has_doi']
+    if total_with_doi > 0:
+        stats['both_pct'] = (stats['both'] / total_with_doi) * 100
+        stats['crossref_only_pct'] = (stats['crossref_only'] / total_with_doi) * 100
+        stats['openalex_only_pct'] = (stats['openalex_only'] / total_with_doi) * 100
+        stats['none_pct'] = (stats['none'] / total_with_doi) * 100
+    else:
+        stats['both_pct'] = 0
+        stats['crossref_only_pct'] = 0
+        stats['openalex_only_pct'] = 0
+        stats['none_pct'] = 0
+    
+    return stats
+
+def display_analysis_statistics(stats: Dict):
+    """
+    Display analysis statistics with color coding and progress bars
+    """
+    total = stats['total']
+    both = stats['both']
+    crossref_only = stats['crossref_only']
+    openalex_only = stats['openalex_only']
+    none = stats['none']
+    
+    # Определяем цвета для разных статусов
+    both_color = "#00CC96"  # Зеленый
+    crossref_color = "#FFA042"  # Оранжевый
+    openalex_color = "#00B5F1"  # Голубой
+    none_color = "#FF6B6B"  # Красный
+    
+    # HTML для отображения статистики
+    stats_html = f"""
+    <style>
+    .analysis-stats {{
+        background: white;
+        border-radius: 15px;
+        padding: 20px;
+        margin: 15px 0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }}
+    .stats-header {{
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 15px;
+        color: #333;
+    }}
+    .stats-grid {{
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 15px;
+    }}
+    .stat-item {{
+        padding: 12px;
+        border-radius: 10px;
+        background: #f8f9fa;
+        text-align: center;
+        transition: transform 0.2s;
+        border-left: 4px solid #ddd;
+    }}
+    .stat-item:hover {{
+        transform: translateY(-2px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }}
+    .stat-number {{
+        font-size: 28px;
+        font-weight: bold;
+        display: block;
+    }}
+    .stat-label {{
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+    }}
+    .stat-percent {{
+        font-size: 14px;
+        font-weight: 500;
+        margin-top: 3px;
+    }}
+    .progress-container {{
+        margin-top: 15px;
+        background: #f0f0f0;
+        border-radius: 20px;
+        overflow: hidden;
+        height: 30px;
+        display: flex;
+        position: relative;
+    }}
+    .progress-segment {{
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 600;
+        color: white;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        transition: width 0.5s ease;
+        position: relative;
+    }}
+    .progress-segment:first-child {{
+        border-radius: 20px 0 0 20px;
+    }}
+    .progress-segment:last-child {{
+        border-radius: 0 20px 20px 0;
+    }}
+    .progress-segment:only-child {{
+        border-radius: 20px;
+    }}
+    .progress-tooltip {{
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0,0,0,0.8);
+        color: white;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 11px;
+        white-space: nowrap;
+        opacity: 0;
+        transition: opacity 0.3s;
+        pointer-events: none;
+    }}
+    .progress-segment:hover .progress-tooltip {{
+        opacity: 1;
+    }}
+    .legend {{
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        margin-top: 12px;
+        justify-content: center;
+    }}
+    .legend-item {{
+        display: flex;
+        align-items: center;
+        font-size: 12px;
+        color: #555;
+    }}
+    .legend-color {{
+        width: 14px;
+        height: 14px;
+        border-radius: 4px;
+        margin-right: 6px;
+    }}
+    </style>
+    
+    <div class="analysis-stats">
+        <div class="stats-header">
+            📊 API Coverage Analysis
+            <span style="font-size: 14px; font-weight: normal; color: #666; margin-left: 10px;">
+                Total: {total} references
+            </span>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-item" style="border-left-color: {both_color};">
+                <span class="stat-number" style="color: {both_color};">{both}</span>
+                <span class="stat-label">Crossref + OpenAlex</span>
+                <span class="stat-percent" style="color: {both_color};">{stats.get('both_pct', 0):.1f}%</span>
+            </div>
+            <div class="stat-item" style="border-left-color: {crossref_color};">
+                <span class="stat-number" style="color: {crossref_color};">{crossref_only}</span>
+                <span class="stat-label">Only Crossref</span>
+                <span class="stat-percent" style="color: {crossref_color};">{stats.get('crossref_only_pct', 0):.1f}%</span>
+            </div>
+            <div class="stat-item" style="border-left-color: {openalex_color};">
+                <span class="stat-number" style="color: {openalex_color};">{openalex_only}</span>
+                <span class="stat-label">Only OpenAlex</span>
+                <span class="stat-percent" style="color: {openalex_color};">{stats.get('openalex_only_pct', 0):.1f}%</span>
+            </div>
+            <div class="stat-item" style="border-left-color: {none_color};">
+                <span class="stat-number" style="color: {none_color};">{none}</span>
+                <span class="stat-label">No Data</span>
+                <span class="stat-percent" style="color: {none_color};">{stats.get('none_pct', 0):.1f}%</span>
+            </div>
+        </div>
+        
+        <div class="progress-container">
+            <div class="progress-segment" style="width: {stats.get('both_pct', 0)}%; background: {both_color};">
+                {f'{both} ({stats.get("both_pct", 0):.0f}%)' if stats.get("both_pct", 0) > 5 else ''}
+                <span class="progress-tooltip">Crossref + OpenAlex: {both}</span>
+            </div>
+            <div class="progress-segment" style="width: {stats.get('crossref_only_pct', 0)}%; background: {crossref_color};">
+                {f'{crossref_only} ({stats.get("crossref_only_pct", 0):.0f}%)' if stats.get("crossref_only_pct", 0) > 5 else ''}
+                <span class="progress-tooltip">Only Crossref: {crossref_only}</span>
+            </div>
+            <div class="progress-segment" style="width: {stats.get('openalex_only_pct', 0)}%; background: {openalex_color};">
+                {f'{openalex_only} ({stats.get("openalex_only_pct", 0):.0f}%)' if stats.get("openalex_only_pct", 0) > 5 else ''}
+                <span class="progress-tooltip">Only OpenAlex: {openalex_only}</span>
+            </div>
+            <div class="progress-segment" style="width: {stats.get('none_pct', 0)}%; background: {none_color};">
+                {f'{none} ({stats.get("none_pct", 0):.0f}%)' if stats.get("none_pct", 0) > 5 else ''}
+                <span class="progress-tooltip">No Data: {none}</span>
+            </div>
+        </div>
+        
+        <div class="legend">
+            <span class="legend-item">
+                <span class="legend-color" style="background: {both_color};"></span>
+                Both APIs
+            </span>
+            <span class="legend-item">
+                <span class="legend-color" style="background: {crossref_color};"></span>
+                Only Crossref
+            </span>
+            <span class="legend-item">
+                <span class="legend-color" style="background: {openalex_color};"></span>
+                Only OpenAlex
+            </span>
+            <span class="legend-item">
+                <span class="legend-color" style="background: {none_color};"></span>
+                No Data
+            </span>
+            <span class="legend-item" style="font-weight: 500;">
+                🎯 Coverage: {((both + crossref_only + openalex_only) / total * 100):.1f}%
+            </span>
+        </div>
+    </div>
+    """
+    
+    st.markdown(stats_html, unsafe_allow_html=True)
+    
+    # Дополнительная информация для улучшения
+    if none > 0:
+        st.info(f"💡 {none} references have no data. Try running analysis again to fetch missing data from APIs.")
+    
+    if crossref_only > 0:
+        st.info(f"🔄 {crossref_only} references have only Crossref data. Re-run to fetch OpenAlex data.")
+    
+    if openalex_only > 0:
+        st.info(f"🔄 {openalex_only} references have only OpenAlex data. Re-run to fetch Crossref data.")
+    
+    if both == total:
+        st.success("🎉 Perfect! All references have data from both APIs!")
+
+def display_analysis_statistics_compact(stats: Dict):
+    """
+    Compact version for sidebar or smaller space
+    """
+    total = stats['total']
+    both = stats['both']
+    crossref_only = stats['crossref_only']
+    openalex_only = stats['openalex_only']
+    none = stats['none']
+    
+    coverage = ((both + crossref_only + openalex_only) / total * 100) if total > 0 else 0
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("✅ Both APIs", both, delta=f"{stats.get('both_pct', 0):.1f}%")
+    with col2:
+        st.metric("📘 Only Crossref", crossref_only, delta=f"{stats.get('crossref_only_pct', 0):.1f}%")
+    with col3:
+        st.metric("📗 Only OpenAlex", openalex_only, delta=f"{stats.get('openalex_only_pct', 0):.1f}%")
+    with col4:
+        st.metric("❌ No Data", none, delta=f"{stats.get('none_pct', 0):.1f}%")
+    
+    st.progress(coverage / 100, text=f"Total API Coverage: {coverage:.1f}%")
 
 def display_top_authors(stats: Dict):
     """Display top authors with proper ORCID and affiliation information (updated with new affiliation structure)"""
@@ -5667,7 +5586,6 @@ def main():
                 else:
                     with st.spinner(get_text('searching_duplicates')):
                         duplicates = find_duplicate_references(references)
-                        duplicates = find_duplicate_references(references)
                         if duplicates:
                             st.warning(get_text('found_duplicates').format(len(duplicates)))
                             with st.expander(get_text('view_duplicates')):
@@ -5685,13 +5603,26 @@ def main():
                     st.session_state['analysis_started'] = True
                     
                     with st.spinner(get_text('analysis_started')):
-                        # Use the optimized analysis function
+                        # Use the optimized analysis function (now with CACHED functions)
                         results = analyze_all_references(references, batch_size, paper_authors if paper_authors else None)
                         st.session_state['results'] = results
                         st.session_state['analysis_complete'] = True
+                        
+                        # ✅ НОВЫЙ КОД: Расчет и отображение статистики
+                        analysis_stats = calculate_analysis_statistics(results)
+                        st.session_state['analysis_stats'] = analysis_stats  # Сохраняем для других вкладок
+                        
+                        # Отображаем статистику
+                        display_analysis_statistics(analysis_stats)
                     
                     st.success(get_text('analysis_complete').format(len([r for r in results if r['doi']]), len(results)))
                     st.balloons()
+                    
+                    # ✅ ДОПОЛНИТЕЛЬНО: Совет по улучшению
+                    analysis_stats = st.session_state.get('analysis_stats', {})
+                    if analysis_stats and analysis_stats.get('both', 0) < analysis_stats.get('total', 0):
+                        st.info("💡 For better coverage, click 'Start Enhanced Analysis' again to fetch missing data from APIs.")
+                    
                     st.info(get_text('go_to_analytics'))
             else:
                 st.warning(get_text('enter_reference_list'))
@@ -5700,6 +5631,10 @@ def main():
     
     with tab2:
         if 'analysis_complete' in st.session_state and st.session_state['analysis_complete']:
+            if 'analysis_stats' in st.session_state:
+                display_analysis_statistics(st.session_state['analysis_stats'])
+                st.markdown("---")
+            
             results = st.session_state['results']
             paper_authors = st.session_state.get('paper_authors', set())
             
