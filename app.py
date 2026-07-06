@@ -1521,7 +1521,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ======================== OPTIMIZED API REQUESTS ========================
-@retry(stop=stop_after_attempt(6), wait=wait_exponential(multiplier=1, min=1, max=8))
+@retry(stop=stop_after_attempt(6), wait=wait_exponential(multiplier=1, min=1, max=10))
 def fetch_crossref(doi: str) -> Optional[Dict]:
     """Request to Crossref API - OPTIMIZED with faster retry"""
     try:
@@ -1539,7 +1539,7 @@ def fetch_crossref(doi: str) -> Optional[Dict]:
     except:
         return None
 
-@retry(stop=stop_after_attempt(4), wait=wait_random(min=1, max=2))
+@retry(stop=stop_after_attempt(4), wait=wait_random(min=1, max=3))
 def fetch_openalex(doi: str) -> Optional[Dict]:
     """Request to OpenAlex API - OPTIMIZED with faster retry"""
     try:
@@ -1556,7 +1556,7 @@ def fetch_openalex_concepts(work_id: str) -> List[Dict]:
     """Extract concepts from OpenAlex"""
     try:
         url = f"https://api.openalex.org/works/{work_id}"
-        response = requests.get(url, timeout=8)
+        response = requests.get(url, timeout=10)
         if response.status_code == 200:
             data = response.json()
             return data.get('concepts', [])
