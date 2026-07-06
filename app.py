@@ -3123,8 +3123,6 @@ def analyze_all_references(references: List[str], batch_size: int = 50, paper_au
     return analyze_all_references_optimized(references, batch_size, paper_authors)
 
 # ======================== OPTIMIZED BATCH PROCESSING ========================
-def analyze_reference_batch_optimized
-
 def analyze_all_references_optimized(references: List[str], batch_size: int = 50, paper_authors: Set[str] = None) -> List[Dict]:
     """Analyze all references with optimized batching, CACHED functions, and DELAY between batches"""
     all_results = []
