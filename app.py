@@ -2428,8 +2428,8 @@ def identify_citation_classics(results: List[Dict]) -> List[Dict]:
             citations = result['crossref_data']['is-referenced-by-count']
         
         if citations >= threshold:
-            title = result.get('openalex_data', {}).get('title', '') or \
-                    result.get('crossref_data', {}).get('title', [''])[0]
+            title = (result.get('openalex_data') or {}).get('title', '') or \
+                    (result.get('crossref_data') or {}).get('title', [''])[0]
             doi = result.get('doi', '')
             classics.append({
                 'title': title,
