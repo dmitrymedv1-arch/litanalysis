@@ -1539,7 +1539,7 @@ def fetch_crossref(doi: str) -> Optional[Dict]:
     except:
         return None
 
-@retry(stop=stop_after_attempt(4), wait=wait_random(min=1, max=3))
+@retry(stop=stop_after_attempt(6), wait=wait_random(min=1, max=4))
 def fetch_openalex(doi: str) -> Optional[Dict]:
     """Request to OpenAlex API - OPTIMIZED with faster retry"""
     try:
