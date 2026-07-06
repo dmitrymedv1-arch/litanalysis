@@ -1539,13 +1539,13 @@ def fetch_crossref(doi: str) -> Optional[Dict]:
     except:
         return None
 
-@retry(stop=stop_after_attempt(4), wait=wait_random(min=1, max=5))
+@retry(stop=stop_after_attempt(4), wait=wait_random(min=1, max=3))
 def fetch_openalex(doi: str) -> Optional[Dict]:
     """Request to OpenAlex API - OPTIMIZED with faster retry"""
     try:
         encoded_doi = requests.utils.quote(doi)
         url = f"https://api.openalex.org/works/doi/{encoded_doi}"
-        response = requests.get(url, timeout=12)
+        response = requests.get(url, timeout=8)
         if response.status_code == 200:
             return response.json()
         return None
@@ -3118,7 +3118,7 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
     
     if dois_with_indices:
         # OPTIMIZATION 1: Single global ThreadPoolExecutor for all DOIs in batch
-        with ThreadPoolExecutor(max_workers=2) as executor:
+        with ThreadPoolExecutor(max_workers=3) as executor:
             futures = {}
             for idx, doi in dois_with_indices:
                 # Check if DOI is in bad cache
