@@ -1544,7 +1544,7 @@ def fetch_openalex(doi: str) -> Optional[Dict]:
     """Request to OpenAlex API - OPTIMIZED with faster retry"""
     try:
         encoded_doi = requests.utils.quote(doi)
-        url = f"https://api.openalex.org/works/doi/{encoded_doi}"
+        url = f"https://api.openalex.org/works/https://doi.org/{encoded_doi}"
         response = requests.get(url, timeout=8)
         if response.status_code == 200:
             return response.json()
