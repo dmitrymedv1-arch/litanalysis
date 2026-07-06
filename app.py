@@ -3146,8 +3146,8 @@ def analyze_reference_batch_optimized(references: List[str], progress_callback=N
                     futures[(idx, 'openalex')] = None
                 else:
                     # Используем КЭШИРОВАННЫЕ функции вместо прямых вызовов
-                    futures[(idx, 'crossref')] = executor.submit(cache_crossref_lookup, doi)
-                    futures[(idx, 'openalex')] = executor.submit(cache_openalex_lookup, doi)
+                    futures[(idx, 'crossref')] = executor.submit(cache_crossref, doi)
+                    futures[(idx, 'openalex')] = executor.submit(cache_openalex, doi)
             
             # Collect results
             for (idx, api_type), future in futures.items():
