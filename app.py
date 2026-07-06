@@ -5629,8 +5629,11 @@ def main():
     
     with tab2:
         if 'analysis_complete' in st.session_state and st.session_state['analysis_complete']:
-            if 'analysis_stats' in st.session_state:
+            if 'analysis_stats' in st.session_state and st.session_state['analysis_stats']:
                 display_analysis_statistics(st.session_state['analysis_stats'])
+                st.markdown("---")
+            else:
+                st.info("📊 Анализ ещё не выполнен. Загрузите список литературы и запустите анализ на вкладке 'Data Upload'.")
                 st.markdown("---")
             
             results = st.session_state['results']
