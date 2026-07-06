@@ -4059,12 +4059,12 @@ def display_analysis_statistics(stats: Dict):
         st.success("🎉 Perfect! All references have data from both APIs!")
 
 # ======================== CACHING ========================
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def cache_crossref(doi: str) -> Optional[Dict]:
     """Cached Crossref request"""
     return fetch_crossref(doi)
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=600, show_spinner=False)
 def cache_openalex(doi: str) -> Optional[Dict]:
     """Cached OpenAlex request"""
     return fetch_openalex(doi)
