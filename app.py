@@ -1541,13 +1541,21 @@ def fetch_crossref(doi: str) -> Optional[Dict]:
 
 @retry(stop=stop_after_attempt(4), wait=wait_random(min=1, max=3))
 def fetch_openalex(doi: str) -> Optional[Dict]:
-    """Request to OpenAlex API - OPTIMIZED with faster retry"""
     try:
         encoded_doi = requests.utils.quote(doi)
-        url = f"https://api.openalex.org/works/https://doi.org/{encoded_doi}"
-        response = requests.get(url, timeout=8)
-        if response.status_code == 200:
-            return response.json()
+        
+        urls = [
+            f"https://api.openalex.org/works/https://doi.org/{encoded_doi}",
+            f"https://api.openalex.org/works/doi/{encoded_doi}"
+        ]
+        
+        headers = {'User-Agent': 'LiteratureAnalyzer/2.0 (mailto:analyzer@example.com)'}
+        
+        for url in urls:
+            response = requests.get(url, headers=headers, timeout=8)
+            if response.status_code == 200:
+                return response.json()
+        
         return None
     except:
         return None
