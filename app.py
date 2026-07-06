@@ -1545,7 +1545,7 @@ def fetch_openalex(doi: str) -> Optional[Dict]:
     try:
         encoded_doi = requests.utils.quote(doi)
         url = f"https://api.openalex.org/works/doi/{encoded_doi}"
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, timeout=12)
         if response.status_code == 200:
             return response.json()
         return None
