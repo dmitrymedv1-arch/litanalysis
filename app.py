@@ -3111,16 +3111,6 @@ def parse_reference_list(references_text: str) -> List[str]:
             else:
                 refined_references.append(ref)
     
-    # Remove duplicates (same URL/DOI appearing twice)
-    seen_refs = set()
-    unique_refs = []
-    for ref in refined_references:
-        # Create a normalized key (lowercase, stripped)
-        ref_key = ref.lower().strip()
-        if ref_key not in seen_refs:
-            seen_refs.add(ref_key)
-            unique_refs.append(ref)
-    
     return unique_refs
 
 def analyze_all_references(references: List[str], batch_size: int = 50, paper_authors: Set[str] = None) -> List[Dict]:
