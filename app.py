@@ -4839,7 +4839,7 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
             duplicate_indices.add(dup['index1'])
             duplicate_indices.add(dup['index2'])
     
-    for idx, result in enumerate(results[:300]):
+    for idx, result in enumerate(results[:2500]):
         authors_full_list = result.get('authors_display', [])
         formatted_authors = ', '.join([html.escape(a) for a in authors_full_list]) if authors_full_list else get_text_local("not_found")
         original_text_full = html.escape(result.get('original_text', ''))
