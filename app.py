@@ -1951,16 +1951,15 @@ def normalize_author_name(name: str) -> Tuple[str, str]:
 def find_duplicate_references(references: List[str], threshold: float = 0.85) -> List[Dict]:
     """Find duplicate references in literature list - ONLY Full DOI match"""
     duplicates = []
-    seen_dois = {}  # Maps DOI -> index of first occurrence
+    seen_dois = {}  # Maps DOI (lowercase) -> index of first occurrence
     
     for i, ref1 in enumerate(references):
         doi1 = extract_doi_from_text(ref1)
         
         if doi1:
-            # Check if DOI already seen (exact match including suffix)
-            if doi1 in seen_dois:
-                j = seen_dois[doi1]
-                # Only consider duplicate if DOIs are EXACTLY the same (including suffix)
+            doi1_lower = doi1.lower()  # Сравниваем без учета регистра
+            if doi1_lower in seen_dois:
+                j = seen_dois[doi1_lower]
                 duplicates.append({
                     'index1': j,
                     'index2': i,
@@ -1970,9 +1969,9 @@ def find_duplicate_references(references: List[str], threshold: float = 0.85) ->
                     'reason': f'Full DOI match: {doi1}'
                 })
             else:
-                seen_dois[doi1] = i
+                seen_dois[doi1_lower] = i
     
-    # Remove duplicates (same pair might appear multiple times if DOI appears more than twice)
+    # Remove duplicate pairs (same pair might appear multiple times)
     unique_duplicates = []
     seen_pairs = set()
     for dup in duplicates:
@@ -2990,7 +2989,6 @@ def parse_reference_list(references_text: str) -> List[str]:
     plain_url_pattern = r'^(https?://[^\s]+)'
     
     # Pattern for detecting if a line starts with text that looks like author names
-    # (starts with capital letter, then lowercase letters, space, then capital letter)
     author_pattern = r'^[A-Z][a-z]+\s+[A-Z]'
     
     i = 0
@@ -3000,7 +2998,6 @@ def parse_reference_list(references_text: str) -> List[str]:
             i += 1
             continue
         
-        # Determine if this line starts a new reference
         is_new_ref = False
         
         # Check 1: Numbered marker
@@ -3010,7 +3007,7 @@ def parse_reference_list(references_text: str) -> List[str]:
                 break
         
         # Check 2: Line starts with DOI/DOI-URL
-        if not is_new_ref and re.match(doi_pattern, line):
+        if not is_new_ref and re.match(doi_pattern, line, re.IGNORECASE):
             is_new_ref = True
         
         # Check 3: Line starts with plain URL
@@ -3018,25 +3015,33 @@ def parse_reference_list(references_text: str) -> List[str]:
             is_new_ref = True
         
         # Check 4: Line starts with author name pattern AND previous reference exists
-        # This handles cases like "Andreev R, Animitsa I..." after a URL
         if not is_new_ref and current_ref and re.match(author_pattern, line):
-            # This looks like a new reference starting with author names
             is_new_ref = True
         
+        # Check 5: CRITICAL FIX - Line contains a DOI and previous reference already has a DIFFERENT DOI
+        if not is_new_ref and current_ref:
+            current_doi = extract_doi_from_text(line)
+            if current_doi:
+                prev_doi = extract_doi_from_text(' '.join(current_ref))
+                if prev_doi and current_doi.lower() != prev_doi.lower():
+                    is_new_ref = True
+        
+        # Check 6: Line starts with a number and contains a DOI
+        if not is_new_ref and re.match(r'^\d+\s+', line):
+            if extract_doi_from_text(line):
+                is_new_ref = True
+        
         if is_new_ref:
-            # Save previous reference if exists
             if current_ref:
                 references.append(' '.join(current_ref))
                 current_ref = []
             
-            # Clean the line from markers if needed
             cleaned_line = line
             for pattern in patterns:
                 cleaned_line = re.sub(pattern, '', cleaned_line, count=1)
             cleaned_line = cleaned_line.strip()
             current_ref = [cleaned_line]
         else:
-            # Continue current reference
             if current_ref:
                 current_ref.append(line)
             else:
@@ -3044,74 +3049,16 @@ def parse_reference_list(references_text: str) -> List[str]:
         
         i += 1
     
-    # Don't forget the last reference
     if current_ref:
         references.append(' '.join(current_ref))
     
-    # Post-processing: detect and split cases where URL is on same line as previous text
-    # AND detect when a non-URL line after a URL should be a separate reference
-    final_references = []
+    # Clean up empty references
+    references = [ref.strip() for ref in references if ref.strip()]
     
-    for ref in references:
-        # Check if this reference contains multiple patterns that should be separate
-        lines_in_ref = ref.split('\n') if '\n' in ref else [ref]
-        
-        if len(lines_in_ref) > 1:
-            # Multi-line reference - check each line for URL patterns
-            temp_refs = []
-            current_temp = []
-            
-            for line_idx, line_part in enumerate(lines_in_ref):
-                line_part = line_part.strip()
-                if not line_part:
-                    continue
-                
-                # Check if this line looks like a standalone URL
-                is_standalone_url = bool(re.match(plain_url_pattern, line_part))
-                
-                # Check if this line looks like a standalone DOI
-                is_standalone_doi = bool(re.match(doi_pattern, line_part))
-                
-                # Check if this line looks like an author-name start (new reference)
-                looks_like_new_ref = bool(re.match(author_pattern, line_part))
-                
-                if (is_standalone_url or is_standalone_doi or looks_like_new_ref) and current_temp:
-                    # Save accumulated text and start new
-                    temp_refs.append(' '.join(current_temp))
-                    current_temp = [line_part]
-                else:
-                    current_temp.append(line_part)
-            
-            if current_temp:
-                temp_refs.append(' '.join(current_temp))
-            
-            final_references.extend(temp_refs)
-        else:
-            # Single line reference
-            final_references.append(ref)
+    # IMPORTANT: DO NOT REMOVE DUPLICATES HERE!
+    # Duplicate detection is handled separately by find_duplicate_references()
     
-    # Second pass: further split any reference that contains both text and a URL
-    # but only if the URL appears to be a separate reference (e.g., at position 2 in list)
-    refined_references = []
-    for idx, ref in enumerate(final_references):
-        # Check if this reference is very short (just a URL) and previous was long
-        is_short_url = len(ref) < 100 and re.match(plain_url_pattern, ref)
-        prev_was_long = idx > 0 and len(final_references[idx-1]) > 100
-        
-        if is_short_url and prev_was_long:
-            # This is likely a URL that was mistakenly attached - keep as is (already separate)
-            refined_references.append(ref)
-        else:
-            # Check if this single reference contains a URL that should be separate
-            # But only if the URL is at the beginning of the line with a number pattern
-            number_url_match = re.match(r'^(\d+)[\.\)]?\s+(https?://[^\s]+)', ref.strip())
-            if number_url_match:
-                # This is "2. https://..." format - keep as one reference
-                refined_references.append(ref)
-            else:
-                refined_references.append(ref)
-    
-    return unique_refs
+    return references
 
 def analyze_all_references(references: List[str], batch_size: int = 50, paper_authors: Set[str] = None) -> List[Dict]:
     """Analyze all references with batching - NOW USING OPTIMIZED VERSION WITH NEW AFFILIATION LOGIC"""
