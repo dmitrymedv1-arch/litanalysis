@@ -5379,8 +5379,39 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     
     return html_content
 
+def test_api_connection():
+    """Test connection to Crossref and OpenAlex APIs"""
+    print("🔍 Testing API connections...")
+    try:
+        # Тест Crossref
+        response = requests.get(
+            "https://api.crossref.org/works/10.1038/s41586-020-2649-2",
+            headers={'User-Agent': 'LiteratureAnalyzer/2.0 (mailto:analyzer@example.com)'},
+            timeout=10
+        )
+        print(f"✅ Crossref test: {response.status_code} - {'OK' if response.status_code == 200 else 'FAILED'}")
+        
+        # Тест OpenAlex
+        response2 = requests.get(
+            "https://api.openalex.org/works/https://doi.org/10.1038/s41586-020-2649-2",
+            headers={'User-Agent': 'LiteratureAnalyzer/2.0 (mailto:analyzer@example.com)'},
+            timeout=10
+        )
+        print(f"✅ OpenAlex test: {response2.status_code} - {'OK' if response2.status_code == 200 else 'FAILED'}")
+        
+        return response.status_code == 200 and response2.status_code == 200
+    except Exception as e:
+        print(f"❌ API test failed: {e}")
+        return False
+
 # ======================== UI INTERFACE (ENGLISH, UPDATED WITH NEW FILTERS AND ORDER) ========================
 def main():
+
+    # Тест API при запуске
+    with st.sidebar:
+        if not test_api_connection():
+            st.warning("⚠️ API connection issues detected. Some features may not work properly.")
+            
     # Language selector in sidebar (before anything else)
     with st.sidebar:
         st.markdown(f"## {get_text('language')}")
