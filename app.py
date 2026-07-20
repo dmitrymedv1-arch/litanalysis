@@ -5815,35 +5815,26 @@ def main():
         st.markdown('<div class="custom-tab fade-in">', unsafe_allow_html=True)
         st.header(get_text('upload_header'))
         
-        # ========== MODIFICATION: Add parsing mode selector ==========
-        # Find this block in the code and replace it:
-        # input_method = st.radio(get_text('input_method'), [get_text('text_paste'), get_text('file_upload')])
+        # ========== MODIFICATION: Two radio buttons in the same style ==========
+        # First: Input method
+        input_method = st.radio(
+            get_text('input_method'), 
+            [get_text('text_paste'), get_text('file_upload')],
+            key="input_method_radio"
+        )
         
-        # ========== NEW CODE: Parsing mode with two options ==========
-        col1, col2 = st.columns([1, 2])
-        with col1:
-            input_method = st.radio(
-                get_text('input_method'), 
-                [get_text('text_paste'), get_text('file_upload')],
-                key="input_method_radio"
-            )
+        # Second: Parsing mode (same style as input_method)
+        parsing_mode = st.radio(
+            get_text('parsing_mode'),
+            [get_text('parsing_mode_line'), get_text('parsing_mode_numbered')],
+            key="parsing_mode_radio",
+            help=get_text('parsing_mode_help')
+        )
         
-        with col2:
-            st.markdown(f"### {get_text('parsing_mode')}")
-            parsing_mode = st.radio(
-                "",
-                options=['line', 'numbered'],
-                format_func=lambda x: get_text('parsing_mode_line') if x == 'line' else get_text('parsing_mode_numbered'),
-                index=0,
-                key="parsing_mode_radio",
-                help=get_text('parsing_mode_help')
-            )
-            
-            # Show hint for numbered mode
-            if parsing_mode == 'numbered':
-                st.info(get_text('parsing_mode_numbered_hint'))
-                st.caption(get_text('parsing_mode_numbered_desc'))
-        
+        # Show hint for numbered mode
+        if parsing_mode == get_text('parsing_mode_numbered'):
+            st.info(get_text('parsing_mode_numbered_hint'))
+            st.caption(get_text('parsing_mode_numbered_desc'))
         # ========== END OF MODIFICATION ==========
         
         references_text = ""
@@ -5864,7 +5855,7 @@ def main():
             if references_text.strip():
                 with st.spinner(get_text('parsing')):
                     # ========== MODIFICATION: Use selected parsing mode ==========
-                    if parsing_mode == 'numbered':
+                    if parsing_mode == get_text('parsing_mode_numbered'):
                         references = parse_reference_list_by_numbering(references_text)
                         st.info(get_text('merged_references_found').format(len(references)))
                     else:
