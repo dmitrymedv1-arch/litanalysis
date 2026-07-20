@@ -482,7 +482,7 @@ TEXTS = {
         'limit_exceeded': "❌ Limit of 2000 references exceeded. Found {} references.",
 
         # New keys for parsing mode
-        'parsing_mode': "📋 Parsing mode",
+        'parsing_mode': "Parsing mode",
         'parsing_mode_help': "Choose how to split the reference list into individual references",
         'parsing_mode_line': "Line-by-line (each line = one reference)",
         'parsing_mode_numbered': "Merge by numbering (numbered list required)",
@@ -787,7 +787,7 @@ TEXTS = {
         'limit_exceeded': "❌ Превышен лимит в 2000 ссылок. Найдено {} ссылок.",
 
         # New keys for parsing mode
-        'parsing_mode': "📋 Режим разбора",
+        'parsing_mode': "Режим разбора",
         'parsing_mode_help': "Выберите способ разделения списка литературы на отдельные ссылки",
         'parsing_mode_line': "Построчный (каждая строка = одна ссылка)",
         'parsing_mode_numbered': "Объединение по нумерации (требуется нумерованный список)",
