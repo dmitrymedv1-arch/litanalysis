@@ -5416,12 +5416,7 @@ def test_api_connection():
 
 # ======================== UI INTERFACE (ENGLISH, UPDATED WITH NEW FILTERS AND ORDER) ========================
 def main():
-
-    # Тест API при запуске
-    with st.sidebar:
-        if not test_api_connection():
-            st.warning("⚠️ API connection issues detected. Some features may not work properly.")
-            
+           
     # Language selector in sidebar (before anything else)
     with st.sidebar:
         st.markdown(f"## {get_text('language')}")
