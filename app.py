@@ -486,7 +486,7 @@ TEXTS = {
         'parsing_mode_help': "Choose how to split the reference list into individual references",
         'parsing_mode_line': "Line-by-line (each line = one reference)",
         'parsing_mode_numbered': "Merge by numbering (numbered list required)",
-        'parsing_mode_numbered_hint': "📌 For this mode, references must have numbering (1., 1), [1], 1) etc.)",
+        'parsing_mode_numbered_hint': "📌 For this mode, references must have numbering: 1., 1), [1], 1) etc.",
         'parsing_mode_numbered_desc': "Groups all text between consecutive numbers into a single reference. Useful when DOIs are split across multiple lines.",
         'parsing_mode_default': "line",  # Default value
         'parsing_mode_numbered_value': "numbered",  # Value for numbered mode
@@ -791,7 +791,7 @@ TEXTS = {
         'parsing_mode_help': "Выберите способ разделения списка литературы на отдельные ссылки",
         'parsing_mode_line': "Построчный (каждая строка = одна ссылка)",
         'parsing_mode_numbered': "Объединение по нумерации (требуется нумерованный список)",
-        'parsing_mode_numbered_hint': "📌 Для этого режима необходим список литературы с нумерацией (1., 1), [1], 1) и т.д.)",
+        'parsing_mode_numbered_hint': "📌 Для этого режима необходим список литературы с нумерацией: 1., 1), [1], 1) и т.д.",
         'parsing_mode_numbered_desc': "Объединяет весь текст между последовательными номерами в одну ссылку. Полезно, когда DOI перенесены на разные строки.",
         'parsing_mode_default': "line",  # Default value
         'parsing_mode_numbered_value': "numbered",  # Value for numbered mode
