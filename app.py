@@ -480,6 +480,19 @@ TEXTS = {
         'go_to_analytics': "👈 Go to 'Enhanced Analytics' tab for detailed results",
         'enter_reference_list': "⚠️ Please enter a reference list",
         'limit_exceeded': "❌ Limit of 2000 references exceeded. Found {} references.",
+
+        # New keys for parsing mode
+        'parsing_mode': "📋 Parsing mode",
+        'parsing_mode_help': "Choose how to split the reference list into individual references",
+        'parsing_mode_line': "Line-by-line (each line = one reference)",
+        'parsing_mode_numbered': "Merge by numbering (numbered list required)",
+        'parsing_mode_numbered_hint': "📌 For this mode, references must have numbering (1., 1), [1], 1) etc.)",
+        'parsing_mode_numbered_desc': "Groups all text between consecutive numbers into a single reference. Useful when DOIs are split across multiple lines.",
+        'parsing_mode_default': "line",  # Default value
+        'parsing_mode_numbered_value': "numbered",  # Value for numbered mode
+        
+        # New keys for reference display
+        'merged_references_found': "📄 Found {} references (merged by numbering)",
         
         # Analytics tab - metrics
         'total_references': "Total references",
@@ -772,6 +785,19 @@ TEXTS = {
         'go_to_analytics': "👈 Перейдите на вкладку 'Расширенная аналитика' для просмотра результатов",
         'enter_reference_list': "⚠️ Пожалуйста, введите список литературы",
         'limit_exceeded': "❌ Превышен лимит в 2000 ссылок. Найдено {} ссылок.",
+
+        # New keys for parsing mode
+        'parsing_mode': "📋 Режим разбора",
+        'parsing_mode_help': "Выберите способ разделения списка литературы на отдельные ссылки",
+        'parsing_mode_line': "Построчный (каждая строка = одна ссылка)",
+        'parsing_mode_numbered': "Объединение по нумерации (требуется нумерованный список)",
+        'parsing_mode_numbered_hint': "📌 Для этого режима необходим список литературы с нумерацией (1., 1), [1], 1) и т.д.)",
+        'parsing_mode_numbered_desc': "Объединяет весь текст между последовательными номерами в одну ссылку. Полезно, когда DOI перенесены на разные строки.",
+        'parsing_mode_default': "line",  # Default value
+        'parsing_mode_numbered_value': "numbered",  # Value for numbered mode
+        
+        # New keys for reference display
+        'merged_references_found': "📄 Найдено {} ссылок (объединено по нумерации)",
         
         # Analytics tab - metrics
         'total_references': "📄 Всего ссылок",
@@ -3057,6 +3083,110 @@ def parse_reference_list(references_text: str) -> List[str]:
     
     # IMPORTANT: DO NOT REMOVE DUPLICATES HERE!
     # Duplicate detection is handled separately by find_duplicate_references()
+    
+    return references
+
+def parse_reference_list_by_numbering(references_text: str) -> List[str]:
+    """
+    Parse reference list by grouping text between numbered references.
+    Each reference starts with a number followed by a separator: ., ), space, tab, or [number].
+    Supports formats: "1.", "1", "1)", "[1]", "1\t"
+    Groups all text between consecutive numbers into a single reference.
+    
+    Args:
+        references_text: The raw text containing numbered references
+        
+    Returns:
+        List of merged reference strings, each containing all text for that numbered entry
+    """
+    if not references_text or not references_text.strip():
+        return []
+    
+    lines = references_text.strip().split('\n')
+    references = []
+    current_ref_lines = []
+    expected_next_number = 1
+    
+    # Pattern to detect start of a numbered reference
+    # Matches: "1.", "1", "1)", "[1]", "1\t" at the start of a line
+    # Also handles optional whitespace before the number
+    number_patterns = [
+        r'^\s*(\d+)\.\s*',      # "1. Text"
+        r'^\s*(\d+)\s+',        # "1 Text" (space after number)
+        r'^\s*(\d+)\)\s*',      # "1) Text"
+        r'^\s*\[(\d+)\]\s*',    # "[1] Text"
+        r'^\s*(\d+)\t',         # "1\tText" (tab after number)
+    ]
+    
+    def detect_number(line: str) -> Optional[int]:
+        """Check if line starts with a number and return the number if found"""
+        for pattern in number_patterns:
+            match = re.match(pattern, line)
+            if match:
+                return int(match.group(1))
+        return None
+    
+    def strip_number_from_line(line: str) -> str:
+        """Remove the number prefix from a line"""
+        for pattern in number_patterns:
+            match = re.match(pattern, line)
+            if match:
+                # Remove the matched prefix
+                return line[match.end():].strip()
+        return line.strip()
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            # Empty line - ignore (don't add to current ref)
+            continue
+        
+        detected_num = detect_number(line)
+        
+        if detected_num is not None:
+            # This line starts a new reference
+            if current_ref_lines:
+                # Check if this is the expected next number
+                if detected_num == expected_next_number:
+                    # Save the previous reference
+                    merged_ref = ' '.join(current_ref_lines).strip()
+                    if merged_ref:
+                        references.append(merged_ref)
+                    # Start new reference with the current line (without number)
+                    current_ref_lines = [strip_number_from_line(line)]
+                    expected_next_number = detected_num + 1
+                else:
+                    # This is a new number but not the expected one
+                    # This means the numbering is not sequential or has gaps
+                    # We'll still start a new reference, but update expected number
+                    if current_ref_lines:
+                        merged_ref = ' '.join(current_ref_lines).strip()
+                        if merged_ref:
+                            references.append(merged_ref)
+                    current_ref_lines = [strip_number_from_line(line)]
+                    expected_next_number = detected_num + 1
+            else:
+                # First reference
+                current_ref_lines = [strip_number_from_line(line)]
+                expected_next_number = detected_num + 1
+        else:
+            # This line is part of the current reference
+            if current_ref_lines:
+                current_ref_lines.append(line)
+            else:
+                # No current reference started yet - this might be text before first number
+                # We'll just add it as a reference without number
+                # This shouldn't happen according to requirements, but handle gracefully
+                current_ref_lines = [line]
+    
+    # Don't forget the last reference
+    if current_ref_lines:
+        merged_ref = ' '.join(current_ref_lines).strip()
+        if merged_ref:
+            references.append(merged_ref)
+    
+    # Clean up any empty references
+    references = [ref for ref in references if ref.strip()]
     
     return references
 
@@ -5685,7 +5815,36 @@ def main():
         st.markdown('<div class="custom-tab fade-in">', unsafe_allow_html=True)
         st.header(get_text('upload_header'))
         
-        input_method = st.radio(get_text('input_method'), [get_text('text_paste'), get_text('file_upload')])
+        # ========== MODIFICATION: Add parsing mode selector ==========
+        # Find this block in the code and replace it:
+        # input_method = st.radio(get_text('input_method'), [get_text('text_paste'), get_text('file_upload')])
+        
+        # ========== NEW CODE: Parsing mode with two options ==========
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            input_method = st.radio(
+                get_text('input_method'), 
+                [get_text('text_paste'), get_text('file_upload')],
+                key="input_method_radio"
+            )
+        
+        with col2:
+            st.markdown(f"### {get_text('parsing_mode')}")
+            parsing_mode = st.radio(
+                "",
+                options=['line', 'numbered'],
+                format_func=lambda x: get_text('parsing_mode_line') if x == 'line' else get_text('parsing_mode_numbered'),
+                index=0,
+                key="parsing_mode_radio",
+                help=get_text('parsing_mode_help')
+            )
+            
+            # Show hint for numbered mode
+            if parsing_mode == 'numbered':
+                st.info(get_text('parsing_mode_numbered_hint'))
+                st.caption(get_text('parsing_mode_numbered_desc'))
+        
+        # ========== END OF MODIFICATION ==========
         
         references_text = ""
         
@@ -5704,8 +5863,14 @@ def main():
         if st.button(get_text('start_analysis'), type="primary", disabled=not references_text.strip()):
             if references_text.strip():
                 with st.spinner(get_text('parsing')):
-                    references = parse_reference_list(references_text)
-                    st.info(get_text('found_refs').format(len(references)))
+                    # ========== MODIFICATION: Use selected parsing mode ==========
+                    if parsing_mode == 'numbered':
+                        references = parse_reference_list_by_numbering(references_text)
+                        st.info(get_text('merged_references_found').format(len(references)))
+                    else:
+                        references = parse_reference_list(references_text)
+                        st.info(get_text('found_refs').format(len(references)))
+                    # ========== END OF MODIFICATION ==========
                     
                     with st.expander(get_text('preview')):
                         for i, ref in enumerate(references[:3]):
@@ -5715,7 +5880,6 @@ def main():
                     st.error(get_text('limit_exceeded').format(len(references)))
                 else:
                     with st.spinner(get_text('searching_duplicates')):
-                        duplicates = find_duplicate_references(references)
                         duplicates = find_duplicate_references(references)
                         if duplicates:
                             st.warning(get_text('found_duplicates').format(len(duplicates)))
@@ -5734,7 +5898,6 @@ def main():
                     st.session_state['analysis_started'] = True
                     
                     with st.spinner(get_text('analysis_started')):
-                        # Use the optimized analysis function
                         results = analyze_all_references(references, batch_size, paper_authors if paper_authors else None)
                         st.session_state['results'] = results
                         st.session_state['analysis_complete'] = True
