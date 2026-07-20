@@ -3111,6 +3111,7 @@ def parse_reference_list_by_numbering(references_text: str) -> List[str]:
     # Matches: "1.", "1", "1)", "[1]", "1\t" at the start of a line
     # Also handles optional whitespace before the number
     number_patterns = [
+        r'^\s*\((\d+)\)\s*',    # "(1) Text"
         r'^\s*(\d+)\.\s*',      # "1. Text"
         r'^\s*(\d+)\s+',        # "1 Text" (space after number)
         r'^\s*(\d+)\)\s*',      # "1) Text"
