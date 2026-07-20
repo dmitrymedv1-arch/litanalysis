@@ -4249,7 +4249,11 @@ def generate_advanced_statistics(results: List[Dict]) -> Dict:
     citation_classics = identify_citation_classics(results)
     
     # Collect self-citations
-    self_citation_refs = [r for r in results if r.get('is_self_citation', False)]
+    self_citation_refs = sorted(
+        [r for r in results if r.get('is_self_citation', False)],
+        key=lambda x: x.get('year', 0) if isinstance(x.get('year'), (int, float)) else 0,
+        reverse=True
+    )
     
     # Calculate percentages
     def calc_percent(count):
@@ -4603,7 +4607,13 @@ def generate_html_report_advanced(results: List[Dict], stats: Dict, paper_author
     self_citations_html = ""
     if show_self_citations_section:
         if stats.get('self_citation_refs'):
-            for ref in stats.get('self_citation_refs', []):
+            # Сортируем ссылки по году от новых к старым
+            sorted_refs = sorted(
+                stats.get('self_citation_refs', []),
+                key=lambda x: x.get('year', 0) if isinstance(x.get('year'), (int, float)) else 0,
+                reverse=True
+            )
+            for ref in sorted_refs:
                 authors_full_list = ref.get('authors_display', [])
                 formatted_authors = format_authors_with_colors_for_selfcitations(authors_full_list, normalized_paper_authors_map)
                 original_text_full = html.escape(ref.get('original_text', ''))
