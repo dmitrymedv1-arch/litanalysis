@@ -1667,7 +1667,9 @@ def extract_authors_with_affiliations_from_openalex(openalex_data: Dict) -> List
     
     for authorship in openalex_data.get('authorships', []):
         author_info = authorship.get('author', {})
-        author_name = author_info.get('raw_author_name', '') or author_info.get('display_name', '')
+        author_name = author_info.get('raw_author_name', '')
+        if not author_name:
+            author_name = author_info.get('display_name', '')
         
         if not author_name:
             continue
