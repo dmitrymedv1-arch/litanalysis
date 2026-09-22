@@ -22,6 +22,13 @@ from itertools import combinations
 import html
 import threading
 
+import base64
+import binascii
+import io
+from bs4 import BeautifulSoup
+from PIL import Image
+import minify_html
+
 # ======================== ИМПОРТ СТИЛЕЙ ========================
 from styles import (
     BASE_CSS,
@@ -45,6 +52,145 @@ from styles import (
     get_gradient_colors,
     inject_color_placeholders
 )
+
+# ======================== HTML OPTIMIZATION (NEW) ========================
+PNG_DATA_URI_RE = re.compile(
+    r"^data:image/png;base64,(?P<data>[A-Za-z0-9+/=\s]+)$",
+    re.IGNORECASE,
+)
+
+def _convert_png_data_uri(
+    data_uri: str,
+    output_format: str,
+    quality: int,
+    scale: float,
+) -> Optional[str]:
+    """
+    Convert a PNG data URI to a WebP or AVIF data URI.
+    Returns None if the URI is invalid or cannot be converted.
+    """
+    match = PNG_DATA_URI_RE.match(data_uri.strip())
+    if not match:
+        return None
+
+    try:
+        png_bytes = base64.b64decode(match.group("data"), validate=True)
+    except (binascii.Error, ValueError):
+        return None
+
+    try:
+        with Image.open(io.BytesIO(png_bytes)) as image:
+            image.load()
+
+            if "A" in image.getbands():
+                image = image.convert("RGBA")
+            else:
+                image = image.convert("RGB")
+
+            if scale <= 0:
+                raise ValueError("Scale must be greater than zero")
+            elif scale != 1.0:
+                width, height = image.size
+                new_width = max(1, round(width * scale))
+                new_height = max(1, round(height * scale))
+                image = image.resize(
+                    (new_width, new_height),
+                    Image.Resampling.LANCZOS,
+                )
+
+            output = io.BytesIO()
+            save_options = {
+                "format": output_format.upper(),
+                "quality": quality,
+            }
+            if output_format == "webp":
+                save_options["method"] = 6
+            elif output_format == "avif":
+                save_options["speed"] = 6
+
+            image.save(output, **save_options)
+    except Exception as exc:
+        print(f"Warning: could not encode image as {output_format}: {exc}")
+        return None
+
+    encoded = base64.b64encode(output.getvalue()).decode("ascii")
+    return f"data:image/{output_format};base64,{encoded}"
+
+
+def optimize_html_report(
+    html_content: str,
+    output_format: str = "webp",
+    quality: int = 80,
+    scale: float = 0.5,
+    minify: bool = True,
+) -> str:
+    """
+    Optimize an HTML report by:
+    - converting embedded PNG data URIs to WebP (or AVIF)
+    - optionally downscaling images
+    - minifying the resulting HTML
+
+    Returns the optimized HTML string.
+    Falls back to the original HTML if optimization fails entirely.
+    """
+    try:
+        soup = BeautifulSoup(html_content, "html.parser")
+    except Exception as exc:
+        print(f"Warning: BeautifulSoup failed: {exc}")
+        return html_content
+
+    cache: Dict[str, str] = {}
+    converted_count = 0
+    skipped_count = 0
+
+    for image_tag in soup.find_all("img"):
+        src = image_tag.get("src")
+        if not src:
+            continue
+
+        if not src.strip().lower().startswith("data:image/png;base64,"):
+            continue
+
+        if src in cache:
+            image_tag["src"] = cache[src]
+            converted_count += 1
+            continue
+
+        converted = _convert_png_data_uri(
+            src,
+            output_format=output_format,
+            quality=quality,
+            scale=scale,
+        )
+
+        if converted is None:
+            skipped_count += 1
+            continue
+
+        cache[src] = converted
+        image_tag["src"] = converted
+        converted_count += 1
+
+    modified_html = str(soup)
+
+    if minify:
+        try:
+            modified_html = minify_html.minify(
+                modified_html,
+                minify_css=True,
+                minify_js=True,
+                keep_comments=False,
+                keep_closing_tags=True,
+            )
+        except Exception as exc:
+            print(f"Warning: minify_html failed: {exc}")
+
+    print(
+        f"HTML optimization: {converted_count} images converted, "
+        f"{skipped_count} skipped"
+    )
+    return modified_html
+
 
 # ======================== COLOR UTILITIES FOR DYNAMIC THEMES ========================
 import colorsys
@@ -5806,6 +5952,19 @@ def main():
         # ========== SETTINGS (LAST) ==========
         st.markdown(f"## {get_text('settings')}")
         batch_size = st.slider(get_text('batch_size'), 10, 100, 50, help=get_text('batch_size_help'))
+        
+        # ========== HTML OPTIMIZATION SETTINGS (NEW) ==========
+        st.markdown("---")
+        st.markdown("### 🗜 HTML Report Optimization")
+        optimize_html_output = st.checkbox(
+            "Optimize HTML report (WebP, 50% scale, minify)",
+            value=st.session_state.get('optimize_html_output', True),
+            key="optimize_html_output_checkbox",
+            help="Convert embedded PNG icons to WebP at 50% scale and minify the HTML. "
+                 "Reduces report size from ~3 MB to ~500 KB. "
+                 "Disable only if you need maximum image quality or compatibility with very old browsers."
+        )
+        st.session_state.optimize_html_output = optimize_html_output
     
     st.image("logo.png", width=250)
     st.markdown("---")
@@ -6755,6 +6914,26 @@ def main():
                 design_theme,
                 reference_color_style
             )
+            
+            # ========== OPTIMIZE HTML REPORT (NEW) ==========
+            if st.session_state.get('optimize_html_output', True):
+                with st.spinner("🗜 Optimizing HTML report (WebP + minify)..."):
+                    original_size = len(html_report.encode('utf-8'))
+                    html_report = optimize_html_report(
+                        html_report,
+                        output_format="webp",
+                        quality=80,
+                        scale=0.5,
+                        minify=True,
+                    )
+                    optimized_size = len(html_report.encode('utf-8'))
+                    reduction = (1 - optimized_size / original_size) * 100 if original_size > 0 else 0
+                st.success(
+                    f"✅ Report optimized: "
+                    f"{original_size / 1024 / 1024:.2f} MB → "
+                    f"{optimized_size / 1024:.0f} KB "
+                    f"(−{reduction:.1f}%)"
+                )
             
             # Generate filename from journal abbreviation and article number (no datetime)
             def get_journal_abbreviation(journal_name: str) -> str:
